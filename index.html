@@ -765,11 +765,11 @@ function vendasFakePara(id) {
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
 async function carregarProdutos() {
   try {
-    const doc = await db.collection('config').doc('produtosSite').get();
+    const doc = await db.collection('config').doc('produtos').get();
     if (!doc.exists) { produtos = []; renderCatalogo(); return; }
     const lista = JSON.parse(doc.data().data || '[]');
-    // Produtos sob consulta (sem preço fixo) também aparecem — mostram "Sob consulta"
-    produtos = lista.filter(p => p.preco > 0 || p.sobConsulta).map(p => ({
+    // Só produtos com preço definido fazem sentido num checkout autônomo
+    produtos = lista.filter(p => p.preco > 0).map(p => ({
       ...p,
       categoria: p.categoria || inferirCategoria(p.nome),
     }));
