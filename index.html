@@ -652,33 +652,6 @@
           <input type="tel" id="ckWhatsapp" placeholder="(11) 99999-9999" required>
         </div>
 
-        <div class="form-group">
-          <label>Nome do(a) aniversariante</label>
-          <input type="text" id="ckNomeAniversariante" placeholder="Ex: Felipinho" required>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Idade</label>
-            <input type="text" id="ckIdade" placeholder="Ex: 1 ano">
-          </div>
-          <div class="form-group">
-            <label>Data da festa</label>
-            <input type="date" id="ckData">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Horário</label>
-          <input type="text" id="ckHora" placeholder="Ex: 15:00">
-        </div>
-        <div class="form-group">
-          <label>Local (endereço)</label>
-          <input type="text" id="ckLocal" placeholder="Endereço completo do evento">
-        </div>
-        <div class="form-group">
-          <label>Observações (opcional)</label>
-          <textarea id="ckObs" placeholder="Alguma personalização especial? Conte aqui..."></textarea>
-        </div>
-
         <button type="submit" class="btn-finalizar" id="btnFinalizarPedido">
           💬 Enviar pedido pelo WhatsApp
         </button>
@@ -765,7 +738,7 @@ function vendasFakePara(id) {
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
 async function carregarProdutos() {
   try {
-    const doc = await db.collection('config').doc('produtos').get();
+    const doc = await db.collection('config').doc('produtosSite').get();
     if (!doc.exists) { produtos = []; renderCatalogo(); return; }
     const lista = JSON.parse(doc.data().data || '[]');
     // Só produtos com preço definido fazem sentido num checkout autônomo
@@ -1077,14 +1050,8 @@ async function finalizarPedido() {
   const btn = document.getElementById('btnFinalizarPedido');
   const nomeComprador = document.getElementById('ckNomeComprador').value.trim();
   const whatsapp = document.getElementById('ckWhatsapp').value.trim();
-  const nomeAniversariante = document.getElementById('ckNomeAniversariante').value.trim();
-  const idade = document.getElementById('ckIdade').value.trim();
-  const dataFesta = document.getElementById('ckData').value;
-  const hora = document.getElementById('ckHora').value.trim();
-  const local = document.getElementById('ckLocal').value.trim();
-  const obsExtra = document.getElementById('ckObs').value.trim();
 
-  if (!nomeComprador || !whatsapp || !nomeAniversariante) {
+  if (!nomeComprador || !whatsapp) {
     showToast('Preencha os campos obrigatórios', 'error');
     return;
   }
@@ -1101,18 +1068,6 @@ async function finalizarPedido() {
   }).join('\n');
   const valorTotal = carrinho.reduce((s, i) => s + i.preco, 0);
 
-  // Monta a observação estruturada (mesmo formato "* Campo - Valor" do sistema de gestão)
-  const dataFestaFmt = dataFesta ? dataFesta.split('-').reverse().join('/') : '';
-  const obsEstruturada = [
-    `* Nome - ${nomeAniversariante}`,
-    idade ? `* Idade - ${idade}` : null,
-    dataFestaFmt ? `* Data - ${dataFestaFmt}` : null,
-    hora ? `* Hora - ${hora}` : null,
-    local ? `* Local (endereço completo) - ${local}` : null,
-    `* Número de WhatsApp para confirmação de presença - ${whatsapp}`,
-    obsExtra ? `* Observações adicionais - ${obsExtra}` : null,
-  ].filter(Boolean).join('\n');
-
   // Grava o pedido como pendente no Firestore — o sistema de gestão vai mostrar
   // isso nas Tarefas do Dia pra confirmação manual. NUNCA grava direto em `vendas`.
   try {
@@ -1124,7 +1079,7 @@ async function finalizarPedido() {
       whatsapp,
       valorTotal,
       itens: carrinho.map(i => ({ nome: i.nome, preco: i.preco, adicionais: i.adicionais || [] })),
-      obs: obsEstruturada,
+      obs: `* Número de WhatsApp para confirmação - ${whatsapp}`,
       criadoEm: new Date().toISOString(),
     });
   } catch (e) {
@@ -1132,15 +1087,12 @@ async function finalizarPedido() {
     // Não bloqueia o fluxo — o WhatsApp continua sendo a fonte de verdade do pedido
   }
 
-  // Monta a mensagem completa pro WhatsApp
+  // Monta a mensagem completa pro WhatsApp — detalhes do evento ficam pra combinar na conversa
   const mensagem = [
     `Olá! Gostaria de fazer um pedido:`,
     ``,
     produtoStr,
     `Total: ${BRL(valorTotal)}`,
-    ``,
-    `--- Dados do evento ---`,
-    obsEstruturada,
     ``,
     `Comprador: ${nomeComprador} (${whatsapp})`,
   ].join('\n');
