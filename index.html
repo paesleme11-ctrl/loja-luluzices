@@ -346,6 +346,19 @@
   .produto-descricao li { margin-bottom: 4px; }
 
   .produto-adicionais { margin-bottom: 24px; }
+  .produto-galeria-thumbs { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .produto-galeria-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
+  .produto-galeria-thumbs img.ativa, .produto-galeria-thumbs img:hover { opacity: 1; border-color: var(--rose); }
+  .produto-preco-original { font-size: 15px; color: var(--ink-muted); text-decoration: line-through; font-weight: 500; margin-left: 8px; }
+  .produto-preco-badge-promo { display: inline-block; background: var(--red, #e84040); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; margin-left: 6px; vertical-align: middle; }
+  .produto-crosssell { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .crosssell-titulo { font-size: 16px; font-weight: 600; margin-bottom: 14px; font-family: 'DM Sans', sans-serif; }
+  .crosssell-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+  .crosssell-item { flex-shrink: 0; width: 130px; cursor: pointer; }
+  .crosssell-thumb { width: 130px; height: 130px; border-radius: 10px; background: linear-gradient(135deg, var(--rose-light), var(--warm)); display: flex; align-items: center; justify-content: center; font-size: 32px; overflow: hidden; margin-bottom: 6px; }
+  .crosssell-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .crosssell-nome { font-size: 12.5px; font-weight: 500; line-height: 1.3; margin-bottom: 2px; }
+  .crosssell-preco { font-size: 13px; font-weight: 700; color: var(--rose); }
   .adicionais-titulo {
     font-size: 11.5px; font-weight: 700; color: var(--ink-muted);
     text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
@@ -854,10 +867,24 @@ function abrirProduto(id) {
   produtoAtual = p;
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
 
-  const temFoto = !!p.foto;
-  const thumbHtml = temFoto
-    ? `<img src="${p.foto}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;">`
+  const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
+  const thumbHtml = fotos.length
+    ? `<img src="${fotos[0]}" alt="${p.nome}" id="produtoImgPrincipal" style="width:100%;height:100%;object-fit:cover;">`
     : emojiPara(p.categoria);
+  const galeriaHtml = fotos.length > 1 ? `
+    <div class="produto-galeria-thumbs">
+      ${fotos.map((url,i) => `<img src="${url}" onclick="document.getElementById('produtoImgPrincipal').src='${url}'" class="${i===0?'ativa':''}">`).join('')}
+    </div>` : '';
+
+  const precoOriginal = p.preco;
+  let precoFinal = p.preco;
+  let promoHtml = '';
+  if (p.promoAtiva && p.promoValor > 0 && !p.sobConsulta) {
+    precoFinal = p.promoTipo === 'percentual'
+      ? p.preco * (1 - p.promoValor / 100)
+      : Math.max(p.preco - p.promoValor, 0);
+    promoHtml = `<span class="produto-preco-original">${BRL(precoOriginal)}</span> <span class="produto-preco-badge-promo">${p.promoTipo === 'percentual' ? p.promoValor + '% OFF' : 'Desconto ' + BRL(p.promoValor)}</span>`;
+  }
 
   const descricaoHtml = p.descricao
     ? p.descricao.replace(/\n/g, '<br>')
@@ -878,18 +905,42 @@ function abrirProduto(id) {
     </div>
   ` : '';
 
+  // Cross-sell: produtos do mesmo tema (se tiver) ou marcados manualmente na lista crossSell
+  const idsCrossManual = p.crossSell || [];
+  const doMesmoTema = p.temaId ? produtos.filter(x => x.temaId === p.temaId && x.id !== p.id) : [];
+  const crossIds = new Set([...idsCrossManual, ...doMesmoTema.map(x => x.id)]);
+  const crossProdutos = [...crossIds].map(cid => produtos.find(x => x.id === cid)).filter(Boolean);
+
+  const crossSellHtml = crossProdutos.length ? `
+    <div class="produto-crosssell">
+      <div class="crosssell-titulo">${p.temaId ? `Mais produtos do tema "${p.temaNome}"` : 'Você também pode gostar'}</div>
+      <div class="crosssell-scroll">
+        ${crossProdutos.map(cp => {
+          const cpFoto = (cp.fotos && cp.fotos[0]) || cp.foto;
+          return `<div class="crosssell-item" onclick="abrirProduto('${cp.id}')">
+            <div class="crosssell-thumb">${cpFoto ? `<img src="${cpFoto}">` : emojiPara(cp.categoria)}</div>
+            <div class="crosssell-nome">${cp.nome}</div>
+            <div class="crosssell-preco">${cp.sobConsulta ? 'Sob consulta' : BRL(cp.preco)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
   document.getElementById('produtoDetalheContainer').innerHTML = `
     <div class="produto-detalhe-thumb">${thumbHtml}</div>
+    ${galeriaHtml}
     <div class="produto-detalhe-info">
-      <div class="produto-categoria">${p.categoria}</div>
+      <div class="produto-categoria">${p.categoria}${p.temaNome ? ' · ' + p.temaNome : ''}</div>
       <h1>${p.nome}</h1>
-      <div class="produto-detalhe-preco" id="produtoDetalhePrecoTotal">${BRL(p.preco)}</div>
+      <div class="produto-detalhe-preco" id="produtoDetalhePrecoTotal">${BRL(precoFinal)} ${promoHtml}</div>
       <div class="produto-descricao">${descricaoHtml}</div>
       ${adicionaisHtml}
       <button class="btn-comprar" id="btnAdicionarCarrinho" onclick="adicionarAoCarrinhoComAdicionais('${p.id}')">
-        Adicionar ao carrinho — ${BRL(p.preco)}
+        Adicionar ao carrinho — ${BRL(precoFinal)}
       </button>
     </div>
+    ${crossSellHtml}
   `;
 
   document.getElementById('view-catalogo').classList.remove('active');
@@ -1150,6 +1201,630 @@ atualizarCarrinhoUI();
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { fecharCarrinho(); fecharCheckout(); }
 });
+</script>
+<!-- ═══════════ PAINEL ADMIN OCULTO ═══════════ -->
+<div id="adminOverlay" style="display:none;position:fixed;inset:0;background:#fdf6f0;z-index:9999;overflow-y:auto;">
+  <div id="adminLoginBox" style="max-width:360px;margin:80px auto;padding:32px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);text-align:center;">
+    <div style="font-size:32px;margin-bottom:8px;">🔒</div>
+    <h2 style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:16px;">Painel Admin</h2>
+    <input type="password" id="adminSenhaInput" placeholder="Senha" style="width:100%;padding:11px;border:1.5px solid #ecddd6;border-radius:9px;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')verificarSenhaAdmin()">
+    <button onclick="verificarSenhaAdmin()" style="width:100%;padding:12px;background:#e8546a;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
+    <p id="adminSenhaErro" style="display:none;color:#e84040;font-size:12px;margin-top:10px;">Senha incorreta.</p>
+  </div>
+
+  <div id="adminPainel" style="display:none;max-width:960px;margin:0 auto;padding:24px 16px 60px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+      <h1 style="font-family:'DM Serif Display',serif;font-size:22px;">🎀 Painel Admin — Luluzices</h1>
+      <button onclick="fecharAdmin()" style="background:#1a1214;color:#fff;border:none;padding:9px 16px;border-radius:100px;font-size:12.5px;font-weight:600;cursor:pointer;">✕ Fechar</button>
+    </div>
+
+    <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;border-bottom:1.5px solid #ecddd6;">
+      <div class="admin-tab active" data-atab="produtos" onclick="adminGoTab('produtos')">🛍️ Produtos</div>
+      <div class="admin-tab" data-atab="temas" onclick="adminGoTab('temas')">🎨 Temas</div>
+      <div class="admin-tab" data-atab="banners" onclick="adminGoTab('banners')">📣 Banners</div>
+      <div class="admin-tab" data-atab="cores" onclick="adminGoTab('cores')">🌈 Cores</div>
+      <div class="admin-tab" data-atab="logo" onclick="adminGoTab('logo')">🖼️ Logo</div>
+    </div>
+
+    <!-- PRODUTOS -->
+    <div class="admin-subpage active" id="atab-produtos">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <p style="font-size:12.5px;color:#9a8890;">Fotos (galeria), tema, promoção, adicionais e cross-sell.</p>
+        <button class="admin-btn-primary" onclick="adminNovoProduto()">+ Novo Produto</button>
+      </div>
+      <div id="adminProdutosGrid" class="admin-grid"></div>
+    </div>
+
+    <!-- TEMAS -->
+    <div class="admin-subpage" id="atab-temas">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <p style="font-size:12.5px;color:#9a8890;">Cadastre temas (ex: Bluey, Jardim Encantado, Toy Story) para organizar produtos e ativar cross-sell automático.</p>
+        <button class="admin-btn-primary" onclick="adminNovoTema()">+ Novo Tema</button>
+      </div>
+      <div id="adminTemasGrid" class="admin-grid"></div>
+    </div>
+
+    <!-- BANNERS -->
+    <div class="admin-subpage" id="atab-banners">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <p style="font-size:12.5px;color:#9a8890;">Slides do carrossel — cada um pode levar a uma categoria ou produto.</p>
+        <button class="admin-btn-primary" onclick="adminNovoBanner()">+ Novo Banner</button>
+      </div>
+      <div id="adminBannersGrid" class="admin-grid"></div>
+    </div>
+
+    <!-- CORES -->
+    <div class="admin-subpage" id="atab-cores">
+      <div class="admin-card" style="max-width:480px;">
+        <div class="admin-cor-row"><span>Cor Principal</span><input type="color" id="acorPrincipal" value="#e8546a" onchange="adminSalvarCores()"></div>
+        <div class="admin-cor-row"><span>Cor de Fundo</span><input type="color" id="acorFundo" value="#fdf6f0" onchange="adminSalvarCores()"></div>
+        <div class="admin-cor-row"><span>Cor dos Cards</span><input type="color" id="acorCard" value="#ffffff" onchange="adminSalvarCores()"></div>
+        <div class="admin-cor-row"><span>Cor do Texto</span><input type="color" id="acorTexto" value="#1a1214" onchange="adminSalvarCores()"></div>
+        <div class="admin-cor-row" style="border-bottom:none;"><span>Texto Secundário</span><input type="color" id="acorTextoMuted" value="#9a8890" onchange="adminSalvarCores()"></div>
+      </div>
+    </div>
+
+    <!-- LOGO -->
+    <div class="admin-subpage" id="atab-logo">
+      <div class="admin-card" style="max-width:420px;">
+        <div id="adminLogoPreview" style="height:70px;display:flex;align-items:center;justify-content:center;background:#fdf6f0;border-radius:9px;margin-bottom:12px;overflow:hidden;">
+          <span style="color:#9a8890;font-size:12px;">Sem logo</span>
+        </div>
+        <input type="text" id="alogoUrl" placeholder="Link da imagem da logo" oninput="adminPreviewLogo()" style="width:100%;padding:10px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;margin-bottom:10px;">
+        <button class="admin-btn-primary" onclick="adminSalvarLogo()" style="width:100%;">Salvar Logo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PRODUTO (admin) -->
+<div id="adminModalProduto" class="admin-modal-overlay">
+  <div class="admin-modal">
+    <div class="admin-modal-header"><span id="adminModalProdutoTitle">Novo Produto</span><button onclick="adminFecharModal('adminModalProduto')">✕</button></div>
+    <div class="admin-modal-body">
+      <div class="admin-field">
+        <label>Fotos (galeria)</label>
+        <div id="adminFotosGaleria" class="admin-fotos-galeria"></div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" id="aFotoNovaUrl" placeholder="Link da imagem" style="flex:1;">
+          <button type="button" class="admin-btn-ghost" onclick="adminAdicionarFoto()">+ Add</button>
+        </div>
+      </div>
+      <div class="admin-row2">
+        <div class="admin-field" style="position:relative;">
+          <label>Tema</label>
+          <input type="text" id="aTemaInput" placeholder="Buscar tema..." autocomplete="off" oninput="adminOnTemaInput()" onfocus="adminOnTemaInput()" onblur="setTimeout(adminFecharTemaSugestoes,150)">
+          <input type="hidden" id="aTemaId">
+          <div id="adminTemaSugestoes" class="admin-sugestoes"></div>
+        </div>
+        <div class="admin-field">
+          <label>Categoria</label>
+          <select id="aCategoria">
+            <option value="Aniversário">Aniversário</option>
+            <option value="Casamento">Casamento</option>
+            <option value="Debutante">Debutante</option>
+            <option value="Infantil">Infantil</option>
+            <option value="Chá de Bebê">Chá de Bebê</option>
+            <option value="Formatura">Formatura</option>
+          </select>
+        </div>
+      </div>
+      <div class="admin-field"><label>Nome do produto</label><input type="text" id="aNome" placeholder="Ex: Convite Interativo Animado"></div>
+
+      <div class="admin-check-row">
+        <label><input type="checkbox" id="aSobConsulta" onchange="adminToggleSobConsulta()"> Sem preço fixo (sob consulta via WhatsApp)</label>
+      </div>
+      <div class="admin-field" id="aPrecoGroup"><label>Preço (R$)</label><input type="number" id="aPreco" step="0.01" min="0"></div>
+
+      <div class="admin-check-row">
+        <label><input type="checkbox" id="aPromoAtiva" onchange="adminTogglePromo()"> Produto em promoção</label>
+      </div>
+      <div class="admin-row2" id="aPromoFields" style="display:none;">
+        <div class="admin-field"><label>Tipo de desconto</label>
+          <select id="aPromoTipo" onchange="adminTogglePromoTipo()">
+            <option value="percentual">Percentual (%)</option>
+            <option value="fixo">Valor fixo (R$)</option>
+          </select>
+        </div>
+        <div class="admin-field"><label id="aPromoValorLabel">Desconto (%)</label><input type="number" id="aPromoValor" step="0.01" min="0"></div>
+      </div>
+
+      <div class="admin-field"><label>Descrição</label><textarea id="aDescricao" rows="3"></textarea></div>
+
+      <div class="admin-field">
+        <label>Adicionais</label>
+        <div id="adminAdicionaisContainer"></div>
+        <button type="button" class="admin-btn-ghost" onclick="adminAddAdicionalLinha()">+ Adicionar opção extra</button>
+      </div>
+
+      <div class="admin-field">
+        <label>Cross-sell manual (além do que é automático por tema)</label>
+        <select id="aCrossSell" multiple style="min-height:80px;"></select>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalProduto')">Cancelar</button>
+      <button class="admin-btn-primary" onclick="adminSalvarProduto()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: TEMA (admin) -->
+<div id="adminModalTema" class="admin-modal-overlay">
+  <div class="admin-modal" style="max-width:400px;">
+    <div class="admin-modal-header"><span id="adminModalTemaTitle">Novo Tema</span><button onclick="adminFecharModal('adminModalTema')">✕</button></div>
+    <div class="admin-modal-body">
+      <div class="admin-field"><label>Nome do tema</label><input type="text" id="atNome" placeholder="Ex: Bluey"></div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalTema')">Cancelar</button>
+      <button class="admin-btn-primary" onclick="adminSalvarTema()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BANNER (admin) -->
+<div id="adminModalBanner" class="admin-modal-overlay">
+  <div class="admin-modal" style="max-width:420px;">
+    <div class="admin-modal-header"><span id="adminModalBannerTitle">Novo Banner</span><button onclick="adminFecharModal('adminModalBanner')">✕</button></div>
+    <div class="admin-modal-body">
+      <div class="admin-field"><label>Foto do banner</label><input type="text" id="abFotoUrl" placeholder="Link da imagem"></div>
+      <div class="admin-field"><label>Tag</label><input type="text" id="abTag" placeholder="Ex: Novidade"></div>
+      <div class="admin-field"><label>Título</label><input type="text" id="abTitulo"></div>
+      <div class="admin-field"><label>Subtítulo</label><input type="text" id="abSubtitulo"></div>
+      <div class="admin-row2">
+        <div class="admin-field"><label>Destino</label>
+          <select id="abTipoDestino" onchange="adminBannerDestinoChange()">
+            <option value="categoria">Categoria</option>
+            <option value="produto">Produto</option>
+          </select>
+        </div>
+        <div class="admin-field"><label id="abDestinoLabel">Categoria</label><select id="abDestino"></select></div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalBanner')">Cancelar</button>
+      <button class="admin-btn-primary" onclick="adminSalvarBanner()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .admin-tab { padding:9px 16px; font-size:12.5px; font-weight:600; color:#9a8890; cursor:pointer; border-bottom:2.5px solid transparent; margin-bottom:-1.5px; }
+  .admin-tab.active { color:#e8546a; border-bottom-color:#e8546a; }
+  .admin-subpage { display:none; }
+  .admin-subpage.active { display:block; }
+  .admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+  .admin-card-item { background:#fff; border:1px solid #ecddd6; border-radius:12px; overflow:hidden; }
+  .admin-card-thumb { aspect-ratio:1/1; background:linear-gradient(135deg,#f9dde1,#f5ebe0); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; }
+  .admin-card-thumb img { width:100%; height:100%; object-fit:cover; }
+  .admin-card-info { padding:8px 10px 10px; }
+  .admin-card-nome { font-size:12px; font-weight:600; margin-bottom:2px; }
+  .admin-card-sub { font-size:10.5px; color:#9a8890; margin-bottom:6px; }
+  .admin-card-actions { display:flex; gap:5px; }
+  .admin-card-actions button { flex:1; padding:5px; border:1px solid #ecddd6; background:#fff; border-radius:6px; font-size:10.5px; cursor:pointer; }
+  .admin-card { background:#fff; border-radius:14px; padding:20px; border:1px solid #ecddd6; }
+  .admin-cor-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #ecddd6; font-size:13px; }
+  .admin-cor-row input { width:44px; height:36px; border-radius:8px; border:1.5px solid #ecddd6; cursor:pointer; }
+  .admin-btn-primary { background:#e8546a; color:#fff; border:none; padding:9px 16px; border-radius:9px; font-size:12.5px; font-weight:700; cursor:pointer; }
+  .admin-btn-ghost { background:transparent; border:1.5px solid #ecddd6; color:#5a4a50; padding:8px 14px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer; }
+  .admin-modal-overlay { display:none; position:fixed; inset:0; background:rgba(26,18,20,0.5); z-index:10000; align-items:center; justify-content:center; padding:16px; }
+  .admin-modal-overlay.open { display:flex; }
+  .admin-modal { background:#fff; border-radius:14px; width:560px; max-width:100%; max-height:88vh; overflow-y:auto; }
+  .admin-modal-header { padding:16px 20px; border-bottom:1px solid #ecddd6; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:15px; }
+  .admin-modal-header button { background:none; border:none; font-size:17px; color:#9a8890; cursor:pointer; }
+  .admin-modal-body { padding:16px 20px; }
+  .admin-modal-footer { padding:14px 20px; border-top:1px solid #ecddd6; display:flex; justify-content:flex-end; gap:8px; }
+  .admin-field { margin-bottom:12px; }
+  .admin-field label { display:block; font-size:10.5px; font-weight:700; color:#9a8890; text-transform:uppercase; margin-bottom:5px; }
+  .admin-field input, .admin-field select, .admin-field textarea { width:100%; padding:9px 12px; border:1.5px solid #ecddd6; border-radius:9px; font-size:14px; font-family:'DM Sans',sans-serif; }
+  .admin-row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .admin-check-row { background:#fdf6f0; border-radius:9px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; }
+  .admin-check-row input { margin-right:8px; }
+  .admin-fotos-galeria { display:flex; flex-wrap:wrap; gap:6px; }
+  .admin-foto-item { position:relative; width:60px; height:60px; border-radius:8px; overflow:hidden; border:1.5px solid #ecddd6; }
+  .admin-foto-item img { width:100%; height:100%; object-fit:cover; }
+  .admin-foto-item button { position:absolute; top:1px; right:1px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; font-size:10px; cursor:pointer; }
+  .admin-sugestoes { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #e8546a; border-radius:9px; max-height:160px; overflow-y:auto; z-index:10; margin-top:3px; }
+  .admin-sugestoes.open { display:block; }
+  .admin-sugestoes div { padding:8px 12px; font-size:13px; cursor:pointer; }
+  .admin-sugestoes div:hover { background:#fdf6f0; }
+  .adicional-row-admin { display:flex; gap:6px; align-items:center; padding:6px 0; }
+  .adicional-row-admin input[type=text] { flex:2; }
+  .adicional-row-admin input[type=number] { flex:1; }
+  .adicional-row-admin button { background:none; border:none; color:#e84040; font-size:15px; }
+</style>
+
+<script>
+// ============================================================
+// PAINEL ADMIN OCULTO — acesso só via ?painel=luluzices2026admin
+// ============================================================
+const ADMIN_URL_KEY = 'luluzices2026admin';
+const ADMIN_SENHA = 'LzAdmin#2026';
+
+let temasSite = [];
+let bannersSite = [];
+let _fotosGaleriaAdmin = [];
+let _editandoProdutoIdx = null;
+let _editandoTemaIdx = null;
+let _editandoBannerIdx = null;
+
+function checarAcessoAdmin() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('painel') === ADMIN_URL_KEY) {
+    document.getElementById('adminOverlay').style.display = 'block';
+  }
+}
+
+function verificarSenhaAdmin() {
+  const val = document.getElementById('adminSenhaInput').value;
+  if (val === ADMIN_SENHA) {
+    document.getElementById('adminLoginBox').style.display = 'none';
+    document.getElementById('adminPainel').style.display = 'block';
+    adminCarregarTudo();
+  } else {
+    document.getElementById('adminSenhaErro').style.display = 'block';
+  }
+}
+function fecharAdmin() {
+  document.getElementById('adminOverlay').style.display = 'none';
+  document.getElementById('adminLoginBox').style.display = 'block';
+  document.getElementById('adminPainel').style.display = 'none';
+  document.getElementById('adminSenhaInput').value = '';
+  document.getElementById('adminSenhaErro').style.display = 'none';
+}
+
+function adminGoTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach(el => el.classList.toggle('active', el.dataset.atab === tab));
+  document.querySelectorAll('.admin-subpage').forEach(el => el.classList.remove('active'));
+  document.getElementById('atab-' + tab).classList.add('active');
+}
+
+function adminFecharModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function adminCarregarTudo() {
+  await Promise.all([carregarProdutos(), carregarTemas(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
+  adminRenderProdutos();
+  adminRenderTemas();
+  adminRenderBanners();
+}
+
+async function carregarTemas() {
+  try {
+    const doc = await db.collection('config').doc('temasSite').get();
+    temasSite = doc.exists ? JSON.parse(doc.data().data || '[]') : [];
+  } catch(e) { temasSite = []; }
+}
+async function salvarTemasRemote() {
+  try { await db.collection('config').doc('temasSite').set({ data: JSON.stringify(temasSite) }); } catch(e) {}
+}
+async function carregarBannersAdmin() {
+  try {
+    const doc = await db.collection('config').doc('bannersSite').get();
+    bannersSite = doc.exists ? JSON.parse(doc.data().data || '[]') : [];
+  } catch(e) { bannersSite = []; }
+}
+async function salvarBannersRemote() {
+  try { await db.collection('config').doc('bannersSite').set({ data: JSON.stringify(bannersSite) }); } catch(e) {}
+}
+async function carregarCoresAdmin() {
+  try {
+    const doc = await db.collection('config').doc('coresSite').get();
+    if (!doc.exists) return;
+    const c = doc.data();
+    if (c.principal) document.getElementById('acorPrincipal').value = c.principal;
+    if (c.fundo) document.getElementById('acorFundo').value = c.fundo;
+    if (c.card) document.getElementById('acorCard').value = c.card;
+    if (c.texto) document.getElementById('acorTexto').value = c.texto;
+    if (c.textoMuted) document.getElementById('acorTextoMuted').value = c.textoMuted;
+  } catch(e) {}
+}
+async function adminSalvarCores() {
+  const cores = {
+    principal: document.getElementById('acorPrincipal').value,
+    fundo: document.getElementById('acorFundo').value,
+    card: document.getElementById('acorCard').value,
+    texto: document.getElementById('acorTexto').value,
+    textoMuted: document.getElementById('acorTextoMuted').value,
+  };
+  try { await db.collection('config').doc('coresSite').set(cores); showToast('Cores salvas ✓','success'); } catch(e) {}
+}
+async function carregarLogoAdmin() {
+  try {
+    const doc = await db.collection('config').doc('logoSite').get();
+    if (doc.exists && doc.data().url) {
+      document.getElementById('alogoUrl').value = doc.data().url;
+      adminPreviewLogo();
+    }
+  } catch(e) {}
+}
+function adminPreviewLogo() {
+  const url = document.getElementById('alogoUrl').value.trim();
+  const el = document.getElementById('adminLogoPreview');
+  el.innerHTML = url ? `<img src="${url}" style="max-height:100%;">` : '<span style="color:#9a8890;font-size:12px;">Sem logo</span>';
+}
+async function adminSalvarLogo() {
+  const url = document.getElementById('alogoUrl').value.trim() || null;
+  try { await db.collection('config').doc('logoSite').set({ url }); showToast('Logo salva ✓','success'); } catch(e) {}
+}
+
+// ── PRODUTOS ──────────────────────────────────────────────────────────────────
+function adminRenderProdutos() {
+  const grid = document.getElementById('adminProdutosGrid');
+  if (!produtos.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto cadastrado.</p>'; return; }
+  grid.innerHTML = produtos.map((p, idx) => {
+    const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
+    return `<div class="admin-card-item">
+      <div class="admin-card-thumb">${fotos[0] ? `<img src="${fotos[0]}">` : '🎉'}</div>
+      <div class="admin-card-info">
+        <div class="admin-card-nome">${p.nome}</div>
+        <div class="admin-card-sub">${p.temaNome ? p.temaNome + ' · ' : ''}${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}${p.promoAtiva ? ' 🔥' : ''}</div>
+        <div class="admin-card-actions">
+          <button onclick="adminEditarProduto(${idx})">Editar</button>
+          <button onclick="adminExcluirProduto(${idx})">Excluir</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function adminToggleSobConsulta() {
+  document.getElementById('aPrecoGroup').style.display = document.getElementById('aSobConsulta').checked ? 'none' : 'block';
+}
+function adminTogglePromo() {
+  document.getElementById('aPromoFields').style.display = document.getElementById('aPromoAtiva').checked ? 'grid' : 'none';
+}
+function adminTogglePromoTipo() {
+  document.getElementById('aPromoValorLabel').textContent = document.getElementById('aPromoTipo').value === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)';
+}
+
+function adminRenderFotosGaleria() {
+  const el = document.getElementById('adminFotosGaleria');
+  el.innerHTML = _fotosGaleriaAdmin.length
+    ? _fotosGaleriaAdmin.map((url, i) => `<div class="admin-foto-item"><img src="${url}"><button onclick="adminRemoverFoto(${i})">✕</button></div>`).join('')
+    : '<p style="font-size:11.5px;color:#9a8890;">Nenhuma foto ainda.</p>';
+}
+function adminAdicionarFoto() {
+  const input = document.getElementById('aFotoNovaUrl');
+  const url = input.value.trim();
+  if (!url) return;
+  _fotosGaleriaAdmin.push(url);
+  input.value = '';
+  adminRenderFotosGaleria();
+}
+function adminRemoverFoto(i) { _fotosGaleriaAdmin.splice(i,1); adminRenderFotosGaleria(); }
+
+function adminOnTemaInput() {
+  const termo = document.getElementById('aTemaInput').value.trim().toLowerCase();
+  const el = document.getElementById('adminTemaSugestoes');
+  const lista = termo ? temasSite.filter(t => t.nome.toLowerCase().includes(termo)) : temasSite;
+  if (!lista.length) { el.innerHTML=''; el.classList.remove('open'); return; }
+  el.innerHTML = lista.map(t => `<div onmousedown="adminSelecionarTema('${t.id}','${t.nome.replace(/'/g,"\\'")}')">${t.nome}</div>`).join('');
+  el.classList.add('open');
+}
+function adminSelecionarTema(id, nome) {
+  document.getElementById('aTemaInput').value = nome;
+  document.getElementById('aTemaId').value = id;
+  adminFecharTemaSugestoes();
+}
+function adminFecharTemaSugestoes() {
+  const el = document.getElementById('adminTemaSugestoes');
+  if (el) { el.innerHTML=''; el.classList.remove('open'); }
+}
+
+function adminPopularCrossSell(idExcluir) {
+  const outros = produtos.filter(p => p.id !== idExcluir);
+  document.getElementById('aCrossSell').innerHTML = outros.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+}
+
+function adminAddAdicionalLinha(nome='', preco='') {
+  const c = document.getElementById('adminAdicionaisContainer');
+  const row = document.createElement('div');
+  row.className = 'adicional-row-admin';
+  row.innerHTML = `<input type="text" placeholder="Nome" value="${nome}" class="a-adic-nome"><input type="number" placeholder="Preço" step="0.01" value="${preco}" class="a-adic-preco"><button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  c.appendChild(row);
+}
+function adminColetarAdicionais() {
+  const rows = document.querySelectorAll('#adminAdicionaisContainer .adicional-row-admin');
+  const out = [];
+  rows.forEach(r => {
+    const nome = r.querySelector('.a-adic-nome').value.trim();
+    const preco = parseFloat(r.querySelector('.a-adic-preco').value) || 0;
+    if (nome) out.push({ id:'ad_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), nome, preco });
+  });
+  return out;
+}
+
+function adminNovoProduto() { adminAbrirModalProduto(null); }
+function adminEditarProduto(idx) { adminAbrirModalProduto(idx); }
+
+function adminAbrirModalProduto(idx) {
+  _editandoProdutoIdx = idx;
+  document.getElementById('adminAdicionaisContainer').innerHTML = '';
+  const editando = idx !== null ? produtos[idx] : null;
+  adminPopularCrossSell(editando?.id);
+  _fotosGaleriaAdmin = editando ? [...(editando.fotos || (editando.foto ? [editando.foto] : []))] : [];
+  adminRenderFotosGaleria();
+
+  if (editando) {
+    const p = editando;
+    document.getElementById('adminModalProdutoTitle').textContent = 'Editar Produto';
+    document.getElementById('aNome').value = p.nome || '';
+    document.getElementById('aCategoria').value = p.categoria || 'Aniversário';
+    document.getElementById('aPreco').value = p.preco || '';
+    document.getElementById('aDescricao').value = p.descricao || '';
+    document.getElementById('aSobConsulta').checked = !!p.sobConsulta;
+    document.getElementById('aTemaInput').value = p.temaNome || '';
+    document.getElementById('aTemaId').value = p.temaId || '';
+    document.getElementById('aPromoAtiva').checked = !!p.promoAtiva;
+    document.getElementById('aPromoTipo').value = p.promoTipo || 'percentual';
+    document.getElementById('aPromoValor').value = p.promoValor || '';
+    (p.adicionais || []).forEach(a => adminAddAdicionalLinha(a.nome, a.preco));
+    Array.from(document.getElementById('aCrossSell').options).forEach(o => o.selected = (p.crossSell||[]).includes(o.value));
+  } else {
+    document.getElementById('adminModalProdutoTitle').textContent = 'Novo Produto';
+    ['aNome','aPreco','aDescricao','aTemaInput','aTemaId','aPromoValor'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('aCategoria').value = 'Aniversário';
+    document.getElementById('aSobConsulta').checked = false;
+    document.getElementById('aPromoAtiva').checked = false;
+    document.getElementById('aPromoTipo').value = 'percentual';
+  }
+  adminToggleSobConsulta(); adminTogglePromo(); adminTogglePromoTipo();
+  document.getElementById('adminModalProduto').classList.add('open');
+}
+
+async function adminSalvarProduto() {
+  const nome = document.getElementById('aNome').value.trim();
+  const sobConsulta = document.getElementById('aSobConsulta').checked;
+  const preco = sobConsulta ? 0 : (parseFloat(document.getElementById('aPreco').value) || 0);
+  if (!nome) { showToast('Preencha o nome','error'); return; }
+  if (!sobConsulta && preco <= 0) { showToast('Informe um preço válido','error'); return; }
+
+  const temaId = document.getElementById('aTemaId').value || null;
+  const temaNomeDigitado = document.getElementById('aTemaInput').value.trim();
+  const temaValido = temaId && temasSite.some(t => t.id === temaId && t.nome === temaNomeDigitado);
+
+  const id = _editandoProdutoIdx !== null ? produtos[_editandoProdutoIdx].id : 'ps_' + Date.now();
+  const produtoData = {
+    id, nome,
+    categoria: document.getElementById('aCategoria').value,
+    preco, sobConsulta,
+    descricao: document.getElementById('aDescricao').value.trim(),
+    fotos: [..._fotosGaleriaAdmin],
+    foto: _fotosGaleriaAdmin[0] || null,
+    temaId: temaValido ? temaId : null,
+    temaNome: temaValido ? temaNomeDigitado : null,
+    promoAtiva: document.getElementById('aPromoAtiva').checked,
+    promoTipo: document.getElementById('aPromoTipo').value,
+    promoValor: parseFloat(document.getElementById('aPromoValor').value) || 0,
+    adicionais: sobConsulta ? [] : adminColetarAdicionais(),
+    crossSell: Array.from(document.getElementById('aCrossSell').selectedOptions).map(o => o.value),
+  };
+
+  if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = produtoData;
+  else produtos.push(produtoData);
+
+  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  adminRenderProdutos();
+  adminFecharModal('adminModalProduto');
+  showToast('Produto salvo ✓','success');
+}
+
+async function adminExcluirProduto(idx) {
+  if (!confirm(`Excluir "${produtos[idx].nome}"?`)) return;
+  produtos.splice(idx,1);
+  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  adminRenderProdutos();
+  showToast('Produto excluído','error');
+}
+
+// ── TEMAS ────────────────────────────────────────────────────────────────────
+function adminRenderTemas() {
+  const grid = document.getElementById('adminTemasGrid');
+  if (!temasSite.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum tema cadastrado.</p>'; return; }
+  grid.innerHTML = temasSite.map((t, idx) => `
+    <div class="admin-card-item">
+      <div class="admin-card-thumb">🎨</div>
+      <div class="admin-card-info">
+        <div class="admin-card-nome">${t.nome}</div>
+        <div class="admin-card-actions">
+          <button onclick="adminEditarTema(${idx})">Editar</button>
+          <button onclick="adminExcluirTema(${idx})">Excluir</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function adminNovoTema() { _editandoTemaIdx = null; document.getElementById('adminModalTemaTitle').textContent='Novo Tema'; document.getElementById('atNome').value=''; document.getElementById('adminModalTema').classList.add('open'); }
+function adminEditarTema(idx) { _editandoTemaIdx = idx; document.getElementById('adminModalTemaTitle').textContent='Editar Tema'; document.getElementById('atNome').value = temasSite[idx].nome; document.getElementById('adminModalTema').classList.add('open'); }
+async function adminSalvarTema() {
+  const nome = document.getElementById('atNome').value.trim();
+  if (!nome) { showToast('Preencha o nome do tema','error'); return; }
+  if (_editandoTemaIdx !== null) temasSite[_editandoTemaIdx].nome = nome;
+  else temasSite.push({ id: 'tema_'+Date.now(), nome });
+  await salvarTemasRemote();
+  adminRenderTemas();
+  adminFecharModal('adminModalTema');
+  showToast('Tema salvo ✓','success');
+}
+async function adminExcluirTema(idx) {
+  if (!confirm(`Excluir tema "${temasSite[idx].nome}"?`)) return;
+  temasSite.splice(idx,1);
+  await salvarTemasRemote();
+  adminRenderTemas();
+  showToast('Tema excluído','error');
+}
+
+// ── BANNERS ──────────────────────────────────────────────────────────────────
+function adminRenderBanners() {
+  const grid = document.getElementById('adminBannersGrid');
+  if (!bannersSite.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum banner cadastrado.</p>'; return; }
+  grid.innerHTML = bannersSite.map((b, idx) => `
+    <div class="admin-card-item">
+      <div class="admin-card-thumb">${b.foto ? `<img src="${b.foto}">` : '📣'}</div>
+      <div class="admin-card-info">
+        <div class="admin-card-nome">${b.titulo||'(sem título)'}</div>
+        <div class="admin-card-sub">${b.tipoDestino==='produto'?'→ produto':'→ '+ (b.destino||'—')}</div>
+        <div class="admin-card-actions">
+          <button onclick="adminEditarBanner(${idx})">Editar</button>
+          <button onclick="adminExcluirBanner(${idx})">Excluir</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+function adminBannerDestinoChange() {
+  const tipo = document.getElementById('abTipoDestino').value;
+  const sel = document.getElementById('abDestino');
+  const label = document.getElementById('abDestinoLabel');
+  if (tipo === 'categoria') {
+    label.textContent = 'Categoria';
+    const cats = [...new Set(produtos.map(p=>p.categoria).filter(Boolean))];
+    sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  } else {
+    label.textContent = 'Produto';
+    sel.innerHTML = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+  }
+}
+function adminNovoBanner() { _editandoBannerIdx = null; document.getElementById('adminModalBannerTitle').textContent='Novo Banner'; ['abFotoUrl','abTag','abTitulo','abSubtitulo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('abTipoDestino').value='categoria'; adminBannerDestinoChange(); document.getElementById('adminModalBanner').classList.add('open'); }
+function adminEditarBanner(idx) {
+  _editandoBannerIdx = idx;
+  const b = bannersSite[idx];
+  document.getElementById('adminModalBannerTitle').textContent='Editar Banner';
+  document.getElementById('abFotoUrl').value = b.foto||'';
+  document.getElementById('abTag').value = b.tag||'';
+  document.getElementById('abTitulo').value = b.titulo||'';
+  document.getElementById('abSubtitulo').value = b.subtitulo||'';
+  document.getElementById('abTipoDestino').value = b.tipoDestino||'categoria';
+  adminBannerDestinoChange();
+  document.getElementById('abDestino').value = b.destino||'';
+  document.getElementById('adminModalBanner').classList.add('open');
+}
+async function adminSalvarBanner() {
+  const titulo = document.getElementById('abTitulo').value.trim();
+  if (!titulo) { showToast('Preencha o título','error'); return; }
+  const id = _editandoBannerIdx !== null ? bannersSite[_editandoBannerIdx].id : 'bn_'+Date.now();
+  const data = {
+    id, foto: document.getElementById('abFotoUrl').value.trim()||null,
+    tag: document.getElementById('abTag').value.trim(),
+    titulo, subtitulo: document.getElementById('abSubtitulo').value.trim(),
+    tipoDestino: document.getElementById('abTipoDestino').value,
+    destino: document.getElementById('abDestino').value,
+  };
+  if (_editandoBannerIdx !== null) bannersSite[_editandoBannerIdx] = data;
+  else bannersSite.push(data);
+  await salvarBannersRemote();
+  adminRenderBanners();
+  adminFecharModal('adminModalBanner');
+  showToast('Banner salvo ✓','success');
+}
+async function adminExcluirBanner(idx) {
+  if (!confirm('Excluir este banner?')) return;
+  bannersSite.splice(idx,1);
+  await salvarBannersRemote();
+  adminRenderBanners();
+  showToast('Banner excluído','error');
+}
+
+checarAcessoAdmin();
 </script>
 </body>
 </html>
