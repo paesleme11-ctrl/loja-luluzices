@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e8546a">
+<title>Luluzices — Finalizar seu Convite</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root {
+    --rose: #e8546a; --rose-light: #f9dde1; --rose-dark: #c23650;
+    --cream: #fdf6f0; --warm: #f5ebe0; --ink: #1a1214;
+    --ink-light: #5a4a50; --ink-muted: #9a8890; --green: #3dab7a;
+    --border: #ecddd6; --radius: 16px; --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  h1, h2 { font-family: 'DM Serif Display', serif; font-weight: 400; }
+  .card {
+    background: #fff; border-radius: var(--radius); box-shadow: 0 8px 32px rgba(26,18,20,0.1);
+    width: 460px; max-width: 100%; padding: 32px 26px; text-align: center;
+  }
+  .card .icon { font-size: 42px; margin-bottom: 12px; }
+  .card h1 { font-size: 22px; margin-bottom: 8px; }
+  .card p.sub { font-size: 13.5px; color: var(--ink-light); margin-bottom: 24px; line-height: 1.6; }
+
+  .step { display: none; }
+  .step.active { display: block; }
+
+  .form-group { margin-bottom: 16px; text-align: left; }
+  .form-group label {
+    display: block; font-size: 11.5px; font-weight: 700; color: var(--ink-muted);
+    text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px;
+  }
+  input[type="text"], input[type="tel"], textarea {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif; font-size: 16px; color: var(--ink); outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus { border-color: var(--rose); }
+  textarea { min-height: 70px; resize: vertical; }
+
+  .btn-primary {
+    width: 100%; background: var(--rose); color: #fff; border: none; border-radius: var(--radius-sm);
+    padding: 15px; font-size: 15px; font-weight: 700; margin-top: 6px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--rose-dark); }
+  .btn-primary:disabled { background: var(--ink-muted); cursor: not-allowed; }
+
+  .btn-whatsapp { background: var(--green); }
+  .btn-whatsapp:hover { background: #2f8d64; }
+
+  .intro-emoji { font-size: 48px; margin-bottom: 14px; }
+  .form-titulo-destaque {
+    font-size: 15px; color: var(--ink); margin-bottom: 22px; line-height: 1.6;
+    background: var(--rose-light); padding: 14px 16px; border-radius: var(--radius-sm);
+    text-align: left;
+  }
+
+  .voltar-passo {
+    display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--ink-muted);
+    margin-top: 14px; cursor: pointer;
+  }
+  .voltar-passo:hover { color: var(--rose); }
+
+  @media (max-width: 480px) {
+    .card { padding: 26px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- PASSO 1: Nome + WhatsApp -->
+  <div class="step active" id="step-1">
+    <div class="intro-emoji">🎈</div>
+    <h1>Vamos finalizar seu pedido!</h1>
+    <p class="sub">Antes de tudo, me conta rapidinho quem é você.</p>
+
+    <div class="form-group">
+      <label>Seu nome</label>
+      <input type="text" id="fNome" placeholder="Nome completo" required>
+    </div>
+    <div class="form-group">
+      <label>Seu WhatsApp</label>
+      <input type="tel" id="fWhatsapp" placeholder="(11) 99999-9999" required>
+    </div>
+
+    <button class="btn-primary" onclick="irParaPasso2()">Continuar →</button>
+  </div>
+
+  <!-- PASSO 2: Formulário do evento -->
+  <div class="step" id="step-2">
+    <div class="intro-emoji">✨</div>
+    <p class="form-titulo-destaque">
+      Perfeito✨ Agora só peço algumas informações finais para montar seu convite personalizado:
+    </p>
+
+    <div class="form-group">
+      <label>Nome do(a) aniversariante</label>
+      <input type="text" id="fNomeAniversariante" placeholder="Ex: Felipinho" required>
+    </div>
+    <div class="form-group">
+      <label>Idade</label>
+      <input type="text" id="fIdade" placeholder="Ex: 1 aninho">
+    </div>
+    <div class="form-group">
+      <label>Data</label>
+      <input type="text" id="fData" placeholder="Ex: 15/09/2026">
+    </div>
+    <div class="form-group">
+      <label>Hora</label>
+      <input type="text" id="fHora" placeholder="Ex: 15h">
+    </div>
+    <div class="form-group">
+      <label>Local (endereço completo + link do Google Maps)</label>
+      <textarea id="fLocal" placeholder="Endereço completo e, se possível, o link do Google Maps"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Número de WhatsApp para confirmação de presença</label>
+      <input type="tel" id="fWhatsappConfirmacao" placeholder="(11) 99999-9999">
+    </div>
+    <div class="form-group">
+      <label>Sugestões de Presentes</label>
+      <textarea id="fPresentes" placeholder="Alguma sugestão para os convidados?"></textarea>
+    </div>
+
+    <button class="btn-primary btn-whatsapp" id="btnSalvar" onclick="finalizarFormulario()">💬 Salvar Informações</button>
+    <div class="voltar-passo" onclick="voltarPasso1()">← Voltar</div>
+  </div>
+
+  <!-- PASSO 3: Confirmação -->
+  <div class="step" id="step-3">
+    <div class="intro-emoji">💌</div>
+    <h1>Tudo certo!</h1>
+    <p class="sub" style="margin-bottom:8px;">
+      💖✨ Agora já vamos iniciar a criação do seu convite personalizado! Em até 1 dia útil você recebe o modelo para aprovação 🪄💌
+    </p>
+    <p class="sub">E caso tenha alguma dúvida, é só entrar em contato com a gente!</p>
+  </div>
+
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
+  authDomain: "luluzices-4254e.firebaseapp.com",
+  projectId: "luluzices-4254e",
+  storageBucket: "luluzices-4254e.firebasestorage.app",
+  messagingSenderId: "328419813225",
+  appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const NUMERO_WHATSAPP = '5521981357208';
+
+let dadosComprador = { nome: '', whatsapp: '' };
+
+function irParaPasso2() {
+  const nome = document.getElementById('fNome').value.trim();
+  const whatsapp = document.getElementById('fWhatsapp').value.trim();
+  if (!nome || !whatsapp) {
+    alert('Preencha seu nome e WhatsApp para continuar.');
+    return;
+  }
+  dadosComprador = { nome, whatsapp };
+  document.getElementById('step-1').classList.remove('active');
+  document.getElementById('step-2').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function voltarPasso1() {
+  document.getElementById('step-2').classList.remove('active');
+  document.getElementById('step-1').classList.add('active');
+}
+
+async function finalizarFormulario() {
+  const nomeAniversariante = document.getElementById('fNomeAniversariante').value.trim();
+  const idade = document.getElementById('fIdade').value.trim();
+  const data = document.getElementById('fData').value.trim();
+  const hora = document.getElementById('fHora').value.trim();
+  const local = document.getElementById('fLocal').value.trim();
+  const whatsappConfirmacao = document.getElementById('fWhatsappConfirmacao').value.trim();
+  const presentes = document.getElementById('fPresentes').value.trim();
+
+  if (!nomeAniversariante) {
+    alert('Preencha ao menos o nome do(a) aniversariante.');
+    return;
+  }
+
+  const btn = document.getElementById('btnSalvar');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  // Monta a observação estruturada no formato que o sistema de gestão já reconhece
+  const obsEstruturada = [
+    `* Nome - ${nomeAniversariante}`,
+    idade ? `* Idade - ${idade}` : null,
+    data ? `* Data - ${data}` : null,
+    hora ? `* Hora - ${hora}` : null,
+    local ? `* Local (endereço completo) - ${local}` : null,
+    whatsappConfirmacao ? `* Número de WhatsApp para confirmação de presença - ${whatsappConfirmacao}` : null,
+    presentes ? `* Sugestões de Presentes - ${presentes}` : null,
+  ].filter(Boolean).join('\n');
+
+  // Salva no Firestore como registro (não bloqueia o fluxo se falhar)
+  try {
+    const docId = 'form_' + Date.now();
+    await db.collection('pedidos_pendentes').doc(docId).set({
+      id: docId,
+      status: 'pendente',
+      origem: 'formulario_externo',
+      nomeComprador: dadosComprador.nome,
+      whatsapp: dadosComprador.whatsapp,
+      obs: obsEstruturada,
+      criadoEm: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.warn('Não foi possível registrar no sistema (segue para o WhatsApp normalmente):', e);
+  }
+
+  // Monta a mensagem pro WhatsApp da Luluzices
+  const mensagem = [
+    `Olá! Preenchi o formulário do convite. Seguem os dados:`,
+    ``,
+    `Comprador: ${dadosComprador.nome} (${dadosComprador.whatsapp})`,
+    ``,
+    obsEstruturada,
+  ].join('\n');
+
+  const linkWhats = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensagem)}`;
+
+  // Mostra a página de agradecimento e depois abre o WhatsApp
+  document.getElementById('step-2').classList.remove('active');
+  document.getElementById('step-3').classList.add('active');
+  window.scrollTo(0, 0);
+
+  setTimeout(() => {
+    window.location.href = linkWhats;
+  }, 900);
+}
+</script>
+</body>
+</html>
