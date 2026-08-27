@@ -503,6 +503,69 @@
     font-size: 11.5px; color: var(--ink-muted);
   }
 
+  /* ── ETAPAS DO CHECKOUT (multi-step) ────────────────────────────────────── */
+  .checkout-etapa { display: none; }
+  .checkout-etapa.active { display: block; }
+
+  .voltar-etapa {
+    text-align: center; margin-top: 14px; font-size: 12.5px; font-weight: 600;
+    color: var(--ink-muted); cursor: pointer;
+  }
+  .voltar-etapa:hover { color: var(--rose); }
+
+  /* Como funciona */
+  .como-funciona-texto {
+    font-size: 14px; color: var(--ink); line-height: 1.6; margin-bottom: 20px;
+  }
+  .como-funciona-texto > p { margin-bottom: 16px; }
+  .como-funciona-importante {
+    background: var(--cream); border-radius: var(--radius-sm);
+    padding: 14px 16px; border-left: 3px solid var(--rose);
+  }
+  .como-funciona-importante-titulo {
+    font-weight: 700; font-size: 13px; margin-bottom: 8px; color: var(--ink);
+  }
+  .como-funciona-importante ul { margin: 0; padding-left: 18px; }
+  .como-funciona-importante li {
+    font-size: 12.5px; color: var(--ink-light); margin-bottom: 6px; line-height: 1.5;
+  }
+
+  /* Forma de pagamento */
+  .pagamento-titulo {
+    font-size: 15px; font-weight: 700; text-align: center; margin-bottom: 16px; color: var(--ink);
+  }
+  .btn-pagamento {
+    width: 100%; display: flex; align-items: center; gap: 14px;
+    background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer; text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .btn-pagamento:hover { border-color: var(--rose); background: var(--rose-light); }
+  .btn-pagamento-icon { font-size: 26px; flex-shrink: 0; }
+  .btn-pagamento-texto { display: flex; flex-direction: column; font-size: 13px; }
+  .btn-pagamento-texto strong { font-size: 15px; color: var(--ink); margin-bottom: 2px; }
+  .btn-pagamento-texto span { color: var(--ink-muted); font-size: 12px; }
+
+  /* Pix */
+  .pix-box, .cartao-box { text-align: center; margin-bottom: 18px; }
+  .pix-icon, .cartao-icon { font-size: 44px; margin-bottom: 10px; }
+  .pix-instrucao { font-size: 13.5px; color: var(--ink-light); line-height: 1.6; margin-bottom: 16px; }
+  .pix-chave-box {
+    background: var(--cream); border-radius: var(--radius-sm); border: 1.5px dashed var(--rose);
+    padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 14px;
+  }
+  .pix-chave-box span { font-size: 13.5px; font-weight: 600; color: var(--ink); word-break: break-all; }
+  .pix-copiar-btn {
+    background: var(--rose); color: #fff; border: none; border-radius: 100px;
+    padding: 7px 14px; font-size: 12px; font-weight: 700; flex-shrink: 0; cursor: pointer;
+  }
+  .pix-valor {
+    font-size: 22px; font-weight: 700; color: var(--rose); text-align: center;
+  }
+  .btn-whats-confirmar { background: var(--green); }
+  .btn-whats-confirmar:hover { background: #2f8d64; }
+
   /* ── TOAST ───────────────────────────────────────────────────────────────── */
   .toast {
     position: fixed; bottom: 24px; left: 50%;
@@ -649,27 +712,107 @@
 <div class="modal-overlay" id="checkoutOverlay">
   <div class="checkout-modal">
     <div class="checkout-header">
-      <h2>Finalizar Pedido</h2>
+      <h2 id="checkoutHeaderTitulo">Finalizar Pedido</h2>
       <button class="checkout-close" onclick="fecharCheckout()">✕</button>
     </div>
     <div class="checkout-body">
-      <div class="checkout-resumo" id="checkoutResumo"></div>
 
-      <form id="checkoutForm" onsubmit="event.preventDefault(); finalizarPedido();">
-        <div class="form-group">
-          <label>Seu nome</label>
-          <input type="text" id="ckNomeComprador" placeholder="Nome de quem está comprando" required>
-        </div>
-        <div class="form-group">
-          <label>Seu WhatsApp</label>
-          <input type="tel" id="ckWhatsapp" placeholder="(11) 99999-9999" required>
+      <!-- ETAPA 1: DADOS DO CLIENTE -->
+      <div class="checkout-etapa active" id="checkout-etapa-dados">
+        <div class="checkout-resumo" id="checkoutResumo"></div>
+
+        <form id="checkoutForm" onsubmit="event.preventDefault(); irParaComoFunciona();">
+          <div class="form-group">
+            <label>Seu nome</label>
+            <input type="text" id="ckNomeComprador" placeholder="Nome de quem está comprando" required>
+          </div>
+          <div class="form-group">
+            <label>Seu WhatsApp</label>
+            <input type="tel" id="ckWhatsapp" placeholder="(11) 99999-9999" required>
+          </div>
+
+          <button type="submit" class="btn-finalizar" id="btnFinalizarPedido">
+            Continuar →
+          </button>
+        </form>
+      </div>
+
+      <!-- ETAPA 2: COMO FUNCIONA -->
+      <div class="checkout-etapa" id="checkout-etapa-como-funciona">
+        <div class="como-funciona-texto">
+          <p>✨ Após a confirmação do pagamento, em <strong>1 dia útil</strong> você recebe o convite para aprovação (nome, data, hora, endereço, etc.). Após sua aprovação, finalizamos o convite.</p>
+
+          <div class="como-funciona-importante">
+            <div class="como-funciona-importante-titulo">📌 Importante:</div>
+            <ul>
+              <li>O pagamento não é reembolsável.</li>
+              <li>O prazo de entrega começa a contar após o envio de todas as informações necessárias.</li>
+              <li>As informações devem ser enviadas em até <strong>7 dias</strong> após o pagamento do sinal. Após esse prazo, o pedido será cancelado sem reembolso.</li>
+              <li>Em caso de desistência o pagamento não será reembolsado.</li>
+            </ul>
+          </div>
         </div>
 
-        <button type="submit" class="btn-finalizar" id="btnFinalizarPedido">
-          💬 Enviar pedido pelo WhatsApp
+        <button class="btn-finalizar" onclick="irParaPagamento()">Entendi, continuar →</button>
+        <div class="voltar-etapa" onclick="voltarParaDados()">← Voltar</div>
+      </div>
+
+      <!-- ETAPA 3: FORMA DE PAGAMENTO -->
+      <div class="checkout-etapa" id="checkout-etapa-pagamento">
+        <div class="checkout-resumo" id="checkoutResumoPagamento"></div>
+
+        <p class="pagamento-titulo">Como você prefere pagar?</p>
+
+        <button class="btn-pagamento btn-pagamento-pix" onclick="selecionarPagamento('pix')">
+          <span class="btn-pagamento-icon">💠</span>
+          <span class="btn-pagamento-texto">
+            <strong>Pix</strong>
+            <span>Pagamento instantâneo</span>
+          </span>
         </button>
-        <div class="checkout-selo">✅ Confirmação e pagamento direto com a gente</div>
-      </form>
+
+        <button class="btn-pagamento btn-pagamento-cartao" onclick="selecionarPagamento('cartao')">
+          <span class="btn-pagamento-icon">💳</span>
+          <span class="btn-pagamento-texto">
+            <strong>Cartão</strong>
+            <span>Combinamos direto no WhatsApp</span>
+          </span>
+        </button>
+
+        <div class="voltar-etapa" onclick="voltarParaComoFunciona()">← Voltar</div>
+      </div>
+
+      <!-- ETAPA 4a: PIX -->
+      <div class="checkout-etapa" id="checkout-etapa-pix">
+        <div class="pix-box">
+          <div class="pix-icon">💠</div>
+          <p class="pix-instrucao">Faça o Pix usando a chave abaixo e depois clique em <strong>"Já paguei"</strong> para enviar o comprovante:</p>
+          <div class="pix-chave-box">
+            <span id="pixChaveTexto">luuluzices@gmail.com</span>
+            <button class="pix-copiar-btn" onclick="copiarChavePix()">📋 Copiar</button>
+          </div>
+          <div class="pix-valor" id="pixValorTexto"></div>
+        </div>
+
+        <button class="btn-finalizar btn-whats-confirmar" onclick="finalizarPedido('pix')">
+          ✓ Já paguei — Enviar comprovante
+        </button>
+        <div class="voltar-etapa" onclick="voltarParaPagamento()">← Voltar</div>
+      </div>
+
+      <!-- ETAPA 4b: CARTÃO -->
+      <div class="checkout-etapa" id="checkout-etapa-cartao">
+        <div class="cartao-box">
+          <div class="cartao-icon">💳</div>
+          <p class="pix-instrucao">Vamos combinar o pagamento no cartão direto pelo WhatsApp — é rapidinho!</p>
+        </div>
+
+        <button class="btn-finalizar btn-whats-confirmar" onclick="finalizarPedido('cartao')">
+          💬 Continuar no WhatsApp
+        </button>
+        <div class="voltar-etapa" onclick="voltarParaPagamento()">← Voltar</div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1059,12 +1202,15 @@ function fecharCarrinho() {
 }
 
 // ── Checkout ───────────────────────────────────────────────────────────────
+const CHAVE_PIX = 'luuluzices@gmail.com';
+let pagamentoEscolhido = null;
+
 function abrirCheckout() {
   if (carrinho.length === 0) return;
   fecharCarrinho();
 
   const total = carrinho.reduce((s, i) => s + i.preco, 0);
-  document.getElementById('checkoutResumo').innerHTML = `
+  const resumoHtml = `
     ${carrinho.map(item => `
       <div class="checkout-resumo-item">
         <span>${item.nome}</span>
@@ -1076,12 +1222,68 @@ function abrirCheckout() {
       <span>${BRL(total)}</span>
     </div>
   `;
+  document.getElementById('checkoutResumo').innerHTML = resumoHtml;
+  document.getElementById('checkoutResumoPagamento').innerHTML = resumoHtml;
 
+  irParaEtapa('dados');
   document.getElementById('checkoutOverlay').classList.add('open');
 }
 
 function fecharCheckout() {
   document.getElementById('checkoutOverlay').classList.remove('open');
+}
+
+/** Troca a etapa visível do modal de checkout, sem perder os dados já preenchidos */
+function irParaEtapa(nome) {
+  document.querySelectorAll('.checkout-etapa').forEach(el => el.classList.remove('active'));
+  document.getElementById('checkout-etapa-' + nome).classList.add('active');
+
+  const titulos = {
+    dados: 'Finalizar Pedido',
+    'como-funciona': 'Como funciona seu pedido',
+    pagamento: 'Forma de pagamento',
+    pix: 'Pagamento via Pix',
+    cartao: 'Pagamento no Cartão',
+  };
+  document.getElementById('checkoutHeaderTitulo').textContent = titulos[nome] || 'Finalizar Pedido';
+}
+
+function irParaComoFunciona() {
+  const nomeComprador = document.getElementById('ckNomeComprador').value.trim();
+  const whatsapp = document.getElementById('ckWhatsapp').value.trim();
+  if (!nomeComprador || !whatsapp) {
+    showToast('Preencha os campos obrigatórios', 'error');
+    return;
+  }
+  irParaEtapa('como-funciona');
+}
+
+function voltarParaDados() { irParaEtapa('dados'); }
+
+function irParaPagamento() { irParaEtapa('pagamento'); }
+
+function voltarParaComoFunciona() { irParaEtapa('como-funciona'); }
+
+function selecionarPagamento(tipo) {
+  pagamentoEscolhido = tipo;
+  if (tipo === 'pix') {
+    const total = carrinho.reduce((s, i) => s + i.preco, 0);
+    document.getElementById('pixChaveTexto').textContent = CHAVE_PIX;
+    document.getElementById('pixValorTexto').textContent = BRL(total);
+    irParaEtapa('pix');
+  } else {
+    irParaEtapa('cartao');
+  }
+}
+
+function voltarParaPagamento() { irParaEtapa('pagamento'); }
+
+function copiarChavePix() {
+  navigator.clipboard.writeText(CHAVE_PIX).then(() => {
+    showToast('Chave Pix copiada ✓', 'success');
+  }).catch(() => {
+    showToast('Não foi possível copiar automaticamente', 'error');
+  });
 }
 
 /** Monta o texto de observações no formato reconhecido pelo parser do sistema de gestão */
@@ -1097,18 +1299,16 @@ function montarObsEstruturada(dados) {
   return linhas.join('\n');
 }
 
-async function finalizarPedido() {
-  const btn = document.getElementById('btnFinalizarPedido');
+async function finalizarPedido(meioPagamento) {
+  const btnId = meioPagamento === 'pix' ? null : null; // botões já identificados via onclick, sem precisar de id fixo
   const nomeComprador = document.getElementById('ckNomeComprador').value.trim();
   const whatsapp = document.getElementById('ckWhatsapp').value.trim();
 
   if (!nomeComprador || !whatsapp) {
     showToast('Preencha os campos obrigatórios', 'error');
+    irParaEtapa('dados');
     return;
   }
-
-  btn.disabled = true;
-  btn.textContent = 'Preparando pedido...';
 
   // Monta o resumo do pedido (produtos + adicionais + total)
   const produtoStr = carrinho.map(i => {
@@ -1118,6 +1318,8 @@ async function finalizarPedido() {
     return `• ${i.nome}${adicionaisTxt} — ${BRL(i.preco)}`;
   }).join('\n');
   const valorTotal = carrinho.reduce((s, i) => s + i.preco, 0);
+
+  const meioPagamentoTexto = meioPagamento === 'pix' ? 'Pix' : 'Cartão';
 
   // Grava o pedido como pendente no Firestore — o sistema de gestão vai mostrar
   // isso nas Tarefas do Dia pra confirmação manual. NUNCA grava direto em `vendas`.
@@ -1129,8 +1331,9 @@ async function finalizarPedido() {
       nomeComprador,
       whatsapp,
       valorTotal,
+      meioPagamento: meioPagamentoTexto,
       itens: carrinho.map(i => ({ nome: i.nome, preco: i.preco, adicionais: i.adicionais || [] })),
-      obs: `* Número de WhatsApp para confirmação - ${whatsapp}`,
+      obs: `* Meio de pagamento - ${meioPagamentoTexto}\n* Número de WhatsApp para confirmação - ${whatsapp}`,
       criadoEm: new Date().toISOString(),
     });
   } catch (e) {
@@ -1139,14 +1342,20 @@ async function finalizarPedido() {
   }
 
   // Monta a mensagem completa pro WhatsApp — detalhes do evento ficam pra combinar na conversa
-  const mensagem = [
+  const mensagemLinhas = [
     `Olá! Gostaria de fazer um pedido:`,
     ``,
     produtoStr,
     `Total: ${BRL(valorTotal)}`,
     ``,
-    `Comprador: ${nomeComprador} (${whatsapp})`,
-  ].join('\n');
+    `Forma de pagamento: ${meioPagamentoTexto}`,
+  ];
+  if (meioPagamento === 'pix') {
+    mensagemLinhas.push(`✅ Já realizei o pagamento via Pix e vou enviar o comprovante.`);
+  }
+  mensagemLinhas.push(``, `Comprador: ${nomeComprador} (${whatsapp})`);
+
+  const mensagem = mensagemLinhas.join('\n');
 
   // Número de WhatsApp da Luluzices que recebe os pedidos
   const numeroLuluzices = '5521981357208';
@@ -1160,8 +1369,7 @@ async function finalizarPedido() {
       carrinho = [];
       atualizarCarrinhoUI();
       fecharCheckout();
-      btn.disabled = false;
-      btn.textContent = '💬 Enviar pedido pelo WhatsApp';
+      irParaEtapa('dados');
     }, 800);
   }, 600);
 }
