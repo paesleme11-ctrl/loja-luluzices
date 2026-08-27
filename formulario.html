@@ -123,7 +123,7 @@
     </div>
     <div class="form-group">
       <label>Local (endereço completo + link do Google Maps)</label>
-      <textarea id="fLocal" placeholder="Endereço completo e, se possível, o link do Google Maps"></textarea>
+      <textarea id="fLocal" placeholder="Endereço completo e o link do Google Maps (obrigatório)" required></textarea>
     </div>
     <div class="form-group">
       <label>Número de WhatsApp para confirmação de presença</label>
@@ -131,7 +131,7 @@
     </div>
     <div class="form-group">
       <label>Sugestões de Presentes</label>
-      <textarea id="fPresentes" placeholder="Alguma sugestão para os convidados?"></textarea>
+      <textarea id="fPresentes" placeholder="Ex: Roupas: tam 3, Calçados: nº 22, Brinquedos"></textarea>
     </div>
 
     <button class="btn-primary btn-whatsapp" id="btnSalvar" onclick="finalizarFormulario()">💬 Salvar Informações</button>
@@ -195,6 +195,10 @@ async function finalizarFormulario() {
 
   if (!nomeAniversariante) {
     alert('Preencha ao menos o nome do(a) aniversariante.');
+    return;
+  }
+  if (!local) {
+    alert('O endereço completo com o link do Google Maps é obrigatório.');
     return;
   }
 
