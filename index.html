@@ -747,7 +747,7 @@
             <ul>
               <li>O pagamento não é reembolsável.</li>
               <li>O prazo de entrega começa a contar após o envio de todas as informações necessárias.</li>
-              <li>As informações devem ser enviadas em até <strong>7 dias</strong> após o pagamento. Após esse prazo, o pedido será cancelado sem reembolso.</li>
+              <li>As informações devem ser enviadas em até <strong>7 dias</strong> após o pagamento do sinal. Após esse prazo, o pedido será cancelado sem reembolso.</li>
               <li>Em caso de desistência o pagamento não será reembolsado.</li>
             </ul>
           </div>
@@ -1438,8 +1438,14 @@ document.addEventListener('keydown', (e) => {
     <div class="admin-subpage active" id="atab-produtos">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
         <p style="font-size:12.5px;color:#9a8890;">Fotos (galeria), tema, promoção, adicionais e cross-sell.</p>
-        <button class="admin-btn-primary" onclick="adminNovoProduto()">+ Novo Produto</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="admin-btn-ghost" onclick="adminBaixarModeloCSV()">⬇ Baixar modelo CSV</button>
+          <button class="admin-btn-ghost" onclick="document.getElementById('adminCsvInput').click()">📤 Importar CSV</button>
+          <input type="file" id="adminCsvInput" accept=".csv" style="display:none;" onchange="adminImportarCSV(event)">
+          <button class="admin-btn-primary" onclick="adminNovoProduto()">+ Novo Produto</button>
+        </div>
       </div>
+      <div id="adminCsvStatus" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:9px;font-size:12.5px;"></div>
       <div id="adminProdutosGrid" class="admin-grid"></div>
     </div>
 
@@ -1609,8 +1615,8 @@ document.addEventListener('keydown', (e) => {
   .admin-card-info { padding:8px 10px 10px; }
   .admin-card-nome { font-size:12px; font-weight:600; margin-bottom:2px; }
   .admin-card-sub { font-size:10.5px; color:#9a8890; margin-bottom:6px; }
-  .admin-card-actions { display:flex; gap:5px; }
-  .admin-card-actions button { flex:1; padding:5px; border:1px solid #ecddd6; background:#fff; border-radius:6px; font-size:10.5px; cursor:pointer; }
+  .admin-card-actions { display:flex; gap:4px; flex-wrap:wrap; }
+  .admin-card-actions button { flex:1; min-width:44px; padding:5px 3px; border:1px solid #ecddd6; background:#fff; border-radius:6px; font-size:9.5px; cursor:pointer; }
   .admin-card { background:#fff; border-radius:14px; padding:20px; border:1px solid #ecddd6; }
   .admin-cor-row { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #ecddd6; font-size:13px; }
   .admin-cor-row input { width:44px; height:36px; border-radius:8px; border:1.5px solid #ecddd6; cursor:pointer; }
@@ -1757,6 +1763,132 @@ async function adminSalvarLogo() {
 }
 
 // ── PRODUTOS ──────────────────────────────────────────────────────────────────
+// ── IMPORTAÇÃO EM MASSA VIA CSV ──────────────────────────────────────────────
+// Colunas esperadas (nessa ordem): nome, categoria, tema, preco, foto, descricao
+// - "tema" é opcional: se o nome não existir ainda na lista de Temas, ele é criado automaticamente
+// - "foto" é opcional: aceita um link de imagem (a primeira foto vira a capa)
+// - Produtos com preço 0 ou vazio entram como "sob consulta"
+
+function adminBaixarModeloCSV() {
+  const linhas = [
+    ['nome','categoria','tema','preco','foto','descricao'],
+    ['Convite Interativo Bluey','Infantil','Bluey','120,00','https://exemplo.com/bluey.jpg','Convite animado com o tema Bluey'],
+    ['Convite Safári','Aniversário','Safári','95,00','','Convite com tema safári, sem foto ainda'],
+  ];
+  const csv = linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'modelo-produtos-luluzices.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Parser simples de CSV que respeita aspas e vírgulas dentro de campos entre aspas */
+function adminParseCSV(texto) {
+  const linhas = [];
+  let linhaAtual = [], campoAtual = '', dentroAspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i], prox = texto[i+1];
+    if (dentroAspas) {
+      if (c === '"' && prox === '"') { campoAtual += '"'; i++; }
+      else if (c === '"') { dentroAspas = false; }
+      else { campoAtual += c; }
+    } else {
+      if (c === '"') dentroAspas = true;
+      else if (c === ',') { linhaAtual.push(campoAtual); campoAtual = ''; }
+      else if (c === '\r') { /* ignora */ }
+      else if (c === '\n') { linhaAtual.push(campoAtual); linhas.push(linhaAtual); linhaAtual = []; campoAtual = ''; }
+      else campoAtual += c;
+    }
+  }
+  if (campoAtual || linhaAtual.length) { linhaAtual.push(campoAtual); linhas.push(linhaAtual); }
+  return linhas.filter(l => l.some(c => c.trim() !== ''));
+}
+
+function adminMostrarStatusCSV(msg, tipo) {
+  const el = document.getElementById('adminCsvStatus');
+  el.style.display = 'block';
+  el.style.background = tipo === 'erro' ? '#fde2e2' : (tipo === 'aviso' ? '#fef3dc' : '#d4f0e4');
+  el.style.color = tipo === 'erro' ? '#c0392b' : (tipo === 'aviso' ? '#7a5200' : '#1e6b48');
+  el.innerHTML = msg;
+}
+
+async function adminImportarCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const texto = await file.text();
+  const linhas = adminParseCSV(texto);
+  if (linhas.length < 2) { adminMostrarStatusCSV('O arquivo parece vazio ou sem produtos.', 'erro'); event.target.value = ''; return; }
+
+  const cabecalho = linhas[0].map(h => h.trim().toLowerCase());
+  const idxNome = cabecalho.indexOf('nome');
+  const idxCategoria = cabecalho.indexOf('categoria');
+  const idxTema = cabecalho.indexOf('tema');
+  const idxPreco = cabecalho.indexOf('preco');
+  const idxFoto = cabecalho.indexOf('foto');
+  const idxDescricao = cabecalho.indexOf('descricao');
+
+  if (idxNome === -1) {
+    adminMostrarStatusCSV('A coluna "nome" é obrigatória no CSV. Baixe o modelo e confira os nomes das colunas.', 'erro');
+    event.target.value = '';
+    return;
+  }
+
+  let importados = 0, comAvisoTema = 0, ignorados = 0;
+
+  linhas.slice(1).forEach(linha => {
+    const nome = (linha[idxNome] || '').trim();
+    if (!nome) { ignorados++; return; }
+
+    const categoria = idxCategoria >= 0 ? (linha[idxCategoria] || '').trim() : '';
+    const temaNomeCsv = idxTema >= 0 ? (linha[idxTema] || '').trim() : '';
+    const precoTexto = idxPreco >= 0 ? (linha[idxPreco] || '').trim() : '';
+    const preco = parseFloat(precoTexto.replace(',', '.')) || 0;
+    const foto = idxFoto >= 0 ? (linha[idxFoto] || '').trim() : '';
+    const descricao = idxDescricao >= 0 ? (linha[idxDescricao] || '').trim() : '';
+
+    // Resolve o tema: usa um existente com o mesmo nome, ou cria um novo automaticamente
+    let temaId = null, temaNome = null;
+    if (temaNomeCsv) {
+      let tema = temasSite.find(t => t.nome.toLowerCase() === temaNomeCsv.toLowerCase());
+      if (!tema) {
+        tema = { id: 'tema_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), nome: temaNomeCsv };
+        temasSite.push(tema);
+        comAvisoTema++;
+      }
+      temaId = tema.id; temaNome = tema.nome;
+    }
+
+    produtos.push({
+      id: 'ps_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      nome, categoria: categoria || 'Aniversário',
+      preco, sobConsulta: preco <= 0,
+      descricao,
+      fotos: foto ? [foto] : [],
+      foto: foto || null,
+      temaId, temaNome,
+      promoAtiva: false, promoTipo: 'percentual', promoValor: 0,
+      adicionais: [], crossSell: [],
+    });
+    importados++;
+  });
+
+  try {
+    await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) });
+    if (comAvisoTema > 0) await salvarTemasRemote();
+  } catch(e) { console.warn(e); }
+
+  adminRenderProdutos();
+  adminRenderTemas();
+
+  let msg = `✓ ${importados} produto${importados===1?'':'s'} importado${importados===1?'':'s'} com sucesso.`;
+  if (comAvisoTema > 0) msg += ` ${comAvisoTema} tema${comAvisoTema===1?'':'s'} novo${comAvisoTema===1?'':'s'} criado${comAvisoTema===1?'':'s'} automaticamente.`;
+  if (ignorados > 0) msg += ` ${ignorados} linha${ignorados===1?'':'s'} ignorada${ignorados===1?'':'s'} por falta de nome.`;
+  adminMostrarStatusCSV(msg, ignorados > 0 ? 'aviso' : 'sucesso');
+  event.target.value = '';
+}
+
 function adminRenderProdutos() {
   const grid = document.getElementById('adminProdutosGrid');
   if (!produtos.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto cadastrado.</p>'; return; }
@@ -1769,6 +1901,7 @@ function adminRenderProdutos() {
         <div class="admin-card-sub">${p.temaNome ? p.temaNome + ' · ' : ''}${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}${p.promoAtiva ? ' 🔥' : ''}</div>
         <div class="admin-card-actions">
           <button onclick="adminEditarProduto(${idx})">Editar</button>
+          <button onclick="adminDuplicarProduto(${idx})">Duplicar</button>
           <button onclick="adminExcluirProduto(${idx})">Excluir</button>
         </div>
       </div>
@@ -1846,18 +1979,27 @@ function adminColetarAdicionais() {
 function adminNovoProduto() { adminAbrirModalProduto(null); }
 function adminEditarProduto(idx) { adminAbrirModalProduto(idx); }
 
-function adminAbrirModalProduto(idx) {
-  _editandoProdutoIdx = idx;
+/** Abre o modal já preenchido com os dados de um produto existente, mas em modo
+ * "criação" — ao salvar, gera um produto novo em vez de sobrescrever o original.
+ * Poupa o trabalho de digitar tudo de novo quando os produtos são parecidos. */
+function adminDuplicarProduto(idx) {
+  adminAbrirModalProduto(idx, /* comoNovoDuplicado */ true);
+}
+
+function adminAbrirModalProduto(idx, comoNovoDuplicado) {
+  // No modo duplicado, carrega os dados do produto em idx, mas trata como "novo"
+  // (sem editar o original) — _editandoProdutoIdx fica null pra salvar como item novo.
+  _editandoProdutoIdx = comoNovoDuplicado ? null : idx;
   document.getElementById('adminAdicionaisContainer').innerHTML = '';
   const editando = idx !== null ? produtos[idx] : null;
-  adminPopularCrossSell(editando?.id);
+  adminPopularCrossSell(comoNovoDuplicado ? null : editando?.id);
   _fotosGaleriaAdmin = editando ? [...(editando.fotos || (editando.foto ? [editando.foto] : []))] : [];
   adminRenderFotosGaleria();
 
   if (editando) {
     const p = editando;
-    document.getElementById('adminModalProdutoTitle').textContent = 'Editar Produto';
-    document.getElementById('aNome').value = p.nome || '';
+    document.getElementById('adminModalProdutoTitle').textContent = comoNovoDuplicado ? 'Duplicar Produto' : 'Editar Produto';
+    document.getElementById('aNome').value = comoNovoDuplicado ? (p.nome ? p.nome + ' (Cópia)' : '') : (p.nome || '');
     document.getElementById('aCategoria').value = p.categoria || 'Aniversário';
     document.getElementById('aPreco').value = p.preco || '';
     document.getElementById('aDescricao').value = p.descricao || '';
@@ -1868,6 +2010,8 @@ function adminAbrirModalProduto(idx) {
     document.getElementById('aPromoTipo').value = p.promoTipo || 'percentual';
     document.getElementById('aPromoValor').value = p.promoValor || '';
     (p.adicionais || []).forEach(a => adminAddAdicionalLinha(a.nome, a.preco));
+    // No modo duplicado, o próprio produto original ainda deve poder ser escolhido
+    // como cross-sell do novo — por isso adminPopularCrossSell(null) acima.
     Array.from(document.getElementById('aCrossSell').options).forEach(o => o.selected = (p.crossSell||[]).includes(o.value));
   } else {
     document.getElementById('adminModalProdutoTitle').textContent = 'Novo Produto';
