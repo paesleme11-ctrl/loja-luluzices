@@ -73,6 +73,27 @@
     position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
     color: var(--ink-muted); font-size: 15px; pointer-events: none;
   }
+  .busca-sugestoes {
+    display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: #fff; border-radius: 12px; box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.15));
+    max-height: 280px; overflow-y: auto; z-index: 50;
+  }
+  .busca-sugestoes.open { display: block; }
+  .busca-sugestao-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; cursor: pointer; font-size: 13.5px; color: var(--ink);
+    border-bottom: 1px solid var(--border);
+  }
+  .busca-sugestao-item:last-child { border-bottom: none; }
+  .busca-sugestao-item:hover, .busca-sugestao-item.ativa { background: var(--cream); }
+  .busca-sugestao-thumb {
+    width: 32px; height: 32px; border-radius: 7px; flex-shrink: 0; overflow: hidden;
+    background: linear-gradient(135deg, var(--rose-light), var(--warm));
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+  .busca-sugestao-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .busca-sugestao-nome { font-weight: 600; }
+  .busca-sugestao-count { font-size: 11px; color: var(--ink-muted); margin-left: auto; }
   .header-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   .btn-carrinho {
     position: relative;
@@ -250,6 +271,13 @@
     color: var(--ink-muted);
   }
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { line-height: 1.6; }
+  .btn-whatsapp-tema-personalizado {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--green, #3dab7a); color: #fff;
+    padding: 12px 22px; border-radius: 100px; font-size: 13.5px; font-weight: 700;
+    margin-top: 18px; text-decoration: none;
+  }
 
   /* ── LOADING ─────────────────────────────────────────────────────────────── */
   .loading-produtos {
@@ -633,9 +661,12 @@
 <header>
   <div class="header-top">
     <div class="logo">🎈 Lulu</div>
-    <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Buscar convites, temas..." oninput="onSearchInput()">
+    <div class="search-bar" style="position:relative;">
+      <input type="text" id="searchInput" placeholder="Qual tema você procura?" autocomplete="off"
+             oninput="onSearchInput()" onfocus="onSearchInput()" onblur="setTimeout(fecharSugestoesBusca, 150)"
+             onkeydown="onSearchKeydown(event)">
       <span class="search-icon">🔍</span>
+      <div id="buscaSugestoes" class="busca-sugestoes"></div>
     </div>
     <div class="header-actions">
       <button class="btn-carrinho" onclick="abrirCarrinho()">
@@ -970,9 +1001,75 @@ function filtrarCategoria(cat) {
   renderCatalogo();
 }
 
+let sugestaoBuscaIndex = -1;
+
 function onSearchInput() {
   termoBusca = document.getElementById('searchInput').value.trim().toLowerCase();
+  renderSugestoesBusca();
   renderCatalogo();
+}
+
+/** Lista de temas únicos existentes no catálogo, com contagem de produtos e uma foto de exemplo */
+function getTemasDisponiveis() {
+  const mapa = {};
+  produtos.forEach(p => {
+    const nomeTema = p.temaNome || p.categoria;
+    if (!nomeTema) return;
+    if (!mapa[nomeTema]) mapa[nomeTema] = { nome: nomeTema, count: 0, foto: null };
+    mapa[nomeTema].count++;
+    if (!mapa[nomeTema].foto && p.foto) mapa[nomeTema].foto = p.foto;
+  });
+  return Object.values(mapa);
+}
+
+function renderSugestoesBusca() {
+  const el = document.getElementById('buscaSugestoes');
+  sugestaoBuscaIndex = -1;
+  if (!termoBusca) { el.innerHTML = ''; el.classList.remove('open'); return; }
+
+  const temas = getTemasDisponiveis().filter(t => t.nome.toLowerCase().includes(termoBusca));
+  if (!temas.length) { el.innerHTML = ''; el.classList.remove('open'); return; }
+
+  el.innerHTML = temas.slice(0, 8).map(t => `
+    <div class="busca-sugestao-item" onmousedown="selecionarSugestaoBusca('${t.nome.replace(/'/g,"\\'")}')">
+      <div class="busca-sugestao-thumb">${t.foto ? `<img src="${t.foto}">` : '🎨'}</div>
+      <span class="busca-sugestao-nome">${t.nome}</span>
+      <span class="busca-sugestao-count">${t.count} modelo${t.count === 1 ? '' : 's'}</span>
+    </div>`).join('');
+  el.classList.add('open');
+}
+
+function selecionarSugestaoBusca(nomeTema) {
+  document.getElementById('searchInput').value = nomeTema;
+  termoBusca = nomeTema.toLowerCase();
+  fecharSugestoesBusca();
+  renderCatalogo();
+}
+
+function fecharSugestoesBusca() {
+  const el = document.getElementById('buscaSugestoes');
+  if (el) { el.innerHTML = ''; el.classList.remove('open'); }
+}
+
+function onSearchKeydown(event) {
+  const el = document.getElementById('buscaSugestoes');
+  const itens = el.querySelectorAll('.busca-sugestao-item');
+  if (!itens.length) return;
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    sugestaoBuscaIndex = Math.min(sugestaoBuscaIndex + 1, itens.length - 1);
+    itens.forEach((it, i) => it.classList.toggle('ativa', i === sugestaoBuscaIndex));
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    sugestaoBuscaIndex = Math.max(sugestaoBuscaIndex - 1, 0);
+    itens.forEach((it, i) => it.classList.toggle('ativa', i === sugestaoBuscaIndex));
+  } else if (event.key === 'Enter' && sugestaoBuscaIndex >= 0) {
+    event.preventDefault();
+    itens[sugestaoBuscaIndex].dispatchEvent(new Event('mousedown'));
+  } else if (event.key === 'Escape') {
+    fecharSugestoesBusca();
+  }
 }
 
 function scrollParaCategorias() {
@@ -980,19 +1077,41 @@ function scrollParaCategorias() {
   document.querySelector('.categorias-section')?.scrollIntoView({ behavior: 'smooth' });
 }
 
+/** Monta o link do WhatsApp para pedir um tema personalizado que não foi encontrado na busca */
+function linkWhatsAppTemaPersonalizado(termo) {
+  const numeroLuluzices = '5521981357208';
+  const msg = `Olá! Procurei o tema "${termo}" no site mas não encontrei. Vocês fazem convite personalizado nesse tema?`;
+  return `https://wa.me/${numeroLuluzices}?text=${encodeURIComponent(msg)}`;
+}
+
 function renderCatalogo() {
   const grid = document.getElementById('catalogoGrid');
   let lista = categoriaAtiva === 'todas' ? produtos : produtos.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
-    lista = lista.filter(p => p.nome.toLowerCase().includes(termoBusca) || p.categoria.toLowerCase().includes(termoBusca));
+    lista = lista.filter(p =>
+      p.nome.toLowerCase().includes(termoBusca) ||
+      p.categoria.toLowerCase().includes(termoBusca) ||
+      (p.temaNome && p.temaNome.toLowerCase().includes(termoBusca))
+    );
   }
 
   if (lista.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state">
-        <div class="icon">🎈</div>
-        <p>Nenhum produto encontrado.</p>
-      </div>`;
+    if (termoBusca) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <p><strong>Tema não encontrado</strong><br>Não temos "${document.getElementById('searchInput').value.trim()}" pronto ainda, mas podemos criar um convite personalizado pra você!</p>
+          <a href="${linkWhatsAppTemaPersonalizado(document.getElementById('searchInput').value.trim())}" target="_blank" class="btn-whatsapp-tema-personalizado">
+            💬 Pedir tema personalizado
+          </a>
+        </div>`;
+    } else {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🎈</div>
+          <p>Nenhum produto encontrado.</p>
+        </div>`;
+    }
     return;
   }
 
