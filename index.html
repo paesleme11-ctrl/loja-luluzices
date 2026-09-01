@@ -928,8 +928,8 @@ async function carregarProdutos() {
     const doc = await db.collection('config').doc('produtosSite').get();
     if (!doc.exists) { produtos = []; renderCatalogo(); return; }
     const lista = JSON.parse(doc.data().data || '[]');
-    // Só produtos com preço definido fazem sentido num checkout autônomo
-    produtos = lista.filter(p => p.preco > 0).map(p => ({
+    // Só produtos ativos e com preço definido (ou sob consulta) aparecem no site público
+    produtos = lista.filter(p => (p.preco > 0 || p.sobConsulta) && p.ativo !== false).map(p => ({
       ...p,
       categoria: p.categoria || inferirCategoria(p.nome),
     }));
@@ -1551,6 +1551,17 @@ document.addEventListener('keydown', (e) => {
           <button onclick="adminExcluirSelecionadosMassa()" style="background:#e84040;color:#fff;border:none;padding:7px 12px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">🗑 Excluir selecionados</button>
         </div>
       </div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <input type="text" id="adminBuscaProduto" placeholder="🔍 Buscar por nome ou tema..." oninput="adminRenderProdutos()" style="flex:2;min-width:200px;padding:9px 12px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;">
+        <select id="adminFiltroCategoria" onchange="adminRenderProdutos()" style="flex:1;min-width:150px;padding:9px 12px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;">
+          <option value="">Todas as categorias</option>
+        </select>
+        <select id="adminFiltroStatus" onchange="adminRenderProdutos()" style="flex:1;min-width:150px;padding:9px 12px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;">
+          <option value="">Todos os status</option>
+          <option value="ativos">Só ativos</option>
+          <option value="inativos">Só inativos</option>
+        </select>
+      </div>
       <div id="adminProdutosGrid" class="admin-grid"></div>
     </div>
 
@@ -1739,6 +1750,12 @@ document.addEventListener('keydown', (e) => {
   .admin-subpage.active { display:block; }
   .admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
   .admin-card-item { background:#fff; border:1px solid #ecddd6; border-radius:12px; overflow:hidden; position:relative; }
+  .admin-card-inativo { opacity:0.55; }
+  .admin-card-tag-inativo {
+    position:absolute; top:8px; right:8px; z-index:5;
+    background:#1a1214; color:#fff; font-size:9px; font-weight:700;
+    padding:2px 8px; border-radius:100px; text-transform:uppercase; letter-spacing:0.4px;
+  }
   .admin-card-checkbox { position:absolute; top:8px; left:8px; z-index:5; background:rgba(255,255,255,0.9); border-radius:6px; padding:3px; display:flex; }
   .admin-card-checkbox input { width:16px; height:16px; cursor:pointer; margin:0; }
   .admin-card-thumb { aspect-ratio:1/1; background:linear-gradient(135deg,#f9dde1,#f5ebe0); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; }
@@ -2055,28 +2072,89 @@ async function adminExcluirSelecionadosMassa() {
   showToast(`${qtd} produto${qtd===1?'':'s'} excluído${qtd===1?'':'s'}`, 'error');
 }
 
+function adminPopularFiltroCategorias() {
+  const sel = document.getElementById('adminFiltroCategoria');
+  if (!sel) return;
+  const valorAtual = sel.value;
+  const categorias = [...new Set(produtos.map(p => p.categoria).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todas as categorias</option>' + categorias.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = valorAtual;
+}
+
 function adminRenderProdutos() {
+  adminPopularFiltroCategorias();
+
   const grid = document.getElementById('adminProdutosGrid');
   if (!produtos.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto cadastrado.</p>'; return; }
-  grid.innerHTML = produtos.map((p, idx) => {
+
+  const busca = (document.getElementById('adminBuscaProduto')?.value || '').trim().toLowerCase();
+  const categoriaFiltro = document.getElementById('adminFiltroCategoria')?.value || '';
+  const statusFiltro = document.getElementById('adminFiltroStatus')?.value || '';
+
+  const filtrados = produtos.filter(p => {
+    if (busca) {
+      const alvo = `${p.nome || ''} ${p.temaNome || ''}`.toLowerCase();
+      if (!alvo.includes(busca)) return false;
+    }
+    if (categoriaFiltro && p.categoria !== categoriaFiltro) return false;
+    const ativo = p.ativo !== false; // ausência do campo = ativo (compatibilidade com produtos antigos)
+    if (statusFiltro === 'ativos' && !ativo) return false;
+    if (statusFiltro === 'inativos' && ativo) return false;
+    return true;
+  });
+
+  if (!filtrados.length) {
+    grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto encontrado com esse filtro.</p>';
+    return;
+  }
+
+  grid.innerHTML = filtrados.map((p) => {
     const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
     const marcado = produtosSelecionadosMassa.has(p.id);
-    return `<div class="admin-card-item">
+    const ativo = p.ativo !== false;
+    return `<div class="admin-card-item ${ativo ? '' : 'admin-card-inativo'}">
       <label class="admin-card-checkbox">
         <input type="checkbox" ${marcado ? 'checked' : ''} onchange="adminToggleSelecaoMassa('${p.id}', this.checked)">
       </label>
+      ${!ativo ? '<span class="admin-card-tag-inativo">Inativo</span>' : ''}
       <div class="admin-card-thumb">${fotos[0] ? `<img src="${fotos[0]}">` : '🎉'}</div>
       <div class="admin-card-info">
         <div class="admin-card-nome">${p.nome}</div>
         <div class="admin-card-sub">${p.temaNome ? p.temaNome + ' · ' : ''}${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}${p.promoAtiva ? ' 🔥' : ''}</div>
         <div class="admin-card-actions">
-          <button onclick="adminEditarProduto(${idx})">Editar</button>
-          <button onclick="adminDuplicarProduto(${idx})">Duplicar</button>
-          <button onclick="adminExcluirProduto(${idx})">Excluir</button>
+          <button onclick="adminEditarProdutoPorId('${p.id}')">Editar</button>
+          <button onclick="adminDuplicarProdutoPorId('${p.id}')">Duplicar</button>
+        </div>
+        <div class="admin-card-actions" style="margin-top:5px;">
+          <button onclick="adminToggleAtivoProduto('${p.id}')">${ativo ? '⏸ Desativar' : '▶ Ativar'}</button>
+          <button onclick="adminExcluirProdutoPorId('${p.id}')">Excluir</button>
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+/** Ativa/desativa um produto sem excluí-lo — produtos inativos somem do site público mas continuam no admin */
+async function adminToggleAtivoProduto(id) {
+  const p = produtos.find(x => x.id === id);
+  if (!p) return;
+  p.ativo = p.ativo === false ? true : false;
+  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  adminRenderProdutos();
+  showToast(p.ativo === false ? 'Produto desativado' : 'Produto ativado ✓', p.ativo === false ? 'error' : 'success');
+}
+
+function adminEditarProdutoPorId(id) {
+  const idx = produtos.findIndex(p => p.id === id);
+  if (idx >= 0) adminAbrirModalProduto(idx);
+}
+function adminDuplicarProdutoPorId(id) {
+  const idx = produtos.findIndex(p => p.id === id);
+  if (idx >= 0) adminAbrirModalProduto(idx, true);
+}
+async function adminExcluirProdutoPorId(id) {
+  const idx = produtos.findIndex(p => p.id === id);
+  if (idx >= 0) await adminExcluirProduto(idx);
 }
 
 function adminToggleSobConsulta() {
