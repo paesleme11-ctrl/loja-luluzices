@@ -1015,7 +1015,10 @@ function getTemasDisponiveis() {
   produtos.forEach(p => {
     const nomeTema = p.temaNome || p.categoria;
     if (!nomeTema) return;
-    if (!mapa[nomeTema]) mapa[nomeTema] = { nome: nomeTema, count: 0, foto: null };
+    if (!mapa[nomeTema]) {
+      const temaCadastrado = p.temaId ? temasSite.find(t => t.id === p.temaId) : null;
+      mapa[nomeTema] = { nome: nomeTema, count: 0, foto: null, palavrasChave: temaCadastrado?.palavrasChave || [] };
+    }
     mapa[nomeTema].count++;
     if (!mapa[nomeTema].foto && p.foto) mapa[nomeTema].foto = p.foto;
   });
@@ -1027,7 +1030,10 @@ function renderSugestoesBusca() {
   sugestaoBuscaIndex = -1;
   if (!termoBusca) { el.innerHTML = ''; el.classList.remove('open'); return; }
 
-  const temas = getTemasDisponiveis().filter(t => t.nome.toLowerCase().includes(termoBusca));
+  const temas = getTemasDisponiveis().filter(t =>
+    t.nome.toLowerCase().includes(termoBusca) ||
+    t.palavrasChave.some(pc => pc.includes(termoBusca))
+  );
   if (!temas.length) { el.innerHTML = ''; el.classList.remove('open'); return; }
 
   el.innerHTML = temas.slice(0, 8).map(t => `
@@ -1084,15 +1090,24 @@ function linkWhatsAppTemaPersonalizado(termo) {
   return `https://wa.me/${numeroLuluzices}?text=${encodeURIComponent(msg)}`;
 }
 
+/** Verifica se um produto bate com o termo de busca — considera nome, categoria,
+ * nome do tema e também as palavras-chave cadastradas no tema (busca tipo "SEO" interno) */
+function produtoBateComBusca(p, termo) {
+  if (p.nome.toLowerCase().includes(termo)) return true;
+  if (p.categoria && p.categoria.toLowerCase().includes(termo)) return true;
+  if (p.temaNome && p.temaNome.toLowerCase().includes(termo)) return true;
+  if (p.temaId) {
+    const tema = temasSite.find(t => t.id === p.temaId);
+    if (tema && tema.palavrasChave && tema.palavrasChave.some(pc => pc.includes(termo))) return true;
+  }
+  return false;
+}
+
 function renderCatalogo() {
   const grid = document.getElementById('catalogoGrid');
   let lista = categoriaAtiva === 'todas' ? produtos : produtos.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
-    lista = lista.filter(p =>
-      p.nome.toLowerCase().includes(termoBusca) ||
-      p.categoria.toLowerCase().includes(termoBusca) ||
-      (p.temaNome && p.temaNome.toLowerCase().includes(termoBusca))
-    );
+    lista = lista.filter(p => produtoBateComBusca(p, termoBusca));
   }
 
   if (lista.length === 0) {
@@ -1619,6 +1634,7 @@ async function carregarCorPersonalizada() {
 // ── Init ─────────────────────────────────────────────────────────────────────
 carregarCorPersonalizada();
 carregarProdutos();
+carregarTemas(); // necessário para a busca por palavras-chave considerar os temas
 initBannerCarrossel();
 atualizarCarrinhoUI();
 
@@ -1828,6 +1844,11 @@ document.addEventListener('keydown', (e) => {
     <div class="admin-modal-header"><span id="adminModalTemaTitle">Novo Tema</span><button onclick="adminFecharModal('adminModalTema')">✕</button></div>
     <div class="admin-modal-body">
       <div class="admin-field"><label>Nome do tema</label><input type="text" id="atNome" placeholder="Ex: Bluey"></div>
+      <div class="admin-field">
+        <label>Palavras-chave relacionadas</label>
+        <input type="text" id="atPalavrasChave" placeholder="Ex: herói, marvel, ação (separe por vírgula)">
+        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Quando o cliente buscar por uma dessas palavras, esse tema aparece nos resultados — mesmo que o nome do tema seja diferente.</p>
+      </div>
     </div>
     <div class="admin-modal-footer">
       <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalTema')">Cancelar</button>
@@ -2467,6 +2488,7 @@ function adminRenderTemas() {
       <div class="admin-card-thumb">🎨</div>
       <div class="admin-card-info">
         <div class="admin-card-nome">${t.nome}</div>
+        <div class="admin-card-sub">${(t.palavrasChave && t.palavrasChave.length) ? t.palavrasChave.join(', ') : '<em style="color:#c0b0b5;">sem palavras-chave</em>'}</div>
         <div class="admin-card-actions">
           <button onclick="adminEditarTema(${idx})">Editar</button>
           <button onclick="adminExcluirTema(${idx})">Excluir</button>
@@ -2474,13 +2496,31 @@ function adminRenderTemas() {
       </div>
     </div>`).join('');
 }
-function adminNovoTema() { _editandoTemaIdx = null; document.getElementById('adminModalTemaTitle').textContent='Novo Tema'; document.getElementById('atNome').value=''; document.getElementById('adminModalTema').classList.add('open'); }
-function adminEditarTema(idx) { _editandoTemaIdx = idx; document.getElementById('adminModalTemaTitle').textContent='Editar Tema'; document.getElementById('atNome').value = temasSite[idx].nome; document.getElementById('adminModalTema').classList.add('open'); }
+function adminNovoTema() {
+  _editandoTemaIdx = null;
+  document.getElementById('adminModalTemaTitle').textContent='Novo Tema';
+  document.getElementById('atNome').value='';
+  document.getElementById('atPalavrasChave').value='';
+  document.getElementById('adminModalTema').classList.add('open');
+}
+function adminEditarTema(idx) {
+  _editandoTemaIdx = idx;
+  document.getElementById('adminModalTemaTitle').textContent='Editar Tema';
+  document.getElementById('atNome').value = temasSite[idx].nome;
+  document.getElementById('atPalavrasChave').value = (temasSite[idx].palavrasChave || []).join(', ');
+  document.getElementById('adminModalTema').classList.add('open');
+}
 async function adminSalvarTema() {
   const nome = document.getElementById('atNome').value.trim();
   if (!nome) { showToast('Preencha o nome do tema','error'); return; }
-  if (_editandoTemaIdx !== null) temasSite[_editandoTemaIdx].nome = nome;
-  else temasSite.push({ id: 'tema_'+Date.now(), nome });
+  const palavrasChave = document.getElementById('atPalavrasChave').value
+    .split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+  if (_editandoTemaIdx !== null) {
+    temasSite[_editandoTemaIdx].nome = nome;
+    temasSite[_editandoTemaIdx].palavrasChave = palavrasChave;
+  } else {
+    temasSite.push({ id: 'tema_'+Date.now(), nome, palavrasChave });
+  }
   await salvarTemasRemote();
   adminRenderTemas();
   adminFecharModal('adminModalTema');
