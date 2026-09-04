@@ -10,6 +10,7 @@
 <!-- Firebase (apenas leitura de produtos + chamada das Cloud Functions) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 <style>
   /* ============================================================
@@ -896,6 +897,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 
 // ── Emojis por categoria (usado como "thumbnail" visual dos produtos) ────────
 const EMOJI_CATEGORIA = {
@@ -1648,9 +1650,10 @@ document.addEventListener('keydown', (e) => {
   <div id="adminLoginBox" style="max-width:360px;margin:80px auto;padding:32px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);text-align:center;">
     <div style="font-size:32px;margin-bottom:8px;">🔒</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:16px;">Painel Admin</h2>
+    <input type="email" id="adminEmailInput" placeholder="E-mail" style="width:100%;padding:11px;border:1.5px solid #ecddd6;border-radius:9px;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')document.getElementById('adminSenhaInput').focus()">
     <input type="password" id="adminSenhaInput" placeholder="Senha" style="width:100%;padding:11px;border:1.5px solid #ecddd6;border-radius:9px;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')verificarSenhaAdmin()">
     <button onclick="verificarSenhaAdmin()" style="width:100%;padding:12px;background:#e8546a;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
-    <p id="adminSenhaErro" style="display:none;color:#e84040;font-size:12px;margin-top:10px;">Senha incorreta.</p>
+    <p id="adminSenhaErro" style="display:none;color:#e84040;font-size:12px;margin-top:10px;">E-mail ou senha incorretos.</p>
   </div>
 
   <div id="adminPainel" style="display:none;max-width:960px;margin:0 auto;padding:24px 16px 60px;">
@@ -1939,10 +1942,11 @@ document.addEventListener('keydown', (e) => {
 
 <script>
 // ============================================================
-// PAINEL ADMIN OCULTO — acesso só via ?painel=luluzices2026admin
+// PAINEL ADMIN OCULTO — acesso só via ?painel=luluzices2026admin, com login real
+// via Firebase Auth (a senha nunca fica visível no código, e o Firestore checa
+// esse mesmo login antes de aceitar qualquer escrita — ver regras no console).
 // ============================================================
 const ADMIN_URL_KEY = 'luluzices2026admin';
-const ADMIN_SENHA = 'LzAdmin#2026';
 
 let temasSite = [];
 let bannersSite = [];
@@ -1955,23 +1959,40 @@ function checarAcessoAdmin() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('painel') === ADMIN_URL_KEY) {
     document.getElementById('adminOverlay').style.display = 'block';
+    // Se já existir uma sessão válida (login anterior não expirado), pula a tela de senha
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('adminLoginBox').style.display = 'none';
+        document.getElementById('adminPainel').style.display = 'block';
+        adminCarregarTudo();
+      }
+    });
   }
 }
 
-function verificarSenhaAdmin() {
-  const val = document.getElementById('adminSenhaInput').value;
-  if (val === ADMIN_SENHA) {
+async function verificarSenhaAdmin() {
+  const email = document.getElementById('adminEmailInput').value.trim();
+  const senha = document.getElementById('adminSenhaInput').value;
+  const erroEl = document.getElementById('adminSenhaErro');
+  erroEl.style.display = 'none';
+
+  try {
+    await auth.signInWithEmailAndPassword(email, senha);
     document.getElementById('adminLoginBox').style.display = 'none';
     document.getElementById('adminPainel').style.display = 'block';
     adminCarregarTudo();
-  } else {
-    document.getElementById('adminSenhaErro').style.display = 'block';
+  } catch (e) {
+    erroEl.textContent = 'E-mail ou senha incorretos.';
+    erroEl.style.display = 'block';
   }
 }
+
 function fecharAdmin() {
+  auth.signOut();
   document.getElementById('adminOverlay').style.display = 'none';
   document.getElementById('adminLoginBox').style.display = 'block';
   document.getElementById('adminPainel').style.display = 'none';
+  document.getElementById('adminEmailInput').value = '';
   document.getElementById('adminSenhaInput').value = '';
   document.getElementById('adminSenhaErro').style.display = 'none';
 }
