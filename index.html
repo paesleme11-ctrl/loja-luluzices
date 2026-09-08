@@ -378,6 +378,10 @@
   .produto-galeria-thumbs { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .produto-galeria-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
   .produto-galeria-thumbs img.ativa, .produto-galeria-thumbs img:hover { opacity: 1; border-color: var(--rose); }
+  .thumb-video-wrap { position: relative; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
+  .thumb-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
+  .thumb-video-wrap.ativa, .thumb-video-wrap:hover { opacity: 1; border-color: var(--rose); }
+  .thumb-play-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; background: rgba(0,0,0,0.25); }
   .produto-preco-original { font-size: 15px; color: var(--ink-muted); text-decoration: line-through; font-weight: 500; margin-left: 8px; }
   .produto-preco-badge-promo { display: inline-block; background: var(--red, #e84040); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; margin-left: 6px; vertical-align: middle; }
   .produto-crosssell { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
@@ -1135,10 +1139,13 @@ function renderCatalogo() {
   grid.innerHTML = lista.map(p => {
     const vendas = vendasFakePara(p.id);
     const badge = vendas > 100 ? '🔥 Mais vendido' : (p.adicionais && p.adicionais.length > 0 ? 'Personalizável' : '');
+    // A capa (p.foto) pode ser um vídeo — <img> não reproduz vídeo, então nesse caso
+    // usa a primeira foto de verdade da galeria, ou o emoji da categoria como fallback
+    const capaFoto = (p.foto && !ehVideo(p.foto)) ? p.foto : (p.fotos || []).find(f => !ehVideo(f));
     return `
     <div class="produto-card" onclick="abrirProduto('${p.id}')">
       ${badge ? `<div class="produto-badge">${badge}</div>` : ''}
-      <div class="produto-thumb">${p.foto ? `<img src="${p.foto}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
+      <div class="produto-thumb">${capaFoto ? `<img src="${capaFoto}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
       <div class="produto-info">
         <div class="produto-categoria">${p.categoria}</div>
         <h3 class="produto-nome">${p.nome}</h3>
@@ -1171,6 +1178,19 @@ function irParaBannerSlide(idx) {
 }
 
 // ── Página de produto ──────────────────────────────────────────────────────
+/** Troca a mídia principal exibida na página do produto (foto ou vídeo), substituindo
+ * o elemento inteiro já que <img> e <video> não são intercambiáveis só trocando "src" */
+function trocarMidiaPrincipal(url, video, thumbEl) {
+  const container = document.getElementById('produtoMidiaPrincipal')?.parentElement;
+  if (!container) return;
+  const novoHtml = video
+    ? `<video src="${url}" id="produtoMidiaPrincipal" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
+    : `<img src="${url}" id="produtoMidiaPrincipal" style="width:100%;height:100%;object-fit:cover;">`;
+  container.innerHTML = novoHtml;
+  document.querySelectorAll('.produto-galeria-thumbs img, .produto-galeria-thumbs .thumb-video-wrap').forEach(el => el.classList.remove('ativa'));
+  if (thumbEl) thumbEl.classList.add('ativa');
+}
+
 function abrirProduto(id) {
   const p = produtos.find(x => x.id === id);
   if (!p) return;
@@ -1178,12 +1198,18 @@ function abrirProduto(id) {
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
 
   const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
+  const primeiroEhVideo = fotos.length && ehVideo(fotos[0]);
   const thumbHtml = fotos.length
-    ? `<img src="${fotos[0]}" alt="${p.nome}" id="produtoImgPrincipal" style="width:100%;height:100%;object-fit:cover;">`
+    ? (primeiroEhVideo
+        ? `<video src="${fotos[0]}" id="produtoMidiaPrincipal" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
+        : `<img src="${fotos[0]}" alt="${p.nome}" id="produtoMidiaPrincipal" style="width:100%;height:100%;object-fit:cover;">`)
     : emojiPara(p.categoria);
   const galeriaHtml = fotos.length > 1 ? `
     <div class="produto-galeria-thumbs">
-      ${fotos.map((url,i) => `<img src="${url}" onclick="document.getElementById('produtoImgPrincipal').src='${url}'" class="${i===0?'ativa':''}">`).join('')}
+      ${fotos.map((url,i) => ehVideo(url)
+        ? `<div class="thumb-video-wrap ${i===0?'ativa':''}" onclick="trocarMidiaPrincipal('${url}', true, this)"><video src="${url}" muted></video><span class="thumb-play-icon">▶</span></div>`
+        : `<img src="${url}" onclick="trocarMidiaPrincipal('${url}', false, this)" class="${i===0?'ativa':''}">`
+      ).join('')}
     </div>` : '';
 
   const precoOriginal = p.preco;
@@ -1354,7 +1380,7 @@ function renderOrderBumpNoCarrinho() {
 
   container.innerHTML = `
     <div class="orderbump-card" onclick="aceitarOrderBump('${bump.id}')">
-      <div class="orderbump-thumb">${bump.foto ? `<img src="${bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
+      <div class="orderbump-thumb">${(bump.foto && !ehVideo(bump.foto)) ? `<img src="${bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
       <div class="orderbump-info">
         <div class="orderbump-texto">${textoOferta}</div>
         <div class="orderbump-precos">
@@ -1754,12 +1780,13 @@ document.addEventListener('keydown', (e) => {
     <div class="admin-modal-header"><span id="adminModalProdutoTitle">Novo Produto</span><button onclick="adminFecharModal('adminModalProduto')">✕</button></div>
     <div class="admin-modal-body">
       <div class="admin-field">
-        <label>Fotos (galeria)</label>
+        <label>Fotos e Vídeos (galeria)</label>
         <div id="adminFotosGaleria" class="admin-fotos-galeria"></div>
         <div style="display:flex;gap:6px;margin-top:6px;">
-          <input type="text" id="aFotoNovaUrl" placeholder="Link da imagem" style="flex:1;">
+          <input type="text" id="aFotoNovaUrl" placeholder="Link da imagem ou vídeo .mp4" style="flex:1;">
           <button type="button" class="admin-btn-ghost" onclick="adminAdicionarFoto()">+ Add</button>
         </div>
+        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Links terminados em .mp4 são reconhecidos automaticamente como vídeo.</p>
       </div>
       <div class="admin-row2">
         <div class="admin-field" style="position:relative;">
@@ -1934,8 +1961,9 @@ document.addEventListener('keydown', (e) => {
   .admin-check-row input { margin-right:8px; }
   .admin-fotos-galeria { display:flex; flex-wrap:wrap; gap:6px; }
   .admin-foto-item { position:relative; width:60px; height:60px; border-radius:8px; overflow:hidden; border:1.5px solid #ecddd6; }
-  .admin-foto-item img { width:100%; height:100%; object-fit:cover; }
+  .admin-foto-item img, .admin-foto-item video { width:100%; height:100%; object-fit:cover; }
   .admin-foto-item button { position:absolute; top:1px; right:1px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; font-size:10px; cursor:pointer; }
+  .admin-foto-video-badge { position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.65); color:#fff; font-size:9px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .admin-sugestoes { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #e8546a; border-radius:9px; max-height:160px; overflow-y:auto; z-index:10; margin-top:3px; }
   .admin-sugestoes.open { display:block; }
   .admin-sugestoes div { padding:8px 12px; font-size:13px; cursor:pointer; }
@@ -2334,11 +2362,21 @@ function adminTogglePromoTipo() {
   document.getElementById('aPromoValorLabel').textContent = document.getElementById('aPromoTipo').value === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)';
 }
 
+/** Detecta se um link de mídia é vídeo pela extensão do arquivo */
+function ehVideo(url) {
+  return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url || '');
+}
+
 function adminRenderFotosGaleria() {
   const el = document.getElementById('adminFotosGaleria');
   el.innerHTML = _fotosGaleriaAdmin.length
-    ? _fotosGaleriaAdmin.map((url, i) => `<div class="admin-foto-item"><img src="${url}"><button onclick="adminRemoverFoto(${i})">✕</button></div>`).join('')
-    : '<p style="font-size:11.5px;color:#9a8890;">Nenhuma foto ainda.</p>';
+    ? _fotosGaleriaAdmin.map((url, i) => {
+        const conteudo = ehVideo(url)
+          ? `<video src="${url}" muted></video><span class="admin-foto-video-badge">▶</span>`
+          : `<img src="${url}">`;
+        return `<div class="admin-foto-item">${conteudo}<button onclick="adminRemoverFoto(${i})">✕</button></div>`;
+      }).join('')
+    : '<p style="font-size:11.5px;color:#9a8890;">Nenhuma foto ou vídeo ainda.</p>';
 }
 function adminAdicionarFoto() {
   const input = document.getElementById('aFotoNovaUrl');
