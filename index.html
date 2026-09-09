@@ -324,12 +324,14 @@
 
   .produto-page {
     max-width: 1000px; margin: 0 auto;
-    padding: 32px 24px 80px;
+    padding: 20px 16px 80px;
+    width: 100%;
+    box-sizing: border-box;
   }
   .voltar-link {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 13.5px; font-weight: 600; color: var(--ink-light);
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   .voltar-link:hover { color: var(--rose); }
 
@@ -337,33 +339,62 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 48px;
+    width: 100%;
   }
   @media (max-width: 768px) {
-    .produto-detalhe { grid-template-columns: 1fr; gap: 28px; }
+    .produto-detalhe { grid-template-columns: 1fr; gap: 20px; }
   }
 
-  .produto-detalhe-thumb {
-    aspect-ratio: 4/5;
-    background: linear-gradient(135deg, var(--rose-light), var(--warm));
-    border-radius: var(--radius);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 100px;
+  /* Carrossel de mídia (foto/vídeo) por arraste — substitui a antiga miniatura fixa */
+  .produto-midia-carrossel {
     position: relative;
+    width: 100%;
+    aspect-ratio: 4/5;
+    border-radius: var(--radius);
     overflow: hidden;
+    background: linear-gradient(135deg, var(--rose-light), var(--warm));
   }
-  .produto-detalhe-thumb::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.4), transparent 60%);
+  .produto-midia-track {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .produto-midia-track::-webkit-scrollbar { display: none; }
+  .produto-midia-slide {
+    flex: 0 0 100%;
+    width: 100%;
+    height: 100%;
+    scroll-snap-align: center;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .produto-midia-slide img, .produto-midia-slide video {
+    width: 100%; height: 100%; object-fit: cover;
+    max-width: 100%;
+    display: block;
+  }
+  .produto-midia-slide .emoji-fallback { font-size: 100px; }
+  .produto-midia-dots {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 2;
+  }
+  .produto-midia-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.55); transition: background 0.15s, width 0.15s;
+  }
+  .produto-midia-dot.ativa { background: #fff; width: 18px; border-radius: 4px; }
 
   .produto-detalhe-info .produto-categoria { font-size: 12px; }
-  .produto-detalhe-info h1 { font-size: 32px; margin: 8px 0 16px; }
+  .produto-detalhe-info h1 { font-size: 28px; margin: 8px 0 14px; word-break: break-word; }
   .produto-detalhe-preco {
-    font-size: 34px; font-weight: 700;
+    font-size: 30px; font-weight: 700;
     font-family: 'DM Serif Display', serif;
     color: var(--rose);
-    margin-bottom: 20px;
+    margin-bottom: 18px;
   }
   .produto-descricao {
     color: var(--ink-light); font-size: 14.5px; line-height: 1.7;
@@ -375,13 +406,6 @@
   .produto-descricao li { margin-bottom: 4px; }
 
   .produto-adicionais { margin-bottom: 24px; }
-  .produto-galeria-thumbs { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .produto-galeria-thumbs img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
-  .produto-galeria-thumbs img.ativa, .produto-galeria-thumbs img:hover { opacity: 1; border-color: var(--rose); }
-  .thumb-video-wrap { position: relative; width: 56px; height: 56px; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; opacity: 0.7; }
-  .thumb-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
-  .thumb-video-wrap.ativa, .thumb-video-wrap:hover { opacity: 1; border-color: var(--rose); }
-  .thumb-play-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; background: rgba(0,0,0,0.25); }
   .produto-preco-original { font-size: 15px; color: var(--ink-muted); text-decoration: line-through; font-weight: 500; margin-left: 8px; }
   .produto-preco-badge-promo { display: inline-block; background: var(--red, #e84040); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; margin-left: 6px; vertical-align: middle; }
   .produto-crosssell { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
@@ -1178,17 +1202,17 @@ function irParaBannerSlide(idx) {
 }
 
 // ── Página de produto ──────────────────────────────────────────────────────
-/** Troca a mídia principal exibida na página do produto (foto ou vídeo), substituindo
- * o elemento inteiro já que <img> e <video> não são intercambiáveis só trocando "src" */
-function trocarMidiaPrincipal(url, video, thumbEl) {
-  const container = document.getElementById('produtoMidiaPrincipal')?.parentElement;
-  if (!container) return;
-  const novoHtml = video
-    ? `<video src="${url}" id="produtoMidiaPrincipal" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
-    : `<img src="${url}" id="produtoMidiaPrincipal" style="width:100%;height:100%;object-fit:cover;">`;
-  container.innerHTML = novoHtml;
-  document.querySelectorAll('.produto-galeria-thumbs img, .produto-galeria-thumbs .thumb-video-wrap').forEach(el => el.classList.remove('ativa'));
-  if (thumbEl) thumbEl.classList.add('ativa');
+/** Atualiza os dots do carrossel conforme o usuário arrasta (swipe) entre foto/vídeo */
+function onProdutoMidiaScroll() {
+  const track = document.getElementById('produtoMidiaTrack');
+  const dotsContainer = document.getElementById('produtoMidiaDots');
+  if (!track || !dotsContainer) return;
+  const largura = track.clientWidth;
+  if (!largura) return;
+  const indiceAtual = Math.round(track.scrollLeft / largura);
+  dotsContainer.querySelectorAll('.produto-midia-dot').forEach((dot, i) => {
+    dot.classList.toggle('ativa', i === indiceAtual);
+  });
 }
 
 function abrirProduto(id) {
@@ -1198,19 +1222,29 @@ function abrirProduto(id) {
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
 
   const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
-  const primeiroEhVideo = fotos.length && ehVideo(fotos[0]);
-  const thumbHtml = fotos.length
-    ? (primeiroEhVideo
-        ? `<video src="${fotos[0]}" id="produtoMidiaPrincipal" controls playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
-        : `<img src="${fotos[0]}" alt="${p.nome}" id="produtoMidiaPrincipal" style="width:100%;height:100%;object-fit:cover;">`)
-    : emojiPara(p.categoria);
-  const galeriaHtml = fotos.length > 1 ? `
-    <div class="produto-galeria-thumbs">
-      ${fotos.map((url,i) => ehVideo(url)
-        ? `<div class="thumb-video-wrap ${i===0?'ativa':''}" onclick="trocarMidiaPrincipal('${url}', true, this)"><video src="${url}" muted></video><span class="thumb-play-icon">▶</span></div>`
-        : `<img src="${url}" onclick="trocarMidiaPrincipal('${url}', false, this)" class="${i===0?'ativa':''}">`
-      ).join('')}
-    </div>` : '';
+  const temMidia = fotos.length > 0;
+
+  const slidesHtml = temMidia
+    ? fotos.map(url => {
+        const conteudo = ehVideo(url)
+          ? `<video src="${url}" controls playsinline></video>`
+          : `<img src="${url}" alt="${p.nome}">`;
+        return `<div class="produto-midia-slide">${conteudo}</div>`;
+      }).join('')
+    : `<div class="produto-midia-slide"><span class="emoji-fallback">${emojiPara(p.categoria)}</span></div>`;
+
+  const dotsHtml = fotos.length > 1
+    ? `<div class="produto-midia-dots" id="produtoMidiaDots">${fotos.map((_,i) => `<div class="produto-midia-dot ${i===0?'ativa':''}"></div>`).join('')}</div>`
+    : '';
+
+  const thumbHtml = `
+    <div class="produto-midia-carrossel">
+      <div class="produto-midia-track" id="produtoMidiaTrack" onscroll="onProdutoMidiaScroll()">
+        ${slidesHtml}
+      </div>
+      ${dotsHtml}
+    </div>`;
+  const galeriaHtml = ''; // as miniaturas antigas foram substituídas pelo carrossel de arraste acima
 
   const precoOriginal = p.preco;
   let precoFinal = p.preco;
@@ -1264,7 +1298,7 @@ function abrirProduto(id) {
   ` : '';
 
   document.getElementById('produtoDetalheContainer').innerHTML = `
-    <div class="produto-detalhe-thumb">${thumbHtml}</div>
+    ${thumbHtml}
     ${galeriaHtml}
     <div class="produto-detalhe-info">
       <div class="produto-categoria">${p.categoria}${p.temaNome ? ' · ' + p.temaNome : ''}</div>
