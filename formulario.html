@@ -115,7 +115,7 @@
     </div>
     <div class="form-group">
       <label>Data</label>
-      <input type="text" id="fData" placeholder="Ex: 15/09/2026">
+      <input type="date" id="fData">
     </div>
     <div class="form-group">
       <label>Hora</label>
@@ -184,6 +184,18 @@ function voltarPasso1() {
   document.getElementById('step-1').classList.add('active');
 }
 
+/** Converte "2026-09-15" (formato do input type=date) em "15/09/2026 (terça-feira)" */
+function formatarDataComDiaSemana(dataISO) {
+  if (!dataISO) return '';
+  const diasSemana = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+  const [ano, mes, dia] = dataISO.split('-').map(Number);
+  // Meio-dia evita qualquer problema de fuso horário mudar o dia ao converter
+  const dataObj = new Date(ano, mes - 1, dia, 12, 0, 0);
+  const diaSemana = diasSemana[dataObj.getDay()];
+  const dataFormatada = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${ano}`;
+  return `${dataFormatada} (${diaSemana})`;
+}
+
 async function finalizarFormulario() {
   const nomeAniversariante = document.getElementById('fNomeAniversariante').value.trim();
   const idade = document.getElementById('fIdade').value.trim();
@@ -206,11 +218,14 @@ async function finalizarFormulario() {
   btn.disabled = true;
   btn.textContent = 'Enviando...';
 
+  // Formata a data (YYYY-MM-DD do input) para "15/09/2026 (terça-feira)"
+  const dataFormatada = formatarDataComDiaSemana(data);
+
   // Monta a observação estruturada no formato que o sistema de gestão já reconhece
   const obsEstruturada = [
     `* Nome - ${nomeAniversariante}`,
     idade ? `* Idade - ${idade}` : null,
-    data ? `* Data - ${data}` : null,
+    dataFormatada ? `* Data - ${dataFormatada}` : null,
     hora ? `* Hora - ${hora}` : null,
     local ? `* Local (endereço completo) - ${local}` : null,
     whatsappConfirmacao ? `* Número de WhatsApp para confirmação de presença - ${whatsappConfirmacao}` : null,
