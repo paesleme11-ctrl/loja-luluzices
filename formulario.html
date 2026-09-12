@@ -111,15 +111,15 @@
     </div>
     <div class="form-group">
       <label>Idade</label>
-      <input type="text" id="fIdade" placeholder="Ex: 1 aninho">
+      <input type="text" id="fIdade" placeholder="Ex: 1 aninho" required>
     </div>
     <div class="form-group">
       <label>Data</label>
-      <input type="date" id="fData">
+      <input type="date" id="fData" required>
     </div>
     <div class="form-group">
       <label>Hora</label>
-      <input type="text" id="fHora" placeholder="Ex: 15h">
+      <input type="text" id="fHora" placeholder="Ex: 15h" required>
     </div>
     <div class="form-group">
       <label>Local (endereço completo + link do Google Maps)</label>
@@ -127,7 +127,7 @@
     </div>
     <div class="form-group">
       <label>Número de WhatsApp para confirmação de presença</label>
-      <input type="tel" id="fWhatsappConfirmacao" placeholder="(11) 99999-9999">
+      <input type="tel" id="fWhatsappConfirmacao" placeholder="(11) 99999-9999" required>
     </div>
     <div class="form-group">
       <label>Sugestões de Presentes</label>
@@ -206,11 +206,27 @@ async function finalizarFormulario() {
   const presentes = document.getElementById('fPresentes').value.trim();
 
   if (!nomeAniversariante) {
-    alert('Preencha ao menos o nome do(a) aniversariante.');
+    alert('Preencha o nome do(a) aniversariante.');
+    return;
+  }
+  if (!idade) {
+    alert('Preencha a idade.');
+    return;
+  }
+  if (!data) {
+    alert('Selecione a data da festa.');
+    return;
+  }
+  if (!hora) {
+    alert('Preencha o horário da festa.');
     return;
   }
   if (!local) {
     alert('O endereço completo com o link do Google Maps é obrigatório.');
+    return;
+  }
+  if (!whatsappConfirmacao) {
+    alert('Preencha o número de WhatsApp para confirmação de presença.');
     return;
   }
 
