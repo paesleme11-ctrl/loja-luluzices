@@ -52,18 +52,27 @@
 
       <label>Nome do item</label>
       <input id="i-nome" placeholder="Jogo de panelas">
-      <label>URL da imagem (opcional)</label>
-      <input id="i-img" placeholder="https://...">
 
       <div id="campos-produto">
         <label>Link para comprar</label>
-        <input id="i-link" placeholder="https://loja.com/produto">
+        <input id="i-link" placeholder="https://loja.com/produto" onblur="buscarImagem()">
+        <div id="img-status" style="font-size:.8rem;color:var(--muted);margin-top:6px"></div>
+        <div id="img-preview" class="hidden" style="margin-top:8px">
+          <img id="img-preview-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px">
+        </div>
+        <a href="#" onclick="toggleImgManual();return false" style="font-size:.78rem;color:var(--p)">colar imagem manualmente</a>
+        <div id="img-manual" class="hidden">
+          <label>URL da imagem</label>
+          <input id="i-img" placeholder="https://...">
+        </div>
       </div>
       <div id="campos-pix" class="hidden">
         <label>Valor sugerido</label>
         <input id="i-valor" placeholder="R$ 100">
         <label>Chave Pix</label>
         <input id="i-pix" placeholder="email, celular ou chave aleatória">
+        <label>URL da imagem (opcional)</label>
+        <input id="i-img-pix" placeholder="https://...">
       </div>
 
       <button class="btn" style="margin-top:14px" onclick="addItem()">+ Adicionar à lista</button>
@@ -107,6 +116,38 @@ window.setTipo = function (tipo) {
   document.getElementById("campos-pix").classList.toggle("hidden", tipo !== "pix");
 };
 
+window.toggleImgManual = function () {
+  document.getElementById("img-manual").classList.toggle("hidden");
+};
+
+let imagemAutomatica = "";
+
+window.buscarImagem = async function () {
+  const link = document.getElementById("i-link").value.trim();
+  const statusEl = document.getElementById("img-status");
+  const previewEl = document.getElementById("img-preview");
+  imagemAutomatica = "";
+  previewEl.classList.add("hidden");
+  if (!link) { statusEl.textContent = ""; return; }
+
+  statusEl.textContent = "Buscando imagem do produto...";
+  try {
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(link)}`);
+    const json = await res.json();
+    const imgUrl = json?.data?.image?.url;
+    if (imgUrl) {
+      imagemAutomatica = imgUrl;
+      document.getElementById("img-preview-thumb").src = imgUrl;
+      previewEl.classList.remove("hidden");
+      statusEl.textContent = "Imagem encontrada ✓";
+    } else {
+      statusEl.textContent = "Não achamos imagem automaticamente — cole o link dela em \"colar imagem manualmente\".";
+    }
+  } catch (e) {
+    statusEl.textContent = "Não conseguimos buscar a imagem agora — cole o link dela em \"colar imagem manualmente\".";
+  }
+};
+
 async function init() {
   if (!listaId || !token) return denied();
   try {
@@ -141,6 +182,7 @@ function listenItens() {
         ? `Pix · ${i.valorSugerido || ""}`
         : (i.linkCompra ? `<a href="${i.linkCompra}" target="_blank" rel="noopener">link do produto</a>` : "");
       return `<div class="item">
+        ${i.imagemUrl ? `<img src="${i.imagemUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}
         <div><b>${i.nome}</b><div class="detail">${detail} ${takenTag}</div></div>
         <button class="btn danger" onclick="removerItem('${d.id}')">Excluir</button>
       </div>`;
@@ -153,9 +195,11 @@ window.addItem = async function () {
   const nome = document.getElementById("i-nome").value.trim();
   if (!nome) { msg.innerHTML = '<div class="msg error">Dê um nome ao item.</div>'; return; }
 
+  const manualImg = document.getElementById("i-img").value.trim();
+  const pixImg = document.getElementById("i-img-pix").value.trim();
   const data = {
     nome,
-    imagemUrl: document.getElementById("i-img").value.trim(),
+    imagemUrl: tipoAtual === "produto" ? (manualImg || imagemAutomatica) : pixImg,
     tipo: tipoAtual,
     reservado: false,
     reservadoPor: null,
@@ -172,9 +216,13 @@ window.addItem = async function () {
     await addDoc(collection(db, "listas", listaId, "itens"), data);
     document.getElementById("i-nome").value = "";
     document.getElementById("i-img").value = "";
+    document.getElementById("i-img-pix").value = "";
     document.getElementById("i-link").value = "";
     document.getElementById("i-valor").value = "";
     document.getElementById("i-pix").value = "";
+    document.getElementById("img-status").textContent = "";
+    document.getElementById("img-preview").classList.add("hidden");
+    imagemAutomatica = "";
     msg.innerHTML = "";
   } catch (e) {
     msg.innerHTML = `<div class="msg error">Erro: ${e.message}</div>`;
