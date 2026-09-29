@@ -5,23 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lista de Presentes</title>
 <style>
-  :root{ --p:#d6336c; --bg:#faf7f5; --card:#fff; --text:#2b2226; --muted:#8a7a80; --border:#eee0e2; --ok:#2f9e44; }
+  :root{ --p:#d6336c; --s:#e8c766; --bg:#faf7f5; --card:#fff; --text:#2b2226; --muted:#8a7a80; --border:#eee0e2; --ok:#2f9e44; }
   *{box-sizing:border-box}
   body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
-  header{background:linear-gradient(135deg,var(--p),#a61e4d);color:#fff;padding:26px 20px;text-align:center}
-  header h1{margin:0;font-size:1.3rem}
-  main{max-width:560px;margin:0 auto;padding:18px 14px 60px}
-  .item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:center}
-  .item img{width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0}
-  .item .info{flex:1}
-  .item b{font-size:.95rem}
-  .item .detail{font-size:.82rem;color:var(--muted);margin-top:4px}
-  .pix-box{background:#faf2f4;border-radius:8px;padding:6px 10px;margin-top:6px;font-size:.8rem;display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .btn{background:var(--p);color:#fff;border:none;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-size:.85rem;white-space:nowrap}
-  .btn.tiny{padding:5px 9px;font-size:.72rem;background:#fff;color:var(--p);border:1px solid var(--p)}
-  a.buy{font-size:.82rem;color:var(--p);font-weight:600}
+  header{background:linear-gradient(135deg,var(--p),var(--s));color:#fff;padding:34px 20px 44px;text-align:center}
+  header h1{margin:0 0 4px;font-size:1.4rem}
+  header p{margin:0;opacity:.92;font-size:.88rem}
+  main{max-width:820px;margin:-24px auto 0;padding:0 14px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-top:10px}
+  .prod{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.08);display:flex;flex-direction:column}
+  .prod .thumb{width:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#f3e3e8,#fbeee0);display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .prod .thumb img{width:100%;height:100%;object-fit:cover}
+  .prod .thumb .icon{font-size:2.6rem;opacity:.55}
+  .prod .body{padding:10px 12px 12px;display:flex;flex-direction:column;flex:1}
+  .prod .name{font-size:.87rem;font-weight:600;line-height:1.25;min-height:2.3em}
+  .prod .price{font-size:.92rem;font-weight:700;color:var(--p);margin:4px 0 8px}
+  .prod .price.pix{color:#0a7a3d}
+  .prod .buy-link{font-size:.76rem;color:var(--muted);text-decoration:none;margin-bottom:8px;display:inline-block}
+  .prod .btn{margin-top:auto;background:var(--p);color:#fff;border:none;padding:9px;border-radius:9px;font-weight:700;font-size:.82rem;cursor:pointer}
+  .pix-tag{display:inline-block;background:#e9f7ef;color:#0a7a3d;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:4px;width:fit-content}
   .hidden{display:none !important}
-  #loading,#empty,#access-denied{padding:80px 20px;text-align:center;color:var(--muted)}
+  #loading,#empty,#access-denied{padding:100px 20px;text-align:center;color:var(--muted)}
+  footer{text-align:center;color:var(--muted);font-size:.78rem;padding:24px}
 </style>
 </head>
 <body>
@@ -30,11 +35,15 @@
 <div id="access-denied" class="hidden"><h2>Lista não encontrada</h2></div>
 
 <div id="app" class="hidden">
-  <header><h1 id="l-nome">Lista de Presentes</h1></header>
+  <header>
+    <h1 id="l-nome">Lista de Presentes</h1>
+    <p>Escolha um presente com carinho 💝</p>
+  </header>
   <main>
     <div id="empty" class="hidden"><p>Todos os presentes já foram escolhidos — obrigado pelo carinho! 💝</p></div>
-    <div id="item-list"></div>
+    <div id="item-grid" class="grid"></div>
   </main>
+  <footer>lista gerada por Luluzices</footer>
 </div>
 
 <script type="module">
@@ -62,7 +71,10 @@ async function init() {
   try {
     const snap = await getDoc(doc(db, "listas", listaId));
     if (!snap.exists() || snap.data().active === false) return denied();
-    document.getElementById("l-nome").textContent = snap.data().nome || "Lista de Presentes";
+    const d = snap.data();
+    document.documentElement.style.setProperty("--p", d.colorPrimary || "#d6336c");
+    document.documentElement.style.setProperty("--s", d.colorSecondary || "#e8c766");
+    document.getElementById("l-nome").textContent = d.nome || "Lista de Presentes";
     document.getElementById("loading").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
     listenItens();
@@ -78,27 +90,25 @@ function listenItens() {
   onSnapshot(collection(db, "listas", listaId, "itens"), (snap) => {
     const disponiveis = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.reservado);
     document.getElementById("empty").classList.toggle("hidden", disponiveis.length > 0);
-    document.getElementById("item-list").innerHTML = disponiveis.map(i => {
-      const detail = i.tipo === "pix"
-        ? `<div class="pix-box"><span>Pix ${i.valorSugerido ? "· " + i.valorSugerido : ""}: ${i.chavePix || ""}</span>
-            <button class="btn tiny" onclick="copiarPix('${(i.chavePix||'').replace(/'/g,"")}')">Copiar</button></div>`
-        : (i.linkCompra ? `<a class="buy" href="${i.linkCompra}" target="_blank" rel="noopener">Ver produto ↗</a>` : "");
-      return `<div class="item">
-        ${i.imagemUrl ? `<img src="${i.imagemUrl}">` : ""}
-        <div class="info">
-          <b>${i.nome}</b>
-          <div class="detail">${detail}</div>
+    document.getElementById("item-grid").innerHTML = disponiveis.map(i => {
+      const isPix = i.tipo === "pix";
+      const thumb = i.imagemUrl
+        ? `<img src="${i.imagemUrl}">`
+        : `<span class="icon">${isPix ? "💸" : "🎁"}</span>`;
+      const price = isPix
+        ? `<div class="pix-tag">Pix</div><div class="price pix">${i.valorSugerido || "valor livre"}</div>`
+        : (i.linkCompra ? `<a class="buy-link" href="${i.linkCompra}" target="_blank" rel="noopener">ver produto ↗</a>` : "");
+      return `<div class="prod">
+        <div class="thumb">${thumb}</div>
+        <div class="body">
+          <div class="name">${i.nome}</div>
+          ${price}
+          <button class="btn" onclick="escolher('${i.id}')">Escolher presente</button>
         </div>
-        <button class="btn" onclick="escolher('${i.id}')">Escolher</button>
       </div>`;
     }).join("");
   });
 }
-
-window.copiarPix = function (chave) {
-  navigator.clipboard.writeText(chave);
-  alert("Chave Pix copiada!");
-};
 
 window.escolher = async function (itemId) {
   const nome = prompt("Seu nome, para o casal/aniversariante saber quem trouxe este presente:");
