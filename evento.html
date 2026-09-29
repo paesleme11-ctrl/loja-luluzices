@@ -32,6 +32,15 @@
   .total b{color:var(--p);font-size:1.1rem}
   .msg{font-size:.87rem;padding:10px 12px;border-radius:10px;margin-top:10px}
   .msg.error{background:#fdecea;color:#c0392b}
+  .gift-item{display:flex;gap:12px;border:1px solid #eadfe2;border-radius:14px;padding:10px;margin-bottom:10px;align-items:center}
+  .gift-item img{width:64px;height:64px;object-fit:cover;border-radius:10px;flex-shrink:0}
+  .gift-item .gi-info{flex:1}
+  .gift-item .gi-info b{font-size:.92rem}
+  .gift-item .gi-info div{font-size:.8rem;color:var(--muted);margin-top:2px}
+  .gift-item .gi-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .gift-item .gi-actions a{font-size:.78rem;color:var(--p)}
+  .btn.tiny{padding:7px 12px;font-size:.78rem;width:auto}
+  .taken-tag{font-size:.75rem;color:#c0392b;font-weight:600}
   .qr-box{text-align:center;padding:10px}
   .qr-box #qrcanvas-wrap{display:inline-block;padding:14px;background:#fff;border-radius:16px;border:1px solid #eee;margin:10px 0}
   .hidden{display:none !important}
@@ -90,7 +99,14 @@
     <p>Apresente este QR Code na entrada do evento.</p>
     <div id="qrcanvas-wrap"></div>
     <p id="qr-resumo" style="color:var(--muted);font-size:.9rem"></p>
+    <button class="btn small" style="margin-bottom:8px" onclick="baixarQr()">⬇ Baixar QR Code</button><br>
     <button class="btn outline small" onclick="location.reload()">Ver de novo depois</button>
+  </div>
+
+  <div id="gift-card" class="card hidden">
+    <h2 style="margin-top:0;color:var(--p)">Lista de presentes</h2>
+    <p style="color:var(--muted);font-size:.88rem;margin-top:-6px">Escolha um item para não repetir com outro convidado.</p>
+    <div id="gift-list"></div>
   </div>
 
   <div id="extra-info" class="card hidden">
@@ -105,7 +121,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, collection, addDoc
+  getFirestore, doc, getDoc, collection, addDoc, onSnapshot, updateDoc, query, orderBy
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -177,7 +193,60 @@ function render(d) {
   document.getElementById("loading").classList.add("hidden");
   document.getElementById("content").classList.remove("hidden");
   updateTotal();
+  listenGifts();
 }
+
+function listenGifts() {
+  const q = query(collection(db, "events", eventId, "gifts"), orderBy("createdAt", "asc"));
+  onSnapshot(q, (snap) => {
+    if (snap.empty) return;
+    document.getElementById("gift-card").classList.remove("hidden");
+    const listEl = document.getElementById("gift-list");
+    const reservedHere = JSON.parse(localStorage.getItem(`rsvp_gifts_${eventId}`) || "{}");
+
+    listEl.innerHTML = snap.docs.map(d => {
+      const g = { id: d.id, ...d.data() };
+      const takenByMe = reservedHere[g.id];
+      let actionHtml;
+      if (!g.reservadoPor) {
+        actionHtml = `<button class="btn tiny" onclick="reservarPresente('${g.id}')">Eu vou presentear</button>`;
+      } else if (takenByMe) {
+        actionHtml = `<span class="taken-tag">Você escolheu</span><button class="btn tiny" style="margin-top:4px" onclick="cancelarPresente('${g.id}')">Cancelar</button>`;
+      } else {
+        actionHtml = `<span class="taken-tag">Já escolhido</span>`;
+      }
+      return `<div class="gift-item">
+        ${g.imagemUrl ? `<img src="${g.imagemUrl}">` : ""}
+        <div class="gi-info">
+          <b>${g.nome}</b>
+          ${g.valorEstimado ? `<div>${g.valorEstimado}</div>` : ""}
+          ${g.descricao ? `<div>${g.descricao}</div>` : ""}
+          ${g.linkCompra ? `<a href="${g.linkCompra}" target="_blank" rel="noopener">Ver onde comprar ↗</a>` : ""}
+        </div>
+        <div class="gi-actions">${actionHtml}</div>
+      </div>`;
+    }).join("");
+  });
+}
+
+window.reservarPresente = async function (giftId) {
+  let nome = document.getElementById("g-nome").value.trim();
+  if (!nome) nome = prompt("Seu nome, para avisarmos quem trouxe este presente:") || "";
+  if (!nome.trim()) return;
+  await updateDoc(doc(db, "events", eventId, "gifts", giftId), {
+    reservadoPor: { nome: nome.trim(), reservadoEm: Date.now() }
+  });
+  const reservedHere = JSON.parse(localStorage.getItem(`rsvp_gifts_${eventId}`) || "{}");
+  reservedHere[giftId] = true;
+  localStorage.setItem(`rsvp_gifts_${eventId}`, JSON.stringify(reservedHere));
+};
+
+window.cancelarPresente = async function (giftId) {
+  await updateDoc(doc(db, "events", eventId, "gifts", giftId), { reservadoPor: null });
+  const reservedHere = JSON.parse(localStorage.getItem(`rsvp_gifts_${eventId}`) || "{}");
+  delete reservedHere[giftId];
+  localStorage.setItem(`rsvp_gifts_${eventId}`, JSON.stringify(reservedHere));
+};
 
 window.addAcompanhante = function () {
   acompCount++;
@@ -262,10 +331,39 @@ function showQr(guestId, qrToken, resumo) {
   const qr = qrcode(0, "M");
   qr.addData(payload);
   qr.make();
-  document.getElementById("qrcanvas-wrap").innerHTML = qr.createImgTag(6, 8);
+
+  // renderiza em <canvas> (em vez de <img>) pra dar pra exportar como PNG
+  const cellSize = 8, margin = 4;
+  const count = qr.getModuleCount();
+  const size = (count + margin * 2) * cellSize;
+  const canvas = document.createElement("canvas");
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#000";
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (qr.isDark(row, col)) {
+        ctx.fillRect((col + margin) * cellSize, (row + margin) * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+  const wrap = document.getElementById("qrcanvas-wrap");
+  wrap.innerHTML = "";
+  wrap.appendChild(canvas);
+  window._qrCanvas = canvas;
+
   document.getElementById("qr-resumo").textContent = resumo || "";
   document.getElementById("qr-card").classList.remove("hidden");
 }
+
+window.baixarQr = function () {
+  if (!window._qrCanvas) return;
+  const link = document.createElement("a");
+  link.download = "meu-qrcode-convite.png";
+  link.href = window._qrCanvas.toDataURL("image/png");
+  link.click();
+};
 
 init();
 </script>
