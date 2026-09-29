@@ -47,6 +47,11 @@
   .msg{font-size:.85rem;padding:8px 12px;border-radius:8px;margin-top:8px}
   .msg.error{background:#fdecea;color:var(--danger)}
   .msg.ok{background:#e6f8ea;color:var(--ok)}
+  .gift-panel{border-top:1px dashed var(--border);margin-top:12px;padding-top:12px}
+  .gift-form{background:#faf2f4;border-radius:10px;padding:12px;margin-bottom:12px}
+  .gift-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .gift-taken{font-size:.78rem;color:var(--danger)}
+  .gift-free{font-size:.78rem;color:var(--ok)}
 </style>
 </head>
 <body>
@@ -109,6 +114,21 @@
       <div id="events-list">Carregando...</div>
     </div>
 
+    <div class="card">
+      <h2>🎁 Listas de Presentes (produto avulso)</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:-6px">
+        Produto independente do RSVP: o cliente recebe um link próprio e monta a lista sozinho,
+        vinculando produtos reais ou pedidos de Pix. Quando um convidado escolhe, some da lista na hora.
+      </p>
+      <div class="row">
+        <div><label>Nome da lista</label><input id="lp-nome" placeholder="Chá de bebê da Marina"></div>
+        <div><label>Tipo (opcional)</label><input id="lp-tipo" placeholder="Chá de bebê, casamento..."></div>
+      </div>
+      <button class="btn" style="margin-top:12px" onclick="saveLista()">Criar lista</button>
+      <div id="lista-msg"></div>
+      <div id="listas-list" style="margin-top:16px"></div>
+    </div>
+
   </main>
 </div>
 
@@ -155,7 +175,7 @@ window.doLogout = function () { signOut(auth); };
 onAuthStateChanged(auth, (user) => {
   document.getElementById("login-screen").classList.toggle("hidden", !!user);
   document.getElementById("app").classList.toggle("hidden", !user);
-  if (user) loadEvents();
+  if (user) { loadEvents(); loadListas(); }
 });
 
 function slugify(name) {
@@ -291,7 +311,6 @@ async function loadEvents() {
     const token = await findClientToken(eventId);
     const guestLink = `${BASE_URL}evento.html?e=${eventId}`;
     const clientLink = token ? `${BASE_URL}cliente.html?e=${eventId}&t=${token}` : "(token não encontrado)";
-    const checkinLink = `${BASE_URL}checkin.html?e=${eventId}`;
 
     const div = document.createElement("div");
     div.className = "event-item";
@@ -306,6 +325,7 @@ async function loadEvents() {
         <div class="actions">
           <button class="btn secondary small" onclick="editEvent('${eventId}')">Editar</button>
           <button class="btn secondary small" onclick="toggleActive('${eventId}', ${d.active})">${d.active ? 'Desativar' : 'Ativar'}</button>
+          <button class="btn secondary small" onclick="toggleGifts('${eventId}')">🎁 Presentes</button>
           <button class="btn danger small" onclick="deleteEvent('${eventId}', '${d.name.replace(/'/g,"")}')">Excluir</button>
         </div>
       </div>
@@ -315,10 +335,145 @@ async function loadEvents() {
         <div><b>${totalCheckin}</b>check-ins</div>
       </div>
       <div class="link-row"><input readonly value="${guestLink}"><button class="btn secondary small" id="cp-g-${eventId}" onclick="copyLink('cp-g-${eventId}','${guestLink}')">Copiar</button><span style="color:var(--muted)">link do convite</span></div>
-      <div class="link-row"><input readonly value="${clientLink}"><button class="btn secondary small" id="cp-c-${eventId}" onclick="copyLink('cp-c-${eventId}','${clientLink}')">Copiar</button><span style="color:var(--muted)">link do cliente</span></div>
-      <div class="link-row"><input readonly value="${checkinLink}"><button class="btn secondary small" id="cp-k-${eventId}" onclick="copyLink('cp-k-${eventId}','${checkinLink}')">Copiar</button><span style="color:var(--muted)">link de check-in</span></div>
+      <div class="link-row"><input readonly value="${clientLink}"><button class="btn secondary small" id="cp-c-${eventId}" onclick="copyLink('cp-c-${eventId}','${clientLink}')">Copiar</button><span style="color:var(--muted)">link do cliente (lista + check-in)</span></div>
+      <div id="gifts-${eventId}" class="gift-panel hidden"></div>
     `;
     listEl.appendChild(div);
+  }
+}
+
+window.toggleGifts = async function (eventId) {
+  const panel = document.getElementById(`gifts-${eventId}`);
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden");
+  if (opening) await renderGiftsPanel(eventId);
+};
+
+async function renderGiftsPanel(eventId) {
+  const panel = document.getElementById(`gifts-${eventId}`);
+  panel.innerHTML = "<p>Carregando presentes...</p>";
+  const snap = await getDocs(collection(db, "events", eventId, "gifts"));
+  const gifts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  panel.innerHTML = `
+    <div class="gift-form">
+      <div class="row">
+        <div><label>Nome do presente</label><input id="gf-nome-${eventId}" placeholder="Jogo de panelas"></div>
+        <div><label>Valor estimado (opcional)</label><input id="gf-valor-${eventId}" placeholder="R$ 250"></div>
+      </div>
+      <div class="row">
+        <div><label>URL da imagem (opcional)</label><input id="gf-img-${eventId}" placeholder="https://..."></div>
+        <div><label>Link para comprar (opcional)</label><input id="gf-link-${eventId}" placeholder="https://..."></div>
+      </div>
+      <label>Descrição (opcional)</label>
+      <input id="gf-desc-${eventId}" placeholder="Cor, marca, tamanho...">
+      <button class="btn small" style="margin-top:10px" onclick="addGift('${eventId}')">+ Adicionar presente</button>
+    </div>
+    <div class="gift-list">
+      ${gifts.length ? gifts.map(g => `
+        <div class="gift-row">
+          <div>
+            <b>${g.nome}</b>${g.valorEstimado ? ` · ${g.valorEstimado}` : ""}
+            ${g.reservadoPor ? `<div class="gift-taken">🎁 escolhido por ${g.reservadoPor.nome}</div>` : `<div class="gift-free">disponível</div>`}
+          </div>
+          <button class="btn danger small" onclick="deleteGift('${eventId}','${g.id}')">Excluir</button>
+        </div>
+      `).join("") : "<p style='color:var(--muted)'>Nenhum presente cadastrado ainda.</p>"}
+    </div>
+  `;
+}
+
+window.addGift = async function (eventId) {
+  const nome = document.getElementById(`gf-nome-${eventId}`).value.trim();
+  if (!nome) return;
+  await setDoc(doc(collection(db, "events", eventId, "gifts")), {
+    nome,
+    valorEstimado: document.getElementById(`gf-valor-${eventId}`).value.trim(),
+    imagemUrl: document.getElementById(`gf-img-${eventId}`).value.trim(),
+    linkCompra: document.getElementById(`gf-link-${eventId}`).value.trim(),
+    descricao: document.getElementById(`gf-desc-${eventId}`).value.trim(),
+    reservadoPor: null,
+    createdAt: Date.now()
+  });
+  renderGiftsPanel(eventId);
+};
+
+window.deleteGift = async function (eventId, giftId) {
+  if (!confirm("Excluir este presente da lista?")) return;
+  await deleteDoc(doc(db, "events", eventId, "gifts", giftId));
+  renderGiftsPanel(eventId);
+};
+
+// ===== Listas de Presentes (produto avulso) =====
+
+window.saveLista = async function () {
+  const msg = document.getElementById("lista-msg");
+  const nome = document.getElementById("lp-nome").value.trim();
+  if (!nome) { msg.innerHTML = '<div class="msg error">Dê um nome à lista.</div>'; return; }
+
+  const listaId = slugify(nome);
+  try {
+    await setDoc(doc(db, "listas", listaId), {
+      nome,
+      tipo: document.getElementById("lp-tipo").value.trim(),
+      active: true,
+      createdAt: Date.now()
+    });
+    const token = randomToken();
+    await setDoc(doc(db, "listaAccess", token), { listaId, createdAt: Date.now() });
+
+    document.getElementById("lp-nome").value = "";
+    document.getElementById("lp-tipo").value = "";
+    msg.innerHTML = '<div class="msg ok">Lista criada!</div>';
+    loadListas();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Erro: ${e.message}</div>`;
+  }
+};
+
+window.deleteLista = async function (listaId, nome) {
+  if (!confirm(`Excluir a lista "${nome}"? Os itens cadastrados também serão perdidos.`)) return;
+  const itensSnap = await getDocs(collection(db, "listas", listaId, "itens"));
+  await Promise.all(itensSnap.docs.map(d => deleteDoc(d.ref)));
+  await deleteDoc(doc(db, "listas", listaId));
+  loadListas();
+};
+
+async function findListaToken(listaId) {
+  const snap = await getDocs(collection(db, "listaAccess"));
+  for (const d of snap.docs) if (d.data().listaId === listaId) return d.id;
+  return null;
+}
+
+async function loadListas() {
+  const el = document.getElementById("listas-list");
+  el.textContent = "Carregando...";
+  const snap = await getDocs(query(collection(db, "listas"), orderBy("createdAt", "desc")));
+  if (snap.empty) { el.innerHTML = "<p style='color:var(--muted)'>Nenhuma lista criada ainda.</p>"; return; }
+
+  el.innerHTML = "";
+  for (const docSnap of snap.docs) {
+    const listaId = docSnap.id;
+    const d = docSnap.data();
+    const token = await findListaToken(listaId);
+    const clientLink = token ? `${BASE_URL}lista-cliente.html?l=${listaId}&t=${token}` : "(token não encontrado)";
+    const guestLink = `${BASE_URL}lista.html?l=${listaId}`;
+
+    const div = document.createElement("div");
+    div.className = "event-item";
+    div.style.flexDirection = "column";
+    div.style.alignItems = "stretch";
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div class="info"><b>${d.nome}</b><div>${d.tipo || ""}</div></div>
+        <div class="actions">
+          <button class="btn danger small" onclick="deleteLista('${listaId}','${d.nome.replace(/'/g,"")}')">Excluir</button>
+        </div>
+      </div>
+      <div class="link-row"><input readonly value="${clientLink}"><button class="btn secondary small" id="cp-lc-${listaId}" onclick="copyLink('cp-lc-${listaId}','${clientLink}')">Copiar</button><span style="color:var(--muted)">link do cliente (gerencia a lista)</span></div>
+      <div class="link-row"><input readonly value="${guestLink}"><button class="btn secondary small" id="cp-lg-${listaId}" onclick="copyLink('cp-lg-${listaId}','${guestLink}')">Copiar</button><span style="color:var(--muted)">link do convidado</span></div>
+    `;
+    el.appendChild(div);
   }
 }
 </script>
