@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel do Evento</title>
+<style>
+  :root{ --p:#d6336c; --s:#e8c766; --bg:#faf7f5; --card:#fff; --text:#2b2226; --muted:#8a7a80; --border:#eee0e2; --ok:#2f9e44; --warn:#c98a00; --danger:#c0392b; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:linear-gradient(135deg,var(--p),#a61e4d);color:#fff;padding:20px 18px 0}
+  header h1{margin:0 0 2px;font-size:1.15rem}
+  header .sub{opacity:.9;font-size:.85rem;margin-bottom:14px}
+  .tabs{display:flex;gap:6px}
+  .tab{flex:1;text-align:center;padding:12px 8px;background:rgba(255,255,255,.12);border-radius:12px 12px 0 0;cursor:pointer;font-size:.9rem;font-weight:600}
+  .tab.active{background:var(--bg);color:var(--p)}
+  main{max-width:640px;margin:0 auto;padding:18px 14px 60px}
+  .hidden{display:none !important}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:1.3rem;color:var(--p)}
+  .stat span{font-size:.72rem;color:var(--muted)}
+  input#search{width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:.9rem}
+  .guest{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .guest .top{display:flex;justify-content:space-between;align-items:center}
+  .guest b{font-size:.95rem}
+  .guest .detail{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .badge{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap}
+  .badge.confirmado{background:#fff4e0;color:var(--warn)}
+  .badge.entrada_realizada{background:#e6f8ea;color:var(--ok)}
+  .badge.cancelado{background:#f1f1f1;color:var(--muted)}
+  #reader{width:100%;border-radius:16px;overflow:hidden;background:#000;min-height:260px}
+  .scan-result{margin-top:14px;padding:16px;border-radius:14px;text-align:center}
+  .scan-result.ok{background:#e6f8ea;color:var(--ok)}
+  .scan-result.warn{background:#fff4e0;color:var(--warn)}
+  .scan-result.error{background:#fdecea;color:var(--danger)}
+  .scan-result h3{margin:.2em 0}
+  .btn{background:var(--p);color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem}
+  .recent{margin-top:18px}
+  .recent h4{color:var(--muted);font-size:.8rem;text-transform:uppercase;margin-bottom:8px}
+  #access-denied,#loading{padding:80px 20px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="loading">Carregando...</div>
+
+<div id="access-denied" class="hidden">
+  <h2>Link inválido</h2>
+  <p>Verifique se você abriu o link completo que recebeu.</p>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1 id="ev-name">Evento</h1>
+    <div class="sub" id="ev-sub"></div>
+    <div class="tabs">
+      <div class="tab active" id="tab-lista" onclick="switchTab('lista')">👥 Convidados</div>
+      <div class="tab" id="tab-checkin" onclick="switchTab('checkin')">📷 Check-in</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="view-lista">
+      <div class="stats">
+        <div class="stat"><b id="st-conf">0</b><span>confirmações</span></div>
+        <div class="stat"><b id="st-pessoas">0</b><span>pessoas</span></div>
+        <div class="stat"><b id="st-checkin">0</b><span>já entraram</span></div>
+      </div>
+      <input id="search" placeholder="Buscar convidado...">
+      <div id="guest-list"></div>
+    </div>
+
+    <div id="view-checkin" class="hidden">
+      <div id="reader"></div>
+      <div id="scan-result" class="scan-result hidden"></div>
+      <div class="recent">
+        <h4>Últimos check-ins</h4>
+        <div id="recent-list"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, collection, onSnapshot, updateDoc, query, orderBy
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
+  authDomain: "luluzices-4254e.firebaseapp.com",
+  projectId: "luluzices-4254e",
+  storageBucket: "luluzices-4254e.firebasestorage.app",
+  messagingSenderId: "328419813225",
+  appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const eventId = params.get("e");
+const clientToken = params.get("t");
+
+let allGuests = [];
+let scanner = null;
+let scanLocked = false;
+
+async function init() {
+  if (!eventId || !clientToken) return denied();
+  try {
+    const tokenSnap = await getDoc(doc(db, "clientAccess", clientToken));
+    if (!tokenSnap.exists() || tokenSnap.data().eventId !== eventId) return denied();
+
+    const evSnap = await getDoc(doc(db, "events", eventId));
+    if (!evSnap.exists()) return denied();
+    const ev = evSnap.data();
+    document.documentElement.style.setProperty("--p", ev.colorPrimary || "#d6336c");
+    document.getElementById("ev-name").textContent = ev.name || "Evento";
+    document.getElementById("ev-sub").textContent = [ev.date, ev.time, ev.location].filter(Boolean).join(" · ");
+
+    document.getElementById("loading").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+
+    listenGuests();
+  } catch (e) {
+    denied();
+  }
+}
+
+function denied() {
+  document.getElementById("loading").classList.add("hidden");
+  document.getElementById("access-denied").classList.remove("hidden");
+}
+
+function listenGuests() {
+  const q = query(collection(db, "events", eventId, "guests"), orderBy("confirmadoEm", "desc"));
+  onSnapshot(q, (snap) => {
+    allGuests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderStats();
+    renderList();
+    renderRecentCheckins();
+  });
+}
+
+function renderStats() {
+  const ativos = allGuests.filter(g => g.status !== "cancelado");
+  const pessoas = ativos.reduce((s, g) => s + (g.totalPessoas || 1), 0);
+  const checkins = allGuests.filter(g => g.status === "entrada_realizada").length;
+  document.getElementById("st-conf").textContent = ativos.length;
+  document.getElementById("st-pessoas").textContent = pessoas;
+  document.getElementById("st-checkin").textContent = checkins;
+}
+
+function statusLabel(s) {
+  return { confirmado: "Confirmado", entrada_realizada: "Entrou", cancelado: "Cancelado" }[s] || s;
+}
+
+function renderList() {
+  const term = (document.getElementById("search").value || "").toLowerCase();
+  const list = document.getElementById("guest-list");
+  const filtered = allGuests.filter(g => (g.responsavelNome || "").toLowerCase().includes(term));
+  if (!filtered.length) { list.innerHTML = "<p style='color:var(--muted)'>Nenhum convidado encontrado.</p>"; return; }
+
+  list.innerHTML = filtered.map(g => {
+    const acomp = (g.acompanhantes || []).map(a => a.nome).join(", ");
+    const crianca = (g.criancas || []).map(c => `${c.nome}${c.idade ? " (" + c.idade + "a)" : ""}`).join(", ");
+    return `<div class="guest">
+      <div class="top">
+        <b>${g.responsavelNome}</b>
+        <span class="badge ${g.status}">${statusLabel(g.status)}</span>
+      </div>
+      <div class="detail">${g.totalPessoas} pessoa(s)${acomp ? " · Acomp: " + acomp : ""}${crianca ? " · Crianças: " + crianca : ""}</div>
+    </div>`;
+  }).join("");
+}
+document.getElementById("search")?.addEventListener("input", renderList);
+
+function renderRecentCheckins() {
+  const el = document.getElementById("recent-list");
+  const done = allGuests.filter(g => g.status === "entrada_realizada").slice(0, 8);
+  if (!done.length) { el.innerHTML = "<p style='color:var(--muted);font-size:.85rem'>Nenhum check-in ainda.</p>"; return; }
+  el.innerHTML = done.map(g => `<div class="guest"><div class="top"><b>${g.responsavelNome}</b><span style="font-size:.75rem;color:var(--muted)">${g.checkin?.hora || ""}</span></div></div>`).join("");
+}
+
+window.switchTab = function (tab) {
+  document.getElementById("tab-lista").classList.toggle("active", tab === "lista");
+  document.getElementById("tab-checkin").classList.toggle("active", tab === "checkin");
+  document.getElementById("view-lista").classList.toggle("hidden", tab !== "lista");
+  document.getElementById("view-checkin").classList.toggle("hidden", tab !== "checkin");
+  if (tab === "checkin") startScanner(); else stopScanner();
+};
+
+function startScanner() {
+  if (scanner) return;
+  scanner = new Html5Qrcode("reader");
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 240 },
+    onScanSuccess,
+    () => {}
+  ).catch(() => {
+    document.getElementById("reader").innerHTML = "<p style='color:#fff;padding:20px'>Não foi possível acessar a câmera. Permita o acesso e recarregue a página.</p>";
+  });
+}
+
+function stopScanner() {
+  if (scanner) { scanner.stop().then(() => scanner.clear()).catch(() => {}); scanner = null; }
+}
+
+async function onScanSuccess(decodedText) {
+  if (scanLocked) return;
+  scanLocked = true;
+
+  const parts = decodedText.split("|");
+  const resultEl = document.getElementById("scan-result");
+  resultEl.classList.remove("hidden", "ok", "warn", "error");
+
+  if (parts.length !== 3) {
+    showResult("error", "⚠ CONVITE INVÁLIDO", "Este código não é reconhecido.");
+    return unlockSoon();
+  }
+  const [qrEventId, guestId, qrToken] = parts;
+
+  if (qrEventId !== eventId) {
+    showResult("error", "⚠ CONVITE NÃO PERTENCE A ESTE EVENTO", "");
+    return unlockSoon();
+  }
+
+  const guest = allGuests.find(g => g.id === guestId);
+  if (!guest || guest.qrToken !== qrToken) {
+    showResult("error", "⚠ CONVITE INVÁLIDO", "");
+    return unlockSoon();
+  }
+
+  if (guest.status === "entrada_realizada") {
+    showResult("warn", "⚠ CONVITE JÁ UTILIZADO", `Entrada registrada às ${guest.checkin?.hora || "?"}`);
+    return unlockSoon();
+  }
+  if (guest.status === "cancelado") {
+    showResult("error", "⚠ CONVITE CANCELADO", "");
+    return unlockSoon();
+  }
+
+  try {
+    await updateDoc(doc(db, "events", eventId, "guests", guestId), {
+      status: "entrada_realizada",
+      checkin: {
+        data: new Date().toLocaleDateString("pt-BR"),
+        hora: new Date().toLocaleTimeString("pt-BR"),
+        dispositivo: navigator.userAgent.slice(0, 60)
+      }
+    });
+    const acomp = (guest.acompanhantes || []).map(a => a.nome).join(", ");
+    const crianca = (guest.criancas || []).map(c => c.nome).join(", ");
+    showResult("ok", "✓ CONVITE VÁLIDO", `${guest.responsavelNome} — ${guest.totalPessoas} pessoa(s)${acomp ? " · " + acomp : ""}${crianca ? " · " + crianca : ""}`);
+  } catch (e) {
+    showResult("error", "Erro ao registrar entrada", e.message);
+  }
+  unlockSoon();
+}
+
+function showResult(type, title, sub) {
+  const el = document.getElementById("scan-result");
+  el.className = `scan-result ${type}`;
+  el.innerHTML = `<h3>${title}</h3><p>${sub}</p>`;
+}
+function unlockSoon() { setTimeout(() => { scanLocked = false; }, 2500); }
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luluzices — Painel Master</title>
+<style>
+  :root{
+    --primary:#d6336c; --primary-dark:#a61e4d; --gold:#e8c766;
+    --bg:#faf7f5; --card:#ffffff; --text:#2b2226; --muted:#8a7a80; --border:#eee0e2;
+    --danger:#c0392b; --ok:#2f9e44;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}
+  header h1{margin:0;font-size:1.2rem;font-weight:600}
+  header button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer}
+  main{max-width:960px;margin:0 auto;padding:24px 16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,.03)}
+  h2{margin-top:0;font-size:1.05rem;color:var(--primary-dark)}
+  label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
+  input,textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit}
+  textarea{min-height:60px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:600px){.row,.row3{grid-template-columns:1fr}}
+  .btn{background:var(--primary);color:#fff;border:none;padding:11px 18px;border-radius:9px;cursor:pointer;font-size:.95rem;font-weight:600}
+  .btn:hover{background:var(--primary-dark)}
+  .btn.secondary{background:#fff;color:var(--primary);border:1px solid var(--primary)}
+  .btn.danger{background:var(--danger)}
+  .btn.small{padding:6px 10px;font-size:.8rem}
+  .event-item{border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  .event-item .info b{font-size:1rem}
+  .event-item .info div{font-size:.82rem;color:var(--muted);margin-top:2px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:600}
+  .badge.active{background:#e6f8ea;color:var(--ok)}
+  .badge.inactive{background:#f1f1f1;color:var(--muted)}
+  .actions{display:flex;gap:6px;flex-wrap:wrap}
+  .link-row{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:.8rem}
+  .link-row input{flex:1;font-size:.75rem;background:#f7f2f3}
+  #login-screen{display:flex;min-height:100vh;align-items:center;justify-content:center}
+  #login-box{background:#fff;padding:32px;border-radius:16px;width:320px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+  .hidden{display:none !important}
+  .stats{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+  .stats div{background:#faf2f4;border-radius:10px;padding:8px 14px;font-size:.8rem}
+  .stats b{display:block;font-size:1.1rem;color:var(--primary-dark)}
+  .msg{font-size:.85rem;padding:8px 12px;border-radius:8px;margin-top:8px}
+  .msg.error{background:#fdecea;color:var(--danger)}
+  .msg.ok{background:#e6f8ea;color:var(--ok)}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div id="login-box">
+    <h2 style="margin-top:0">Painel Master — Luluzices</h2>
+    <label>E-mail</label>
+    <input type="email" id="login-email">
+    <label>Senha</label>
+    <input type="password" id="login-pass">
+    <button class="btn" style="width:100%;margin-top:16px" onclick="doLogin()">Entrar</button>
+    <div id="login-msg"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>🎉 Painel Master — Luluzices</h1>
+    <button onclick="doLogout()">Sair</button>
+  </header>
+  <main>
+
+    <div class="card">
+      <h2 id="form-title">Novo evento</h2>
+      <input type="hidden" id="event-id">
+      <div class="row">
+        <div><label>Nome do evento</label><input id="f-name" placeholder="Festa da Vi"></div>
+        <div><label>Nome do aniversariante/responsável</label><input id="f-host"></div>
+      </div>
+      <div class="row3">
+        <div><label>Data</label><input type="date" id="f-date"></div>
+        <div><label>Horário</label><input type="time" id="f-time"></div>
+        <div><label>Local</label><input id="f-location"></div>
+      </div>
+      <div class="row">
+        <div><label>URL da imagem de capa</label><input id="f-cover" placeholder="https://..."></div>
+        <div><label>URL da imagem de fundo</label><input id="f-bg" placeholder="https://..."></div>
+      </div>
+      <div class="row">
+        <div><label>URL do logo (opcional)</label><input id="f-logo"></div>
+        <div class="row">
+          <div><label>Cor principal</label><input type="color" id="f-color1" value="#d6336c"></div>
+          <div><label>Cor secundária</label><input type="color" id="f-color2" value="#e8c766"></div>
+        </div>
+      </div>
+      <label>Texto personalizado (convite)</label>
+      <textarea id="f-text" placeholder="Venha comemorar com a gente!"></textarea>
+      <label>Informações adicionais</label>
+      <textarea id="f-extra" placeholder="Traje, estacionamento, etc."></textarea>
+      <div style="margin-top:14px;display:flex;gap:10px">
+        <button class="btn" onclick="saveEvent()">Salvar evento</button>
+        <button class="btn secondary" onclick="resetForm()">Cancelar</button>
+      </div>
+      <div id="form-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Eventos cadastrados</h2>
+      <div id="events-list">Carregando...</div>
+    </div>
+
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, setDoc, deleteDoc, getDocs, getDoc,
+  query, orderBy, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+// COLE SEU firebaseConfig AQUI (mesmo projeto luluzices-4254e)
+const firebaseConfig = {
+  apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
+  authDomain: "luluzices-4254e.firebaseapp.com",
+  projectId: "luluzices-4254e",
+  storageBucket: "luluzices-4254e.firebasestorage.app",
+  messagingSenderId: "328419813225",
+  appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const BASE_URL = location.href.replace(/master\.html.*$/, ""); // assume os 4 arquivos na mesma pasta
+
+window.doLogin = async function () {
+  const email = document.getElementById("login-email").value.trim();
+  const pass = document.getElementById("login-pass").value;
+  const msg = document.getElementById("login-msg");
+  msg.innerHTML = "";
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Login inválido. ${e.code || ""}</div>`;
+  }
+};
+
+window.doLogout = function () { signOut(auth); };
+
+onAuthStateChanged(auth, (user) => {
+  document.getElementById("login-screen").classList.toggle("hidden", !!user);
+  document.getElementById("app").classList.toggle("hidden", !user);
+  if (user) loadEvents();
+});
+
+function slugify(name) {
+  const base = name.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${base || "evento"}-${suffix}`;
+}
+function randomToken() {
+  return crypto.getRandomValues(new Uint32Array(4)).join("").slice(0, 20);
+}
+
+window.resetForm = function () {
+  document.getElementById("event-id").value = "";
+  ["f-name","f-host","f-date","f-time","f-location","f-cover","f-bg","f-logo","f-text","f-extra"]
+    .forEach(id => document.getElementById(id).value = "");
+  document.getElementById("f-color1").value = "#d6336c";
+  document.getElementById("f-color2").value = "#e8c766";
+  document.getElementById("form-title").textContent = "Novo evento";
+  document.getElementById("form-msg").innerHTML = "";
+};
+
+window.saveEvent = async function () {
+  const msg = document.getElementById("form-msg");
+  const name = document.getElementById("f-name").value.trim();
+  if (!name) { msg.innerHTML = '<div class="msg error">Dê um nome ao evento.</div>'; return; }
+
+  let eventId = document.getElementById("event-id").value;
+  const isNew = !eventId;
+  if (isNew) eventId = slugify(name);
+
+  const data = {
+    name,
+    hostName: document.getElementById("f-host").value.trim(),
+    date: document.getElementById("f-date").value,
+    time: document.getElementById("f-time").value,
+    location: document.getElementById("f-location").value.trim(),
+    coverImage: document.getElementById("f-cover").value.trim(),
+    bgImage: document.getElementById("f-bg").value.trim(),
+    logoUrl: document.getElementById("f-logo").value.trim(),
+    colorPrimary: document.getElementById("f-color1").value,
+    colorSecondary: document.getElementById("f-color2").value,
+    customText: document.getElementById("f-text").value.trim(),
+    extraInfo: document.getElementById("f-extra").value.trim(),
+    active: true,
+  };
+  if (isNew) data.createdAt = Date.now();
+
+  try {
+    await setDoc(doc(db, "events", eventId), data, { merge: true });
+
+    if (isNew) {
+      // cria o token de acesso do cliente
+      const token = randomToken();
+      await setDoc(doc(db, "clientAccess", token), { eventId, createdAt: Date.now() });
+    }
+
+    msg.innerHTML = '<div class="msg ok">Evento salvo!</div>';
+    resetForm();
+    loadEvents();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Erro ao salvar: ${e.message}</div>`;
+  }
+};
+
+window.editEvent = async function (eventId) {
+  const snap = await getDoc(doc(db, "events", eventId));
+  if (!snap.exists()) return;
+  const d = snap.data();
+  document.getElementById("event-id").value = eventId;
+  document.getElementById("f-name").value = d.name || "";
+  document.getElementById("f-host").value = d.hostName || "";
+  document.getElementById("f-date").value = d.date || "";
+  document.getElementById("f-time").value = d.time || "";
+  document.getElementById("f-location").value = d.location || "";
+  document.getElementById("f-cover").value = d.coverImage || "";
+  document.getElementById("f-bg").value = d.bgImage || "";
+  document.getElementById("f-logo").value = d.logoUrl || "";
+  document.getElementById("f-color1").value = d.colorPrimary || "#d6336c";
+  document.getElementById("f-color2").value = d.colorSecondary || "#e8c766";
+  document.getElementById("f-text").value = d.customText || "";
+  document.getElementById("f-extra").value = d.extraInfo || "";
+  document.getElementById("form-title").textContent = `Editando: ${d.name}`;
+  window.scrollTo({top:0, behavior:"smooth"});
+};
+
+window.toggleActive = async function (eventId, current) {
+  await updateDoc(doc(db, "events", eventId), { active: !current });
+  loadEvents();
+};
+
+window.deleteEvent = async function (eventId, name) {
+  if (!confirm(`Excluir "${name}"? Isso não apaga os convidados já cadastrados, apenas o evento.`)) return;
+  await deleteDoc(doc(db, "events", eventId));
+  loadEvents();
+};
+
+window.copyLink = function (id, text) {
+  navigator.clipboard.writeText(text);
+  const el = document.getElementById(id);
+  if (el) { el.textContent = "Copiado!"; setTimeout(() => el.textContent = "Copiar", 1500); }
+};
+
+async function findClientToken(eventId) {
+  // varre clientAccess procurando o token deste evento (coleção pequena, ok para uso do master)
+  const snap = await getDocs(collection(db, "clientAccess"));
+  for (const d of snap.docs) {
+    if (d.data().eventId === eventId) return d.id;
+  }
+  return null;
+}
+
+async function loadEvents() {
+  const listEl = document.getElementById("events-list");
+  listEl.textContent = "Carregando...";
+  const snap = await getDocs(query(collection(db, "events"), orderBy("createdAt", "desc")));
+  if (snap.empty) { listEl.innerHTML = "<p>Nenhum evento cadastrado ainda.</p>"; return; }
+
+  listEl.innerHTML = "";
+  for (const docSnap of snap.docs) {
+    const eventId = docSnap.id;
+    const d = docSnap.data();
+
+    const guestsSnap = await getDocs(collection(db, "events", eventId, "guests"));
+    let totalConf = 0, totalPeople = 0, totalCheckin = 0;
+    guestsSnap.forEach(g => {
+      const gd = g.data();
+      if (gd.status !== "cancelado") { totalConf++; totalPeople += (gd.totalPessoas || 1); }
+      if (gd.status === "entrada_realizada") totalCheckin++;
+    });
+
+    const token = await findClientToken(eventId);
+    const guestLink = `${BASE_URL}evento.html?e=${eventId}`;
+    const clientLink = token ? `${BASE_URL}cliente.html?e=${eventId}&t=${token}` : "(token não encontrado)";
+    const checkinLink = `${BASE_URL}checkin.html?e=${eventId}`;
+
+    const div = document.createElement("div");
+    div.className = "event-item";
+    div.style.flexDirection = "column";
+    div.style.alignItems = "stretch";
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div class="info">
+          <b>${d.name}</b> <span class="badge ${d.active ? 'active' : 'inactive'}">${d.active ? 'Ativo' : 'Inativo'}</span>
+          <div>${d.date || "sem data"} ${d.time || ""} · ${d.location || ""}</div>
+        </div>
+        <div class="actions">
+          <button class="btn secondary small" onclick="editEvent('${eventId}')">Editar</button>
+          <button class="btn secondary small" onclick="toggleActive('${eventId}', ${d.active})">${d.active ? 'Desativar' : 'Ativar'}</button>
+          <button class="btn danger small" onclick="deleteEvent('${eventId}', '${d.name.replace(/'/g,"")}')">Excluir</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div><b>${totalConf}</b>confirmações</div>
+        <div><b>${totalPeople}</b>pessoas</div>
+        <div><b>${totalCheckin}</b>check-ins</div>
+      </div>
+      <div class="link-row"><input readonly value="${guestLink}"><button class="btn secondary small" id="cp-g-${eventId}" onclick="copyLink('cp-g-${eventId}','${guestLink}')">Copiar</button><span style="color:var(--muted)">link do convite</span></div>
+      <div class="link-row"><input readonly value="${clientLink}"><button class="btn secondary small" id="cp-c-${eventId}" onclick="copyLink('cp-c-${eventId}','${clientLink}')">Copiar</button><span style="color:var(--muted)">link do cliente</span></div>
+      <div class="link-row"><input readonly value="${checkinLink}"><button class="btn secondary small" id="cp-k-${eventId}" onclick="copyLink('cp-k-${eventId}','${checkinLink}')">Copiar</button><span style="color:var(--muted)">link de check-in</span></div>
+    `;
+    listEl.appendChild(div);
+  }
+}
+</script>
+</body>
+</html>

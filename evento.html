@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirme sua presença</title>
+<style>
+  :root{ --p:#d6336c; --s:#e8c766; --text:#2b2226; --muted:#7a6b70; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;color:var(--text);
+    background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.35)), var(--bgimg, linear-gradient(135deg,#fce4ec,#fff)) center/cover fixed;
+    min-height:100vh;}
+  .wrap{max-width:480px;margin:0 auto;padding:0 16px 60px}
+  .hero{background:#fff;border-radius:0 0 24px 24px;padding:28px 22px 22px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+  .hero img.cover{width:100%;max-height:220px;object-fit:cover;border-radius:16px;margin-bottom:14px}
+  .hero img.logo{height:48px;margin-bottom:10px}
+  .hero h1{margin:.2em 0;font-size:1.5rem;color:var(--p)}
+  .hero .sub{color:var(--muted);font-size:.95rem;margin-bottom:10px}
+  .meta{display:flex;flex-direction:column;gap:6px;margin:14px 0;font-size:.92rem}
+  .meta div{display:flex;gap:8px;align-items:center;justify-content:center}
+  .card{background:#fff;border-radius:18px;padding:20px;margin-top:16px;box-shadow:0 6px 20px rgba(0,0,0,.1)}
+  .btn{background:var(--p);color:#fff;border:none;padding:14px;border-radius:12px;font-size:1rem;font-weight:700;width:100%;cursor:pointer}
+  .btn.outline{background:#fff;color:var(--p);border:2px solid var(--p)}
+  .btn.small{width:auto;padding:8px 14px;font-size:.85rem;font-weight:600}
+  label{display:block;font-size:.82rem;color:var(--muted);margin:12px 0 4px}
+  input{width:100%;padding:11px;border:1px solid #eadfe2;border-radius:10px;font-size:.95rem}
+  .person-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+  .person-row input{flex:1}
+  .person-row .rm{background:#fdecea;color:#c0392b;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:700}
+  .add-btn{background:#faf2f4;color:var(--p);border:1px dashed var(--p);border-radius:10px;padding:9px;width:100%;cursor:pointer;font-size:.88rem;margin-top:6px}
+  .total{text-align:center;font-size:.95rem;color:var(--muted);margin-top:10px}
+  .total b{color:var(--p);font-size:1.1rem}
+  .msg{font-size:.87rem;padding:10px 12px;border-radius:10px;margin-top:10px}
+  .msg.error{background:#fdecea;color:#c0392b}
+  .qr-box{text-align:center;padding:10px}
+  .qr-box #qrcanvas-wrap{display:inline-block;padding:14px;background:#fff;border-radius:16px;border:1px solid #eee;margin:10px 0}
+  .hidden{display:none !important}
+  .loading{text-align:center;padding:60px 20px;color:#fff}
+  footer{text-align:center;color:rgba(255,255,255,.85);font-size:.8rem;padding:20px}
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading"><p>Carregando convite...</p></div>
+
+<div id="not-found" class="wrap hidden" style="padding-top:60px">
+  <div class="card" style="text-align:center">
+    <h2>Convite não encontrado</h2>
+    <p>Verifique se o link está correto.</p>
+  </div>
+</div>
+
+<div id="content" class="wrap hidden">
+  <div class="hero">
+    <img id="ev-logo" class="logo hidden">
+    <img id="ev-cover" class="cover hidden">
+    <h1 id="ev-name"></h1>
+    <div id="ev-host" class="sub"></div>
+    <div class="meta">
+      <div>📅 <span id="ev-date"></span></div>
+      <div>📍 <span id="ev-location"></span></div>
+    </div>
+    <p id="ev-text"></p>
+  </div>
+
+  <div id="form-card" class="card">
+    <h2 style="margin-top:0;color:var(--p)">Confirmar presença</h2>
+
+    <label>Seu nome completo *</label>
+    <input id="g-nome" placeholder="Nome e sobrenome">
+    <label>WhatsApp (opcional)</label>
+    <input id="g-tel" placeholder="(21) 99999-9999">
+
+    <label style="margin-top:18px">Acompanhantes (adultos)</label>
+    <div id="acomp-list"></div>
+    <button class="add-btn" onclick="addAcompanhante()">+ adicionar acompanhante</button>
+
+    <label style="margin-top:18px">Crianças</label>
+    <div id="crianca-list"></div>
+    <button class="add-btn" onclick="addCrianca()">+ adicionar criança</button>
+
+    <div class="total">Total de pessoas: <b id="total-pessoas">1</b></div>
+
+    <button class="btn" style="margin-top:18px" onclick="confirmar()">Confirmar presença</button>
+    <div id="form-msg"></div>
+  </div>
+
+  <div id="qr-card" class="card qr-box hidden">
+    <h2 style="margin-top:0;color:var(--p)">Presença confirmada! 🎉</h2>
+    <p>Apresente este QR Code na entrada do evento.</p>
+    <div id="qrcanvas-wrap"></div>
+    <p id="qr-resumo" style="color:var(--muted);font-size:.9rem"></p>
+    <button class="btn outline small" onclick="location.reload()">Ver de novo depois</button>
+  </div>
+
+  <div id="extra-info" class="card hidden">
+    <b>Informações adicionais</b>
+    <p id="ev-extra" style="color:var(--muted);white-space:pre-wrap"></p>
+  </div>
+</div>
+
+<footer>convite gerado por Luluzices</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, collection, addDoc
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
+  authDomain: "luluzices-4254e.firebaseapp.com",
+  projectId: "luluzices-4254e",
+  storageBucket: "luluzices-4254e.firebasestorage.app",
+  messagingSenderId: "328419813225",
+  appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const eventId = params.get("e");
+
+let acompCount = 0, criancaCount = 0;
+
+function fmtDate(iso, time) {
+  if (!iso) return "";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}${time ? " às " + time : ""}`;
+}
+
+async function init() {
+  if (!eventId) { showNotFound(); return; }
+  try {
+    const snap = await getDoc(doc(db, "events", eventId));
+    if (!snap.exists() || snap.data().active === false) { showNotFound(); return; }
+    render(snap.data());
+  } catch (e) {
+    showNotFound();
+  }
+}
+
+function showNotFound() {
+  document.getElementById("loading").classList.add("hidden");
+  document.getElementById("not-found").classList.remove("hidden");
+}
+
+function render(d) {
+  document.documentElement.style.setProperty("--p", d.colorPrimary || "#d6336c");
+  document.documentElement.style.setProperty("--s", d.colorSecondary || "#e8c766");
+  if (d.bgImage) document.body.style.setProperty("--bgimg", `url('${d.bgImage}')`);
+
+  document.getElementById("ev-name").textContent = d.name || "";
+  document.getElementById("ev-host").textContent = d.hostName ? `de ${d.hostName}` : "";
+  document.getElementById("ev-date").textContent = fmtDate(d.date, d.time);
+  document.getElementById("ev-location").textContent = d.location || "";
+  document.getElementById("ev-text").textContent = d.customText || "";
+
+  if (d.coverImage) { const el = document.getElementById("ev-cover"); el.src = d.coverImage; el.classList.remove("hidden"); }
+  if (d.logoUrl) { const el = document.getElementById("ev-logo"); el.src = d.logoUrl; el.classList.remove("hidden"); }
+  if (d.extraInfo) {
+    document.getElementById("ev-extra").textContent = d.extraInfo;
+    document.getElementById("extra-info").classList.remove("hidden");
+  }
+
+  // se já confirmou antes neste navegador, mostra o QR de novo em vez do formulário
+  const saved = localStorage.getItem(`rsvp_${eventId}`);
+  if (saved) {
+    try {
+      const info = JSON.parse(saved);
+      document.getElementById("form-card").classList.add("hidden");
+      showQr(info.guestId, info.qrToken, info.resumo);
+    } catch(e) {}
+  }
+
+  document.getElementById("loading").classList.add("hidden");
+  document.getElementById("content").classList.remove("hidden");
+  updateTotal();
+}
+
+window.addAcompanhante = function () {
+  acompCount++;
+  const id = `ac-${acompCount}`;
+  const row = document.createElement("div");
+  row.className = "person-row";
+  row.id = id;
+  row.innerHTML = `<input placeholder="Nome do acompanhante" data-role="acomp">
+    <button class="rm" onclick="document.getElementById('${id}').remove(); updateTotal()">×</button>`;
+  document.getElementById("acomp-list").appendChild(row);
+  updateTotal();
+};
+
+window.addCrianca = function () {
+  criancaCount++;
+  const id = `cr-${criancaCount}`;
+  const row = document.createElement("div");
+  row.className = "person-row";
+  row.id = id;
+  row.innerHTML = `<input placeholder="Nome da criança" data-role="crianca-nome">
+    <input placeholder="Idade" type="number" min="0" max="17" style="max-width:80px" data-role="crianca-idade">
+    <button class="rm" onclick="document.getElementById('${id}').remove(); updateTotal()">×</button>`;
+  document.getElementById("crianca-list").appendChild(row);
+  updateTotal();
+};
+
+window.updateTotal = function () {
+  const acomp = document.querySelectorAll('[data-role="acomp"]').length;
+  const criancas = document.querySelectorAll('[data-role="crianca-nome"]').length;
+  document.getElementById("total-pessoas").textContent = 1 + acomp + criancas;
+};
+document.addEventListener("input", (e) => { if (e.target.matches('[data-role]')) updateTotal(); });
+
+function randomToken() {
+  return crypto.getRandomValues(new Uint32Array(4)).join("").slice(0, 20);
+}
+
+window.confirmar = async function () {
+  const msg = document.getElementById("form-msg");
+  const nome = document.getElementById("g-nome").value.trim();
+  if (!nome) { msg.innerHTML = '<div class="msg error">Digite seu nome completo.</div>'; return; }
+
+  const acompanhantes = [...document.querySelectorAll('[data-role="acomp"]')]
+    .map(i => i.value.trim()).filter(Boolean).map(nome => ({ nome }));
+
+  const criancaRows = document.querySelectorAll('#crianca-list .person-row');
+  const criancas = [];
+  criancaRows.forEach(row => {
+    const nome = row.querySelector('[data-role="crianca-nome"]').value.trim();
+    const idade = row.querySelector('[data-role="crianca-idade"]').value;
+    if (nome) criancas.push({ nome, idade: idade ? Number(idade) : null });
+  });
+
+  const totalPessoas = 1 + acompanhantes.length + criancas.length;
+  const qrToken = randomToken();
+
+  const data = {
+    responsavelNome: nome,
+    telefone: document.getElementById("g-tel").value.trim(),
+    acompanhantes,
+    criancas,
+    totalPessoas,
+    status: "confirmado",
+    qrToken,
+    confirmadoEm: Date.now(),
+    checkin: null
+  };
+
+  try {
+    const ref = await addDoc(collection(db, "events", eventId, "guests"), data);
+    const resumo = `${nome} + ${totalPessoas - 1} pessoa(s) — total ${totalPessoas}`;
+    localStorage.setItem(`rsvp_${eventId}`, JSON.stringify({ guestId: ref.id, qrToken, resumo }));
+    document.getElementById("form-card").classList.add("hidden");
+    showQr(ref.id, qrToken, resumo);
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Não foi possível confirmar: ${e.message}</div>`;
+  }
+};
+
+function showQr(guestId, qrToken, resumo) {
+  const payload = `${eventId}|${guestId}|${qrToken}`;
+  const qr = qrcode(0, "M");
+  qr.addData(payload);
+  qr.make();
+  document.getElementById("qrcanvas-wrap").innerHTML = qr.createImgTag(6, 8);
+  document.getElementById("qr-resumo").textContent = resumo || "";
+  document.getElementById("qr-card").classList.remove("hidden");
+}
+
+init();
+</script>
+</body>
+</html>
