@@ -60,19 +60,12 @@
         <div id="img-preview" class="hidden" style="margin-top:8px">
           <img id="img-preview-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px">
         </div>
-        <a href="#" onclick="toggleImgManual();return false" style="font-size:.78rem;color:var(--p)">colar imagem manualmente</a>
-        <div id="img-manual" class="hidden">
-          <label>URL da imagem</label>
-          <input id="i-img" placeholder="https://...">
-        </div>
       </div>
       <div id="campos-pix" class="hidden">
         <label>Valor sugerido</label>
         <input id="i-valor" placeholder="R$ 100">
         <label>Chave Pix</label>
         <input id="i-pix" placeholder="email, celular ou chave aleatória">
-        <label>URL da imagem (opcional)</label>
-        <input id="i-img-pix" placeholder="https://...">
       </div>
 
       <button class="btn" style="margin-top:14px" onclick="addItem()">+ Adicionar à lista</button>
@@ -116,10 +109,6 @@ window.setTipo = function (tipo) {
   document.getElementById("campos-pix").classList.toggle("hidden", tipo !== "pix");
 };
 
-window.toggleImgManual = function () {
-  document.getElementById("img-manual").classList.toggle("hidden");
-};
-
 let imagemAutomatica = "";
 
 window.buscarImagem = async function () {
@@ -156,7 +145,9 @@ async function init() {
 
     const listaSnap = await getDoc(doc(db, "listas", listaId));
     if (!listaSnap.exists()) return denied();
-    document.getElementById("l-nome").textContent = listaSnap.data().nome || "Lista de presentes";
+    const ld = listaSnap.data();
+    document.documentElement.style.setProperty("--p", ld.colorPrimary || "#d6336c");
+    document.getElementById("l-nome").textContent = ld.nome || "Lista de presentes";
 
     document.getElementById("loading").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
@@ -195,11 +186,9 @@ window.addItem = async function () {
   const nome = document.getElementById("i-nome").value.trim();
   if (!nome) { msg.innerHTML = '<div class="msg error">Dê um nome ao item.</div>'; return; }
 
-  const manualImg = document.getElementById("i-img").value.trim();
-  const pixImg = document.getElementById("i-img-pix").value.trim();
   const data = {
     nome,
-    imagemUrl: tipoAtual === "produto" ? (manualImg || imagemAutomatica) : pixImg,
+    imagemUrl: tipoAtual === "produto" ? imagemAutomatica : "",
     tipo: tipoAtual,
     reservado: false,
     reservadoPor: null,
@@ -215,8 +204,6 @@ window.addItem = async function () {
   try {
     await addDoc(collection(db, "listas", listaId, "itens"), data);
     document.getElementById("i-nome").value = "";
-    document.getElementById("i-img").value = "";
-    document.getElementById("i-img-pix").value = "";
     document.getElementById("i-link").value = "";
     document.getElementById("i-valor").value = "";
     document.getElementById("i-pix").value = "";
