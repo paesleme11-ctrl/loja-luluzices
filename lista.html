@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lista de Presentes</title>
+<style>
+  :root{ --p:#d6336c; --bg:#faf7f5; --card:#fff; --text:#2b2226; --muted:#8a7a80; --border:#eee0e2; --ok:#2f9e44; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:linear-gradient(135deg,var(--p),#a61e4d);color:#fff;padding:26px 20px;text-align:center}
+  header h1{margin:0;font-size:1.3rem}
+  main{max-width:560px;margin:0 auto;padding:18px 14px 60px}
+  .item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;display:flex;gap:12px;align-items:center}
+  .item img{width:72px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0}
+  .item .info{flex:1}
+  .item b{font-size:.95rem}
+  .item .detail{font-size:.82rem;color:var(--muted);margin-top:4px}
+  .pix-box{background:#faf2f4;border-radius:8px;padding:6px 10px;margin-top:6px;font-size:.8rem;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .btn{background:var(--p);color:#fff;border:none;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer;font-size:.85rem;white-space:nowrap}
+  .btn.tiny{padding:5px 9px;font-size:.72rem;background:#fff;color:var(--p);border:1px solid var(--p)}
+  a.buy{font-size:.82rem;color:var(--p);font-weight:600}
+  .hidden{display:none !important}
+  #loading,#empty,#access-denied{padding:80px 20px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="loading">Carregando...</div>
+<div id="access-denied" class="hidden"><h2>Lista não encontrada</h2></div>
+
+<div id="app" class="hidden">
+  <header><h1 id="l-nome">Lista de Presentes</h1></header>
+  <main>
+    <div id="empty" class="hidden"><p>Todos os presentes já foram escolhidos — obrigado pelo carinho! 💝</p></div>
+    <div id="item-list"></div>
+  </main>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, collection, updateDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
+  authDomain: "luluzices-4254e.firebaseapp.com",
+  projectId: "luluzices-4254e",
+  storageBucket: "luluzices-4254e.firebasestorage.app",
+  messagingSenderId: "328419813225",
+  appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const listaId = params.get("l");
+
+async function init() {
+  if (!listaId) return denied();
+  try {
+    const snap = await getDoc(doc(db, "listas", listaId));
+    if (!snap.exists() || snap.data().active === false) return denied();
+    document.getElementById("l-nome").textContent = snap.data().nome || "Lista de Presentes";
+    document.getElementById("loading").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    listenItens();
+  } catch (e) { denied(); }
+}
+
+function denied() {
+  document.getElementById("loading").classList.add("hidden");
+  document.getElementById("access-denied").classList.remove("hidden");
+}
+
+function listenItens() {
+  onSnapshot(collection(db, "listas", listaId, "itens"), (snap) => {
+    const disponiveis = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.reservado);
+    document.getElementById("empty").classList.toggle("hidden", disponiveis.length > 0);
+    document.getElementById("item-list").innerHTML = disponiveis.map(i => {
+      const detail = i.tipo === "pix"
+        ? `<div class="pix-box"><span>Pix ${i.valorSugerido ? "· " + i.valorSugerido : ""}: ${i.chavePix || ""}</span>
+            <button class="btn tiny" onclick="copiarPix('${(i.chavePix||'').replace(/'/g,"")}')">Copiar</button></div>`
+        : (i.linkCompra ? `<a class="buy" href="${i.linkCompra}" target="_blank" rel="noopener">Ver produto ↗</a>` : "");
+      return `<div class="item">
+        ${i.imagemUrl ? `<img src="${i.imagemUrl}">` : ""}
+        <div class="info">
+          <b>${i.nome}</b>
+          <div class="detail">${detail}</div>
+        </div>
+        <button class="btn" onclick="escolher('${i.id}')">Escolher</button>
+      </div>`;
+    }).join("");
+  });
+}
+
+window.copiarPix = function (chave) {
+  navigator.clipboard.writeText(chave);
+  alert("Chave Pix copiada!");
+};
+
+window.escolher = async function (itemId) {
+  const nome = prompt("Seu nome, para o casal/aniversariante saber quem trouxe este presente:");
+  if (!nome || !nome.trim()) return;
+  await updateDoc(doc(db, "listas", listaId, "itens", itemId), {
+    reservado: true,
+    reservadoPor: { nome: nome.trim(), reservadoEm: Date.now() }
+  });
+};
+
+init();
+</script>
+</body>
+</html>
