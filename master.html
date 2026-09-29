@@ -124,6 +124,10 @@
         <div><label>Nome da lista</label><input id="lp-nome" placeholder="Chá de bebê da Marina"></div>
         <div><label>Tipo (opcional)</label><input id="lp-tipo" placeholder="Chá de bebê, casamento..."></div>
       </div>
+      <div class="row">
+        <div><label>Cor principal</label><input type="color" id="lp-color1" value="#d6336c"></div>
+        <div><label>Cor secundária</label><input type="color" id="lp-color2" value="#e8c766"></div>
+      </div>
       <button class="btn" style="margin-top:12px" onclick="saveLista()">Criar lista</button>
       <div id="lista-msg"></div>
       <div id="listas-list" style="margin-top:16px"></div>
@@ -416,6 +420,8 @@ window.saveLista = async function () {
     await setDoc(doc(db, "listas", listaId), {
       nome,
       tipo: document.getElementById("lp-tipo").value.trim(),
+      colorPrimary: document.getElementById("lp-color1").value,
+      colorSecondary: document.getElementById("lp-color2").value,
       active: true,
       createdAt: Date.now()
     });
@@ -472,10 +478,23 @@ async function loadListas() {
       </div>
       <div class="link-row"><input readonly value="${clientLink}"><button class="btn secondary small" id="cp-lc-${listaId}" onclick="copyLink('cp-lc-${listaId}','${clientLink}')">Copiar</button><span style="color:var(--muted)">link do cliente (gerencia a lista)</span></div>
       <div class="link-row"><input readonly value="${guestLink}"><button class="btn secondary small" id="cp-lg-${listaId}" onclick="copyLink('cp-lg-${listaId}','${guestLink}')">Copiar</button><span style="color:var(--muted)">link do convidado</span></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+        <label style="margin:0">Cores:</label>
+        <input type="color" id="lc1-${listaId}" value="${d.colorPrimary || '#d6336c'}">
+        <input type="color" id="lc2-${listaId}" value="${d.colorSecondary || '#e8c766'}">
+        <button class="btn secondary small" onclick="saveListaCores('${listaId}')">Salvar cores</button>
+      </div>
     `;
     el.appendChild(div);
   }
 }
+
+window.saveListaCores = async function (listaId) {
+  await updateDoc(doc(db, "listas", listaId), {
+    colorPrimary: document.getElementById(`lc1-${listaId}`).value,
+    colorSecondary: document.getElementById(`lc2-${listaId}`).value
+  });
+};
 </script>
 </body>
 </html>
