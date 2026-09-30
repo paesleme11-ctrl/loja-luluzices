@@ -521,6 +521,31 @@
     padding: 7px 12px; font-size: 11px; font-weight: 700; flex-shrink: 0; pointer-events: none;
   }
 
+  .ofertas-overlay { position:fixed; inset:0; z-index:1001; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(26,18,20,.58); }
+  .ofertas-overlay.open { display:flex; }
+  .ofertas-modal { width:560px; max-width:100%; max-height:92vh; overflow:auto; background:#fff; border-radius:20px; box-shadow:var(--shadow-lg); }
+  .ofertas-header { padding:20px 22px 14px; display:flex; align-items:flex-start; justify-content:space-between; border-bottom:1px solid var(--border); }
+  .ofertas-header h2 { font-size:22px; }
+  .ofertas-header p { color:var(--ink-muted); font-size:13px; margin-top:3px; }
+  .ofertas-close { background:none; border:0; color:var(--ink-muted); font-size:22px; }
+  .ofertas-body { padding:16px 22px; }
+  .oferta-global { margin-bottom:18px; padding:14px; border:1px dashed var(--rose); border-radius:14px; background:linear-gradient(135deg,var(--rose-light),#fff); }
+  .oferta-global-titulo { font-size:14px; font-weight:700; margin-bottom:4px; }
+  .oferta-global-card { display:flex; align-items:center; gap:12px; }
+  .oferta-global-card .orderbump-thumb { width:64px; height:64px; }
+  .adicionais-globais-titulo { font-size:14px; font-weight:700; margin:8px 0 10px; }
+  .adicionais-globais-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .adicional-global-card { position:relative; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; cursor:pointer; background:#fff; }
+  .adicional-global-card.selecionado { border-color:var(--rose); box-shadow:0 0 0 2px var(--rose-light); }
+  .adicional-global-foto { aspect-ratio:1; background:linear-gradient(135deg,var(--rose-light),var(--warm)); display:flex; align-items:center; justify-content:center; font-size:30px; }
+  .adicional-global-foto img { width:100%; height:100%; object-fit:cover; }
+  .adicional-global-check { position:absolute; top:7px; right:7px; width:22px; height:22px; accent-color:var(--rose); }
+  .adicional-global-info { padding:8px; }
+  .adicional-global-nome { font-size:12px; line-height:1.3; min-height:32px; font-weight:600; }
+  .adicional-global-preco { color:var(--rose); font-size:13px; font-weight:700; margin-top:4px; }
+  .ofertas-footer { padding:14px 22px 20px; border-top:1px solid var(--border); }
+  @media(max-width:420px) { .ofertas-body,.ofertas-header,.ofertas-footer { padding-left:15px; padding-right:15px; } .adicionais-globais-grid { gap:7px; } .adicional-global-info { padding:6px; } }
+
   .cart-empty { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
   .cart-empty .icon { font-size: 36px; margin-bottom: 10px; }
 
@@ -803,6 +828,14 @@
   </div>
 </div>
 
+<div class="ofertas-overlay" id="ofertasOverlay" role="dialog" aria-modal="true" aria-labelledby="ofertasTitulo">
+  <div class="ofertas-modal">
+    <div class="ofertas-header"><div><h2 id="ofertasTitulo">Complete seu pedido</h2><p>Confira as ofertas especiais para o seu carrinho.</p></div><button class="ofertas-close" onclick="fecharOfertas()" aria-label="Fechar">✕</button></div>
+    <div class="ofertas-body" id="ofertasBody"></div>
+    <div class="ofertas-footer"><button class="btn-finalizar" onclick="confirmarOfertas()">Adicionar selecionados e continuar</button><button class="voltar-etapa" onclick="fecharOfertas()">Agora não, continuar sem extras</button></div>
+  </div>
+</div>
+
 <!-- ═══════════════════ MODAL DE CHECKOUT ═══════════════════ -->
 <div class="modal-overlay" id="checkoutOverlay">
   <div class="checkout-modal">
@@ -968,6 +1001,18 @@ let carrinho = [];        // [{ id, nome, preco, categoria }]
 let orderBumpAceito = null; // id do produto de order bump aceito pelo cliente, ou null
 let produtoAtual = null;  // produto sendo visualizado na página de detalhe
 let adicionaisSelecionados = []; // [{ id, nome, preco }] — adicionais marcados na página atual
+let ofertaCrossSellGlobal = { produtoId:'', descontoTipo:'fixo', descontoValor:0, texto:'' };
+let adicionaisGlobais = [];
+let produtoPendenteOfertas = null;
+let adicionaisGlobaisSelecionados = new Set();
+
+async function salvarProdutosSite() {
+  return db.collection('config').doc('produtosSite').set({
+    data: JSON.stringify(produtos),
+    crossSellGlobal: ofertaCrossSellGlobal,
+    adicionaisGlobais: adicionaisGlobais,
+  });
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function BRL(v) {
@@ -993,7 +1038,10 @@ async function carregarProdutos() {
   try {
     const doc = await db.collection('config').doc('produtosSite').get();
     if (!doc.exists) { produtos = []; renderCatalogo(); return; }
-    const lista = JSON.parse(doc.data().data || '[]');
+    const configProdutos = doc.data() || {};
+    const lista = JSON.parse(configProdutos.data || '[]');
+    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
+    adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0, 3) : [];
     // Só produtos ativos e com preço definido (ou sob consulta) aparecem no site público
     produtos = lista.filter(p => (p.preco > 0 || p.sobConsulta) && p.ativo !== false).map(p => ({
       ...p,
@@ -1267,24 +1315,10 @@ function abrirProduto(id) {
        no WhatsApp e redes sociais. Personalização com nome, data, hora e local do evento.
        Entrega em até 3 dias úteis após confirmação dos dados.`;
 
-  const adicionaisHtml = (p.adicionais && p.adicionais.length > 0) ? `
-    <div class="produto-adicionais">
-      <div class="adicionais-titulo">Opções extras</div>
-      ${p.adicionais.map(a => `
-        <label class="adicional-check">
-          <input type="checkbox" value="${a.id}" onchange="toggleAdicional('${a.id}', ${a.preco}, '${a.nome.replace(/'/g,"\\'")}')">
-          <span class="adicional-nome-check">${a.nome}</span>
-          <span class="adicional-preco-check">+ ${BRL(a.preco)}</span>
-        </label>
-      `).join('')}
-    </div>
-  ` : '';
+  const adicionaisHtml = '';
 
   // Cross-sell: produtos do mesmo tema (se tiver) ou marcados manualmente na lista crossSell
-  const idsCrossManual = p.crossSell || [];
-  const doMesmoTema = p.temaId ? produtos.filter(x => x.temaId === p.temaId && x.id !== p.id) : [];
-  const crossIds = new Set([...idsCrossManual, ...doMesmoTema.map(x => x.id)]);
-  const crossProdutos = [...crossIds].map(cid => produtos.find(x => x.id === cid)).filter(Boolean);
+  const crossProdutos = [];
 
   const crossSellHtml = crossProdutos.length ? `
     <div class="produto-crosssell">
@@ -1335,7 +1369,7 @@ function adicionarAoCarrinho(id) {
   carrinho.push({ id: p.id, nome: p.nome, preco: p.preco, categoria: p.categoria, adicionais: [] });
   atualizarCarrinhoUI();
   showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
-  abrirCarrinho();
+  abrirOfertasParaItem(carrinho[carrinho.length - 1]);
 }
 
 /** Marca/desmarca um adicional na página de produto, recalculando o preço total exibido */
@@ -1360,18 +1394,81 @@ function atualizarPrecoTotalProduto() {
 function adicionarAoCarrinhoComAdicionais(id) {
   const p = produtos.find(x => x.id === id);
   if (!p) return;
-  const adicionaisCopy = [...adicionaisSelecionados];
-  const totalAdicionais = adicionaisCopy.reduce((s, a) => s + a.preco, 0);
   carrinho.push({
     id: p.id,
     nome: p.nome,
-    preco: p.preco + totalAdicionais, // preço já com adicionais embutidos
+    preco: p.preco,
     precoBase: p.preco,
     categoria: p.categoria,
-    adicionais: adicionaisCopy,
+    foto: (p.fotos && p.fotos[0]) || p.foto || null,
+    adicionais: [],
   });
+  adicionaisSelecionados = [];
   atualizarCarrinhoUI();
-  showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
+  fecharCarrinho();
+  abrirOfertasParaItem(carrinho[carrinho.length - 1]);
+}
+
+function calcularPrecoCrossSellGlobal(p) {
+  if (!p) return 0;
+  const valor = Number(ofertaCrossSellGlobal.descontoValor) || 0;
+  const final = ofertaCrossSellGlobal.descontoTipo === 'percentual' ? p.preco * (1 - valor / 100) : p.preco - valor;
+  return Math.max(0, final);
+}
+
+function abrirOfertasParaItem(item) {
+  produtoPendenteOfertas = item;
+  adicionaisGlobaisSelecionados = new Set();
+  renderOfertasGlobais();
+  document.getElementById('ofertasOverlay').classList.add('open');
+}
+
+function renderOfertasGlobais() {
+  const body = document.getElementById('ofertasBody');
+  const idsNoCarrinho = new Set(carrinho.map(i => i.id));
+  const cross = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id);
+  const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).slice(0, 3);
+  let html = '';
+  if (cross) {
+    const preco = calcularPrecoCrossSellGlobal(cross);
+    const foto = (cross.fotos && cross.fotos[0]) || cross.foto;
+    html += `<section class="oferta-global"><div class="oferta-global-titulo">🎁 ${ofertaCrossSellGlobal.texto || 'Oferta especial para o seu carrinho'}</div><label class="oferta-global-card"><input type="checkbox" id="crossSellGlobalCheck"><div class="orderbump-thumb">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${cross.nome}">` : emojiPara(cross.categoria)}</div><div class="orderbump-info"><div class="orderbump-texto">${cross.nome}</div><div class="orderbump-precos"><span class="orderbump-preco-antigo">${BRL(cross.preco)}</span><span class="orderbump-preco-novo">${BRL(preco)}</span></div></div><span class="orderbump-btn-add">+ Incluir</span></label></section>`;
+  }
+  if (extras.length) {
+    html += `<div class="adicionais-globais-titulo">Quer incluir mais algum produto? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; return `<label class="adicional-global-card" id="adicionalGlobalCard_${p.id}"><input class="adicional-global-check" type="checkbox" value="${p.id}" onchange="toggleAdicionalGlobal('${p.id}')"><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></label>`; }).join('')}</div>`;
+  }
+  if (!html) html = '<p style="text-align:center;color:var(--ink-muted);padding:18px 0">Seu produto já está no carrinho. Você pode continuar.</p>';
+  body.innerHTML = html;
+}
+
+function toggleAdicionalGlobal(id) {
+  if (adicionaisGlobaisSelecionados.has(id)) adicionaisGlobaisSelecionados.delete(id);
+  else if (adicionaisGlobaisSelecionados.size < 3) adicionaisGlobaisSelecionados.add(id);
+  else { const check = document.querySelector(`.adicional-global-check[value="${id}"]`); if (check) check.checked = false; showToast('Você pode escolher até 3 produtos extras.', 'error'); return; }
+  const card = document.getElementById('adicionalGlobalCard_' + id);
+  if (card) card.classList.toggle('selecionado', adicionaisGlobaisSelecionados.has(id));
+}
+
+function confirmarOfertas() {
+  const nomeProdutoAdicionado = produtoPendenteOfertas?.nome || 'Produto';
+  const cross = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
+  if (cross && document.getElementById('crossSellGlobalCheck')?.checked && !carrinho.some(i => i.id === cross.id)) {
+    carrinho.push({ id:cross.id, nome:cross.nome, preco:calcularPrecoCrossSellGlobal(cross), precoBase:cross.preco, foto:(cross.fotos&&cross.fotos[0])||cross.foto||null, categoria:cross.categoria, adicionais:[], _viaOrderBump:true });
+  }
+  for (const id of adicionaisGlobaisSelecionados) {
+    const p = produtos.find(x => x.id === id);
+    if (p && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:p.preco, categoria:p.categoria, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
+  }
+  fecharOfertas();
+  atualizarCarrinhoUI();
+  showToast(`${nomeProdutoAdicionado} adicionado ao carrinho ✓`, 'success');
+  abrirCarrinho();
+}
+
+function fecharOfertas() {
+  document.getElementById('ofertasOverlay').classList.remove('open');
+  produtoPendenteOfertas = null;
+  adicionaisGlobaisSelecionados = new Set();
   abrirCarrinho();
 }
 
@@ -1488,7 +1585,7 @@ function atualizarCarrinhoUI() {
   if (orderBumpAceito && !carrinho.some(c => c.id === orderBumpAceito)) {
     orderBumpAceito = null;
   }
-  renderOrderBumpNoCarrinho();
+  // A oferta global é apresentada na tela exibida ao adicionar um produto.
 
   const total = carrinho.reduce((s, i) => s + i.preco, 0);
   document.getElementById('cartTotalValor').textContent = BRL(total);
@@ -1736,6 +1833,7 @@ document.addEventListener('keydown', (e) => {
       <div class="admin-tab" data-atab="banners" onclick="adminGoTab('banners')">📣 Banners</div>
       <div class="admin-tab" data-atab="cores" onclick="adminGoTab('cores')">🌈 Cores</div>
       <div class="admin-tab" data-atab="logo" onclick="adminGoTab('logo')">🖼️ Logo</div>
+      <div class="admin-tab" data-atab="ofertas" onclick="adminGoTab('ofertas')">🎁 Ofertas globais</div>
     </div>
 
     <!-- PRODUTOS -->
@@ -1769,6 +1867,26 @@ document.addEventListener('keydown', (e) => {
         </select>
       </div>
       <div id="adminProdutosGrid" class="admin-grid"></div>
+    </div>
+
+    <div class="admin-subpage" id="atab-ofertas">
+      <div style="max-width:680px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;">
+        <h3 style="font-size:18px;margin-bottom:6px;">Ofertas exibidas ao adicionar ao carrinho</h3>
+        <p style="font-size:12.5px;color:#9a8890;margin-bottom:18px;">Estas opções aparecem para todos os produtos depois que o cliente clica em “Adicionar ao carrinho”.</p>
+        <div class="admin-field"><label>Cross-sell global (uma oferta com desconto)</label>
+          <select id="aCrossSellGlobal"><option value="">Nenhum produto selecionado</option></select>
+        </div>
+        <div class="admin-row2">
+          <div class="admin-field"><label>Tipo de desconto</label><select id="aCrossSellGlobalTipo"><option value="fixo">Valor fixo (R$)</option><option value="percentual">Percentual (%)</option></select></div>
+          <div class="admin-field"><label>Desconto</label><input type="number" id="aCrossSellGlobalValor" min="0" step="0.01" placeholder="Ex.: 10"></div>
+        </div>
+        <div class="admin-field"><label>Texto da oferta</label><input type="text" id="aCrossSellGlobalTexto" placeholder="Ex.: Aproveite esta oferta especial"></div>
+        <div class="admin-field"><label>Produtos adicionais (até 3)</label>
+          <select id="aAdicionaisGlobais" multiple style="min-height:120px;"></select>
+          <small style="color:#9a8890;">Segure Ctrl (ou ⌘ no Mac) para selecionar mais de um. O cliente poderá escolher os produtos que quiser.</small>
+        </div>
+        <button class="admin-btn-primary" onclick="adminSalvarOfertasGlobais()">Salvar ofertas globais</button>
+      </div>
     </div>
 
     <!-- TEMAS -->
@@ -1868,43 +1986,7 @@ document.addEventListener('keydown', (e) => {
 
       <div class="admin-field"><label>Descrição</label><textarea id="aDescricao" rows="3"></textarea></div>
 
-      <div class="admin-field">
-        <label>Adicionais</label>
-        <div id="adminAdicionaisContainer"></div>
-        <button type="button" class="admin-btn-ghost" onclick="adminAddAdicionalLinha()">+ Adicionar opção extra</button>
-      </div>
-
-      <div class="admin-field">
-        <label>Cross-sell manual (além do que é automático por tema)</label>
-        <select id="aCrossSell" multiple style="min-height:80px;"></select>
-      </div>
-
-      <div class="admin-field admin-orderbump-box">
-        <label>Order Bump (oferta especial no carrinho)</label>
-        <p style="font-size:11px;color:#9a8890;margin-bottom:8px;">Quando o cliente adicionar este produto ao carrinho, o produto escolhido abaixo aparece como oferta extra com desconto na hora de finalizar.</p>
-        <div style="position:relative;">
-          <input type="text" id="aOrderBumpInput" placeholder="Buscar produto..." autocomplete="off"
-                 oninput="adminOnOrderBumpInput()" onfocus="adminOnOrderBumpInput()" onblur="setTimeout(adminFecharOrderBumpSugestoes,150)">
-          <input type="hidden" id="aOrderBump">
-          <div id="adminOrderBumpSugestoes" class="admin-sugestoes"></div>
-        </div>
-        <div id="aOrderBumpCampos" style="display:none;margin-top:10px;">
-          <div class="admin-row2">
-            <div class="admin-field"><label>Tipo de desconto</label>
-              <select id="aOrderBumpDescontoTipo" onchange="adminOrderBumpToggleTipo()">
-                <option value="fixo">Valor fixo (R$)</option>
-                <option value="percentual">Percentual (%)</option>
-              </select>
-            </div>
-            <div class="admin-field"><label id="aOrderBumpDescontoLabel">Desconto (R$)</label>
-              <input type="number" id="aOrderBumpDescontoValor" step="0.01" min="0" placeholder="Ex: 10">
-            </div>
-          </div>
-          <div class="admin-field"><label>Texto da oferta (opcional)</label>
-            <input type="text" id="aOrderBumpTexto" placeholder="Ex: Leve também o Filtro do Instagram com desconto!">
-          </div>
-        </div>
-      </div>
+      <p style="font-size:11.5px;color:#9a8890;">As ofertas e os produtos adicionais são configurados uma única vez em “Ofertas globais”.</p>
     </div>
     <div class="admin-modal-footer">
       <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalProduto')">Cancelar</button>
@@ -2080,9 +2162,37 @@ function adminFecharModal(id) { document.getElementById(id).classList.remove('op
 
 async function adminCarregarTudo() {
   await Promise.all([carregarProdutos(), carregarTemas(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
+  adminCarregarOfertasGlobais();
   adminRenderProdutos();
   adminRenderTemas();
   adminRenderBanners();
+}
+
+function adminCarregarOfertasGlobais() {
+  const crossSelect = document.getElementById('aCrossSellGlobal');
+  const extrasSelect = document.getElementById('aAdicionaisGlobais');
+  const opcoes = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+  crossSelect.innerHTML = '<option value="">Nenhum produto selecionado</option>' + opcoes;
+  extrasSelect.innerHTML = opcoes;
+  crossSelect.value = ofertaCrossSellGlobal.produtoId || '';
+  document.getElementById('aCrossSellGlobalTipo').value = ofertaCrossSellGlobal.descontoTipo || 'fixo';
+  document.getElementById('aCrossSellGlobalValor').value = ofertaCrossSellGlobal.descontoValor || '';
+  document.getElementById('aCrossSellGlobalTexto').value = ofertaCrossSellGlobal.texto || '';
+  Array.from(extrasSelect.options).forEach(o => o.selected = adicionaisGlobais.includes(o.value));
+}
+
+async function adminSalvarOfertasGlobais() {
+  const extras = Array.from(document.getElementById('aAdicionaisGlobais').selectedOptions).map(o => o.value);
+  if (extras.length > 3) { showToast('Selecione no máximo 3 produtos adicionais.', 'error'); return; }
+  ofertaCrossSellGlobal = {
+    produtoId: document.getElementById('aCrossSellGlobal').value,
+    descontoTipo: document.getElementById('aCrossSellGlobalTipo').value,
+    descontoValor: parseFloat(document.getElementById('aCrossSellGlobalValor').value) || 0,
+    texto: document.getElementById('aCrossSellGlobalTexto').value.trim(),
+  };
+  adicionaisGlobais = extras;
+  try { await salvarProdutosSite(); showToast('Ofertas globais salvas ✓', 'success'); }
+  catch (e) { showToast('Não foi possível salvar as ofertas.', 'error'); }
 }
 
 async function carregarTemas() {
@@ -2257,7 +2367,7 @@ async function adminImportarCSV(event) {
   });
 
   try {
-    await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) });
+    await salvarProdutosSite();
     if (comAvisoTema > 0) await salvarTemasRemote();
   } catch(e) { console.warn(e); }
 
@@ -2300,7 +2410,7 @@ async function adminExcluirSelecionadosMassa() {
   if (!confirm(`Excluir ${qtd} produto${qtd===1?'':'s'} selecionado${qtd===1?'':'s'}? Essa ação não pode ser desfeita.`)) return;
   produtos = produtos.filter(p => !produtosSelecionadosMassa.has(p.id));
   produtosSelecionadosMassa.clear();
-  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  try { await salvarProdutosSite(); } catch(e) {}
   adminAtualizarBarraMassa();
   adminRenderProdutos();
   showToast(`${qtd} produto${qtd===1?'':'s'} excluído${qtd===1?'':'s'}`, 'error');
@@ -2373,7 +2483,7 @@ async function adminToggleAtivoProduto(id) {
   const p = produtos.find(x => x.id === id);
   if (!p) return;
   p.ativo = p.ativo === false ? true : false;
-  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  try { await salvarProdutosSite(); } catch(e) {}
   adminRenderProdutos();
   showToast(p.ativo === false ? 'Produto desativado' : 'Produto ativado ✓', p.ativo === false ? 'error' : 'success');
 }
@@ -2521,9 +2631,7 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
   // No modo duplicado, carrega os dados do produto em idx, mas trata como "novo"
   // (sem editar o original) — _editandoProdutoIdx fica null pra salvar como item novo.
   _editandoProdutoIdx = comoNovoDuplicado ? null : idx;
-  document.getElementById('adminAdicionaisContainer').innerHTML = '';
   const editando = idx !== null ? produtos[idx] : null;
-  adminPopularCrossSell(comoNovoDuplicado ? null : editando?.id);
   _fotosGaleriaAdmin = editando ? [...(editando.fotos || (editando.foto ? [editando.foto] : []))] : [];
   adminRenderFotosGaleria();
 
@@ -2540,27 +2648,13 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
     document.getElementById('aPromoAtiva').checked = !!p.promoAtiva;
     document.getElementById('aPromoTipo').value = p.promoTipo || 'percentual';
     document.getElementById('aPromoValor').value = p.promoValor || '';
-    (p.adicionais || []).forEach(a => adminAddAdicionalLinha(a.nome, a.preco));
-    // No modo duplicado, o próprio produto original ainda deve poder ser escolhido
-    // como cross-sell do novo — por isso adminPopularCrossSell(null) acima.
-    Array.from(document.getElementById('aCrossSell').options).forEach(o => o.selected = (p.crossSell||[]).includes(o.value));
-    document.getElementById('aOrderBump').value = p.orderBump || '';
-    const produtoBumpAtual = p.orderBump ? produtos.find(x => x.id === p.orderBump) : null;
-    document.getElementById('aOrderBumpInput').value = produtoBumpAtual ? produtoBumpAtual.nome : '';
-    document.getElementById('aOrderBumpDescontoTipo').value = p.orderBumpDescontoTipo || 'fixo';
-    document.getElementById('aOrderBumpDescontoValor').value = p.orderBumpDescontoValor || '';
-    document.getElementById('aOrderBumpTexto').value = p.orderBumpTexto || '';
-    adminOrderBumpToggleCampos(); adminOrderBumpToggleTipo();
   } else {
     document.getElementById('adminModalProdutoTitle').textContent = 'Novo Produto';
-    ['aNome','aPreco','aDescricao','aTemaInput','aTemaId','aPromoValor','aOrderBumpDescontoValor','aOrderBumpTexto','aOrderBumpInput'].forEach(id => document.getElementById(id).value = '');
+    ['aNome','aPreco','aDescricao','aTemaInput','aTemaId','aPromoValor'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('aCategoria').value = 'Aniversário';
     document.getElementById('aSobConsulta').checked = false;
     document.getElementById('aPromoAtiva').checked = false;
     document.getElementById('aPromoTipo').value = 'percentual';
-    document.getElementById('aOrderBump').value = '';
-    document.getElementById('aOrderBumpDescontoTipo').value = 'fixo';
-    adminOrderBumpToggleCampos(); adminOrderBumpToggleTipo();
   }
   adminToggleSobConsulta(); adminTogglePromo(); adminTogglePromoTipo();
   document.getElementById('adminModalProduto').classList.add('open');
@@ -2590,18 +2684,12 @@ async function adminSalvarProduto() {
     promoAtiva: document.getElementById('aPromoAtiva').checked,
     promoTipo: document.getElementById('aPromoTipo').value,
     promoValor: parseFloat(document.getElementById('aPromoValor').value) || 0,
-    adicionais: sobConsulta ? [] : adminColetarAdicionais(),
-    crossSell: Array.from(document.getElementById('aCrossSell').selectedOptions).map(o => o.value),
-    orderBump: document.getElementById('aOrderBump').value || null,
-    orderBumpDescontoTipo: document.getElementById('aOrderBumpDescontoTipo').value,
-    orderBumpDescontoValor: parseFloat(document.getElementById('aOrderBumpDescontoValor').value) || 0,
-    orderBumpTexto: document.getElementById('aOrderBumpTexto').value.trim(),
   };
 
   if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = produtoData;
   else produtos.push(produtoData);
 
-  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  try { await salvarProdutosSite(); } catch(e) {}
   adminRenderProdutos();
   adminFecharModal('adminModalProduto');
   showToast('Produto salvo ✓','success');
@@ -2610,7 +2698,7 @@ async function adminSalvarProduto() {
 async function adminExcluirProduto(idx) {
   if (!confirm(`Excluir "${produtos[idx].nome}"?`)) return;
   produtos.splice(idx,1);
-  try { await db.collection('config').doc('produtosSite').set({ data: JSON.stringify(produtos) }); } catch(e) {}
+  try { await salvarProdutosSite(); } catch(e) {}
   adminRenderProdutos();
   showToast('Produto excluído','error');
 }
