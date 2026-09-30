@@ -52,6 +52,9 @@
   .gift-row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
   .gift-taken{font-size:.78rem;color:var(--danger)}
   .gift-free{font-size:.78rem;color:var(--ok)}
+  .cat-card{text-align:center}
+  .cat-card img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px}
+  .cat-card .nm{font-size:.78rem;margin:4px 0}
 </style>
 </head>
 <body>
@@ -133,6 +136,20 @@
       <div id="listas-list" style="margin-top:16px"></div>
     </div>
 
+    <div class="card">
+      <h2>📦 Catálogo de Produtos</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:-6px">
+        Produtos com foto real que o cliente pode escolher ao montar a lista de presentes (panela, caixa de som, TV...).
+      </p>
+      <div class="row">
+        <div><label>Nome do produto</label><input id="cat-nome" placeholder="Caixa de som JBL"></div>
+        <div><label>URL da imagem</label><input id="cat-img" placeholder="https://..."></div>
+      </div>
+      <button class="btn" style="margin-top:12px" onclick="addCatalogo()">Adicionar ao catálogo</button>
+      <div id="catalogo-msg"></div>
+      <div id="catalogo-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:16px"></div>
+    </div>
+
   </main>
 </div>
 
@@ -179,7 +196,7 @@ window.doLogout = function () { signOut(auth); };
 onAuthStateChanged(auth, (user) => {
   document.getElementById("login-screen").classList.toggle("hidden", !!user);
   document.getElementById("app").classList.toggle("hidden", !user);
-  if (user) { loadEvents(); loadListas(); }
+  if (user) { loadEvents(); loadListas(); loadCatalogo(); }
 });
 
 function slugify(name) {
@@ -495,6 +512,44 @@ window.saveListaCores = async function (listaId) {
     colorSecondary: document.getElementById(`lc2-${listaId}`).value
   });
 };
+
+// ===== Catálogo de Produtos (compartilhado entre todas as listas) =====
+
+window.addCatalogo = async function () {
+  const msg = document.getElementById("catalogo-msg");
+  const nome = document.getElementById("cat-nome").value.trim();
+  const imagemUrl = document.getElementById("cat-img").value.trim();
+  if (!nome || !imagemUrl) { msg.innerHTML = '<div class="msg error">Preencha nome e imagem.</div>'; return; }
+  try {
+    await setDoc(doc(collection(db, "catalogo")), { nome, imagemUrl, createdAt: Date.now() });
+    document.getElementById("cat-nome").value = "";
+    document.getElementById("cat-img").value = "";
+    msg.innerHTML = "";
+    loadCatalogo();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Erro: ${e.message}</div>`;
+  }
+};
+
+window.deleteCatalogo = async function (id) {
+  if (!confirm("Remover este produto do catálogo?")) return;
+  await deleteDoc(doc(db, "catalogo", id));
+  loadCatalogo();
+};
+
+async function loadCatalogo() {
+  const el = document.getElementById("catalogo-list");
+  const snap = await getDocs(collection(db, "catalogo"));
+  if (snap.empty) { el.innerHTML = "<p style='color:var(--muted)'>Nenhum produto cadastrado ainda.</p>"; return; }
+  el.innerHTML = snap.docs.map(d => {
+    const c = d.data();
+    return `<div class="cat-card">
+      <img src="${c.imagemUrl}">
+      <div class="nm">${c.nome}</div>
+      <button class="btn danger small" onclick="deleteCatalogo('${d.id}')">Excluir</button>
+    </div>`;
+  }).join("");
+}
 </script>
 </body>
 </html>
