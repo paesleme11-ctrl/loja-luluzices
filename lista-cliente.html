@@ -11,16 +11,18 @@
   header{background:linear-gradient(135deg,var(--p),#a61e4d);color:#fff;padding:20px}
   header h1{margin:0;font-size:1.15rem}
   header .sub{opacity:.9;font-size:.85rem}
-  main{max-width:560px;margin:0 auto;padding:18px 14px 60px}
+  main{max-width:600px;margin:0 auto;padding:18px 14px 60px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px}
   label{display:block;font-size:.82rem;color:var(--muted);margin:10px 0 4px}
   input{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:.92rem}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .toggle{display:flex;gap:8px;margin-top:6px}
   .toggle button{flex:1;padding:10px;border-radius:9px;border:1px solid var(--p);background:#fff;color:var(--p);cursor:pointer;font-size:.85rem;font-weight:600}
   .toggle button.active{background:var(--p);color:#fff}
   .btn{background:var(--p);color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem;width:100%}
   .btn.danger{background:var(--danger);width:auto;padding:8px 12px;font-size:.8rem}
   .item{border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .item img,.item .tile{width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem}
   .item b{font-size:.92rem}
   .item .detail{font-size:.8rem;color:var(--muted);margin-top:3px}
   .badge{font-size:.72rem;padding:2px 9px;border-radius:20px;font-weight:700}
@@ -30,6 +32,16 @@
   #access-denied,#loading{padding:80px 20px;text-align:center;color:var(--muted)}
   .msg{font-size:.85rem;padding:8px 12px;border-radius:8px;margin-top:8px}
   .msg.error{background:#fdecea;color:var(--danger)}
+  .msg.ok{background:#e6f8ea;color:var(--ok)}
+  .catalog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;max-height:280px;overflow-y:auto}
+  .cat-opt{border:2px solid transparent;border-radius:10px;padding:6px;text-align:center;cursor:pointer;background:#faf2f4}
+  .cat-opt.selected{border-color:var(--p)}
+  .cat-opt img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px}
+  .cat-opt .nm{font-size:.72rem;margin-top:4px;line-height:1.2}
+  .icon-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+  .icon-opt{aspect-ratio:1/1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;border:2px solid transparent;position:relative}
+  .icon-opt.selected{border-color:var(--p)}
+  .icon-opt span.lbl{position:absolute;bottom:2px;font-size:.6rem;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 </style>
 </head>
 <body>
@@ -44,28 +56,33 @@
   </header>
   <main>
     <div class="card">
+      <h2 style="margin-top:0">Chave Pix da lista</h2>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:-6px">Uma única chave, usada em todos os itens.</p>
+      <input id="l-pix" placeholder="email, celular ou chave aleatória">
+      <button class="btn" style="margin-top:10px" onclick="salvarPix()">Salvar chave Pix</button>
+      <div id="pix-msg"></div>
+    </div>
+
+    <div class="card">
       <h2 style="margin-top:0">Adicionar item</h2>
       <div class="toggle">
-        <button id="tipo-produto" class="active" onclick="setTipo('produto')">Produto real</button>
-        <button id="tipo-pix" onclick="setTipo('pix')">Ilustrativo (Pix)</button>
+        <button id="modo-catalogo" class="active" onclick="setModo('catalogo')">📦 Catálogo</button>
+        <button id="modo-custom" onclick="setModo('custom')">✏️ Personalizado</button>
+      </div>
+
+      <div id="painel-catalogo">
+        <div id="catalog-grid" class="catalog-grid"></div>
+      </div>
+      <div id="painel-custom" class="hidden">
+        <label>Escolha um ícone</label>
+        <div id="icon-picker" class="icon-picker"></div>
       </div>
 
       <label>Nome do item</label>
       <input id="i-nome" placeholder="Jogo de panelas">
-
-      <div id="campos-produto">
-        <label>Link para comprar</label>
-        <input id="i-link" placeholder="https://loja.com/produto" onblur="buscarImagem()">
-        <div id="img-status" style="font-size:.8rem;color:var(--muted);margin-top:6px"></div>
-        <div id="img-preview" class="hidden" style="margin-top:8px">
-          <img id="img-preview-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px">
-        </div>
-      </div>
-      <div id="campos-pix" class="hidden">
-        <label>Valor sugerido</label>
-        <input id="i-valor" placeholder="R$ 100">
-        <label>Chave Pix</label>
-        <input id="i-pix" placeholder="email, celular ou chave aleatória">
+      <div class="row">
+        <div><label>Valor sugerido</label><input id="i-valor" placeholder="R$ 100"></div>
+        <div><label>Quantidade desejada</label><input id="i-qtd" type="number" min="1" value="1"></div>
       </div>
 
       <button class="btn" style="margin-top:14px" onclick="addItem()">+ Adicionar à lista</button>
@@ -82,7 +99,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, collection, addDoc, deleteDoc, onSnapshot
+  getFirestore, doc, getDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, getDocs
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -99,42 +116,68 @@ const db = getFirestore(app);
 const params = new URLSearchParams(location.search);
 const listaId = params.get("l");
 const token = params.get("t");
-let tipoAtual = "produto";
 
-window.setTipo = function (tipo) {
-  tipoAtual = tipo;
-  document.getElementById("tipo-produto").classList.toggle("active", tipo === "produto");
-  document.getElementById("tipo-pix").classList.toggle("active", tipo === "pix");
-  document.getElementById("campos-produto").classList.toggle("hidden", tipo !== "produto");
-  document.getElementById("campos-pix").classList.toggle("hidden", tipo !== "pix");
+const ICONS = [
+  { key: "casa", emoji: "🏠", label: "Casa", color: "#e8c9a0" },
+  { key: "cozinha", emoji: "🍳", label: "Cozinha", color: "#f6b26b" },
+  { key: "eletro", emoji: "🔌", label: "Eletrônicos", color: "#8ab4e8" },
+  { key: "viagem", emoji: "✈️", label: "Viagem", color: "#7fc9e0" },
+  { key: "luadmel", emoji: "💑", label: "Lua de mel", color: "#f2a6c1" },
+  { key: "bebe", emoji: "🍼", label: "Bebê", color: "#f7c6d9" },
+  { key: "vinho", emoji: "🍷", label: "Vinho", color: "#a94464" },
+  { key: "livros", emoji: "📚", label: "Livros", color: "#7fae7f" },
+  { key: "jardim", emoji: "🌿", label: "Jardim", color: "#8fbf6f" },
+  { key: "pet", emoji: "🐾", label: "Pet", color: "#c9a97e" },
+  { key: "moda", emoji: "👗", label: "Moda", color: "#b98fd1" },
+  { key: "festa", emoji: "🎉", label: "Festa", color: "#e8c766" },
+  { key: "presente", emoji: "🎁", label: "Surpresa", color: "#d6336c" }
+];
+
+let modoAtual = "catalogo";
+let iconeSelecionado = ICONS[0].key;
+let catalogoItens = [];
+let catalogoSelecionado = null;
+
+window.setModo = function (modo) {
+  modoAtual = modo;
+  document.getElementById("modo-catalogo").classList.toggle("active", modo === "catalogo");
+  document.getElementById("modo-custom").classList.toggle("active", modo === "custom");
+  document.getElementById("painel-catalogo").classList.toggle("hidden", modo !== "catalogo");
+  document.getElementById("painel-custom").classList.toggle("hidden", modo !== "custom");
 };
 
-let imagemAutomatica = "";
+function renderIconPicker() {
+  document.getElementById("icon-picker").innerHTML = ICONS.map(ic => `
+    <div class="icon-opt ${ic.key === iconeSelecionado ? 'selected' : ''}" style="background:${ic.color}"
+      onclick="selecionarIcone('${ic.key}')">${ic.emoji}<span class="lbl">${ic.label}</span></div>
+  `).join("");
+}
+window.selecionarIcone = function (key) {
+  iconeSelecionado = key;
+  catalogoSelecionado = null;
+  renderIconPicker();
+};
 
-window.buscarImagem = async function () {
-  const link = document.getElementById("i-link").value.trim();
-  const statusEl = document.getElementById("img-status");
-  const previewEl = document.getElementById("img-preview");
-  imagemAutomatica = "";
-  previewEl.classList.add("hidden");
-  if (!link) { statusEl.textContent = ""; return; }
+async function carregarCatalogo() {
+  const snap = await getDocs(collection(db, "catalogo"));
+  catalogoItens = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderCatalogGrid();
+}
 
-  statusEl.textContent = "Buscando imagem do produto...";
-  try {
-    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(link)}`);
-    const json = await res.json();
-    const imgUrl = json?.data?.image?.url;
-    if (imgUrl) {
-      imagemAutomatica = imgUrl;
-      document.getElementById("img-preview-thumb").src = imgUrl;
-      previewEl.classList.remove("hidden");
-      statusEl.textContent = "Imagem encontrada ✓";
-    } else {
-      statusEl.textContent = "Não achamos imagem automaticamente — cole o link dela em \"colar imagem manualmente\".";
-    }
-  } catch (e) {
-    statusEl.textContent = "Não conseguimos buscar a imagem agora — cole o link dela em \"colar imagem manualmente\".";
-  }
+function renderCatalogGrid() {
+  const el = document.getElementById("catalog-grid");
+  if (!catalogoItens.length) { el.innerHTML = "<p style='color:var(--muted);font-size:.82rem;grid-column:1/-1'>Nenhum produto no catálogo ainda.</p>"; return; }
+  el.innerHTML = catalogoItens.map(c => `
+    <div class="cat-opt ${catalogoSelecionado?.id === c.id ? 'selected' : ''}" onclick="selecionarCatalogo('${c.id}')">
+      <img src="${c.imagemUrl}">
+      <div class="nm">${c.nome}</div>
+    </div>
+  `).join("");
+}
+window.selecionarCatalogo = function (id) {
+  catalogoSelecionado = catalogoItens.find(c => c.id === id);
+  document.getElementById("i-nome").value = catalogoSelecionado.nome;
+  renderCatalogGrid();
 };
 
 async function init() {
@@ -146,11 +189,13 @@ async function init() {
     const listaSnap = await getDoc(doc(db, "listas", listaId));
     if (!listaSnap.exists()) return denied();
     const ld = listaSnap.data();
-    document.documentElement.style.setProperty("--p", ld.colorPrimary || "#d6336c");
     document.getElementById("l-nome").textContent = ld.nome || "Lista de presentes";
+    if (ld.chavePix) document.getElementById("l-pix").value = ld.chavePix;
 
     document.getElementById("loading").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
+    renderIconPicker();
+    await carregarCatalogo();
     listenItens();
   } catch (e) { denied(); }
 }
@@ -160,21 +205,38 @@ function denied() {
   document.getElementById("access-denied").classList.remove("hidden");
 }
 
+window.salvarPix = async function () {
+  const msg = document.getElementById("pix-msg");
+  const chave = document.getElementById("l-pix").value.trim();
+  if (!chave) { msg.innerHTML = '<div class="msg error">Digite uma chave Pix.</div>'; return; }
+  try {
+    await updateDoc(doc(db, "listas", listaId), { chavePix: chave });
+    msg.innerHTML = '<div class="msg ok">Chave Pix salva!</div>';
+  } catch (e) {
+    msg.innerHTML = `<div class="msg error">Erro: ${e.message}</div>`;
+  }
+};
+
 function listenItens() {
   onSnapshot(collection(db, "listas", listaId, "itens"), (snap) => {
     const el = document.getElementById("item-list");
     if (snap.empty) { el.innerHTML = "<p style='color:var(--muted)'>Nenhum item ainda.</p>"; return; }
     el.innerHTML = snap.docs.map(d => {
       const i = d.data();
-      const takenTag = i.reservado
-        ? `<span class="badge taken">escolhido${i.reservadoPor ? " por " + i.reservadoPor.nome : ""}</span>`
-        : `<span class="badge free">disponível</span>`;
-      const detail = i.tipo === "pix"
-        ? `Pix · ${i.valorSugerido || ""}`
-        : (i.linkCompra ? `<a href="${i.linkCompra}" target="_blank" rel="noopener">link do produto</a>` : "");
+      const reservas = i.reservas || [];
+      const qtd = i.quantidadeDesejada || 1;
+      const cheio = reservas.length >= qtd;
+      const tag = cheio
+        ? `<span class="badge taken">completo (${reservas.length}/${qtd})</span>`
+        : `<span class="badge free">${reservas.length}/${qtd} escolhido(s)</span>`;
+      const nomes = reservas.map(r => r.nome).join(", ");
+      const ic = ICONS.find(x => x.key === i.icone);
+      const thumb = i.imagemUrl
+        ? `<img src="${i.imagemUrl}">`
+        : `<div class="tile" style="background:${(ic || ICONS[0]).color}">${(ic || ICONS[0]).emoji}</div>`;
       return `<div class="item">
-        ${i.imagemUrl ? `<img src="${i.imagemUrl}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : ""}
-        <div><b>${i.nome}</b><div class="detail">${detail} ${takenTag}</div></div>
+        ${thumb}
+        <div style="flex:1"><b>${i.nome}</b><div class="detail">${i.valorSugerido || ""} · ${tag}${nomes ? " · " + nomes : ""}</div></div>
         <button class="btn danger" onclick="removerItem('${d.id}')">Excluir</button>
       </div>`;
     }).join("");
@@ -186,30 +248,27 @@ window.addItem = async function () {
   const nome = document.getElementById("i-nome").value.trim();
   if (!nome) { msg.innerHTML = '<div class="msg error">Dê um nome ao item.</div>'; return; }
 
+  const qtd = Math.max(1, parseInt(document.getElementById("i-qtd").value, 10) || 1);
   const data = {
     nome,
-    imagemUrl: tipoAtual === "produto" ? imagemAutomatica : "",
-    tipo: tipoAtual,
-    reservado: false,
-    reservadoPor: null,
+    valorSugerido: document.getElementById("i-valor").value.trim(),
+    quantidadeDesejada: qtd,
+    reservas: [],
     createdAt: Date.now()
   };
-  if (tipoAtual === "produto") {
-    data.linkCompra = document.getElementById("i-link").value.trim();
+  if (modoAtual === "catalogo" && catalogoSelecionado) {
+    data.imagemUrl = catalogoSelecionado.imagemUrl;
   } else {
-    data.valorSugerido = document.getElementById("i-valor").value.trim();
-    data.chavePix = document.getElementById("i-pix").value.trim();
+    data.icone = iconeSelecionado;
   }
 
   try {
     await addDoc(collection(db, "listas", listaId, "itens"), data);
     document.getElementById("i-nome").value = "";
-    document.getElementById("i-link").value = "";
     document.getElementById("i-valor").value = "";
-    document.getElementById("i-pix").value = "";
-    document.getElementById("img-status").textContent = "";
-    document.getElementById("img-preview").classList.add("hidden");
-    imagemAutomatica = "";
+    document.getElementById("i-qtd").value = "1";
+    catalogoSelecionado = null;
+    renderCatalogGrid();
     msg.innerHTML = "";
   } catch (e) {
     msg.innerHTML = `<div class="msg error">Erro: ${e.message}</div>`;
