@@ -16,17 +16,23 @@
   .prod{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.08);display:flex;flex-direction:column}
   .prod .thumb{width:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#f3e3e8,#fbeee0);display:flex;align-items:center;justify-content:center;overflow:hidden}
   .prod .thumb img{width:100%;height:100%;object-fit:cover}
-  .prod .thumb .icon{font-size:2.6rem;opacity:.55}
+  .prod .thumb .icon{font-size:2.6rem}
   .prod .body{padding:10px 12px 12px;display:flex;flex-direction:column;flex:1}
   .prod .name{font-size:.87rem;font-weight:600;line-height:1.25;min-height:2.3em}
-  .prod .price{font-size:.92rem;font-weight:700;color:var(--p);margin:4px 0 8px}
-  .prod .price.pix{color:#0a7a3d}
-  .prod .buy-link{font-size:.76rem;color:var(--muted);text-decoration:none;margin-bottom:8px;display:inline-block}
+  .prod .price{font-size:.92rem;font-weight:700;color:#0a7a3d;margin:4px 0 2px}
+  .prod .left{font-size:.72rem;color:var(--muted);margin-bottom:8px}
   .prod .btn{margin-top:auto;background:var(--p);color:#fff;border:none;padding:9px;border-radius:9px;font-weight:700;font-size:.82rem;cursor:pointer}
+  .prod .btn:disabled{background:#ccc;cursor:not-allowed}
   .pix-tag{display:inline-block;background:#e9f7ef;color:#0a7a3d;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:4px;width:fit-content}
   .hidden{display:none !important}
   #loading,#empty,#access-denied{padding:100px 20px;text-align:center;color:var(--muted)}
   footer{text-align:center;color:var(--muted);font-size:.78rem;padding:24px}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+  .modal{background:#fff;border-radius:16px;padding:22px;max-width:340px;width:100%}
+  .modal input{width:100%;padding:11px;border:1px solid var(--border);border-radius:9px;font-size:.92rem;margin-top:6px}
+  .modal .pixinfo{background:#faf2f4;border-radius:10px;padding:10px;font-size:.82rem;margin:10px 0;word-break:break-all}
+  .modal .btn{background:var(--p);color:#fff;border:none;padding:11px;border-radius:9px;font-weight:700;width:100%;margin-top:12px;cursor:pointer}
+  .modal .btn.secondary{background:#fff;color:var(--p);border:1px solid var(--p);margin-top:8px}
 </style>
 </head>
 <body>
@@ -46,10 +52,24 @@
   <footer>lista gerada por Luluzices</footer>
 </div>
 
+<div id="modal" class="modal-bg hidden">
+  <div class="modal">
+    <h3 id="modal-nome" style="margin-top:0"></h3>
+    <div class="pixinfo">
+      <div><b>Chave Pix:</b> <span id="modal-pix"></span></div>
+      <div id="modal-valor" style="margin-top:4px"></div>
+    </div>
+    <label style="font-size:.82rem;color:var(--muted)">Seu nome (pra avisarmos quem trouxe este presente)</label>
+    <input id="modal-nome-input" placeholder="Nome completo">
+    <button class="btn" onclick="confirmarEscolha()">Confirmar que vou presentear</button>
+    <button class="btn secondary" onclick="fecharModal()">Cancelar</button>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getFirestore, doc, getDoc, collection, updateDoc, onSnapshot
+  getFirestore, doc, getDoc, collection, updateDoc, onSnapshot, arrayUnion
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -66,12 +86,24 @@ const db = getFirestore(app);
 const params = new URLSearchParams(location.search);
 const listaId = params.get("l");
 
+const ICONS = [
+  { key: "casa", emoji: "🏠" }, { key: "cozinha", emoji: "🍳" }, { key: "eletro", emoji: "🔌" },
+  { key: "viagem", emoji: "✈️" }, { key: "luadmel", emoji: "💑" }, { key: "bebe", emoji: "🍼" },
+  { key: "vinho", emoji: "🍷" }, { key: "livros", emoji: "📚" }, { key: "jardim", emoji: "🌿" },
+  { key: "pet", emoji: "🐾" }, { key: "moda", emoji: "👗" }, { key: "festa", emoji: "🎉" },
+  { key: "presente", emoji: "🎁" }
+];
+
+let chavePixAtual = "";
+let itemAtual = null;
+
 async function init() {
   if (!listaId) return denied();
   try {
     const snap = await getDoc(doc(db, "listas", listaId));
     if (!snap.exists() || snap.data().active === false) return denied();
     const d = snap.data();
+    chavePixAtual = d.chavePix || "";
     document.documentElement.style.setProperty("--p", d.colorPrimary || "#d6336c");
     document.documentElement.style.setProperty("--s", d.colorSecondary || "#e8c766");
     document.getElementById("l-nome").textContent = d.nome || "Lista de Presentes";
@@ -88,35 +120,48 @@ function denied() {
 
 function listenItens() {
   onSnapshot(collection(db, "listas", listaId, "itens"), (snap) => {
-    const disponiveis = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(i => !i.reservado);
+    const itens = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const disponiveis = itens.filter(i => (i.reservas || []).length < (i.quantidadeDesejada || 1));
     document.getElementById("empty").classList.toggle("hidden", disponiveis.length > 0);
     document.getElementById("item-grid").innerHTML = disponiveis.map(i => {
-      const isPix = i.tipo === "pix";
-      const thumb = i.imagemUrl
-        ? `<img src="${i.imagemUrl}">`
-        : `<span class="icon">${isPix ? "💸" : "🎁"}</span>`;
-      const price = isPix
-        ? `<div class="pix-tag">Pix</div><div class="price pix">${i.valorSugerido || "valor livre"}</div>`
-        : (i.linkCompra ? `<a class="buy-link" href="${i.linkCompra}" target="_blank" rel="noopener">ver produto ↗</a>` : "");
+      const qtd = i.quantidadeDesejada || 1;
+      const restam = qtd - (i.reservas || []).length;
+      const ic = ICONS.find(x => x.key === i.icone);
+      const thumb = i.imagemUrl ? `<img src="${i.imagemUrl}">` : `<span class="icon">${(ic || ICONS[12]).emoji}</span>`;
       return `<div class="prod">
         <div class="thumb">${thumb}</div>
         <div class="body">
           <div class="name">${i.nome}</div>
-          ${price}
-          <button class="btn" onclick="escolher('${i.id}')">Escolher presente</button>
+          <div class="pix-tag">Pix</div>
+          <div class="price">${i.valorSugerido || "valor livre"}</div>
+          ${qtd > 1 ? `<div class="left">restam ${restam} de ${qtd}</div>` : ""}
+          <button class="btn" onclick='abrirModal(${JSON.stringify(i).replace(/'/g, "&#39;")})'>Escolher presente</button>
         </div>
       </div>`;
     }).join("");
   });
 }
 
-window.escolher = async function (itemId) {
-  const nome = prompt("Seu nome, para o casal/aniversariante saber quem trouxe este presente:");
-  if (!nome || !nome.trim()) return;
-  await updateDoc(doc(db, "listas", listaId, "itens", itemId), {
-    reservado: true,
-    reservadoPor: { nome: nome.trim(), reservadoEm: Date.now() }
+window.abrirModal = function (item) {
+  itemAtual = item;
+  document.getElementById("modal-nome").textContent = item.nome;
+  document.getElementById("modal-pix").textContent = chavePixAtual || "(não informada)";
+  document.getElementById("modal-valor").textContent = item.valorSugerido ? `Valor sugerido: ${item.valorSugerido}` : "";
+  document.getElementById("modal-nome-input").value = "";
+  document.getElementById("modal").classList.remove("hidden");
+};
+window.fecharModal = function () {
+  document.getElementById("modal").classList.add("hidden");
+  itemAtual = null;
+};
+
+window.confirmarEscolha = async function () {
+  const nome = document.getElementById("modal-nome-input").value.trim();
+  if (!nome) return;
+  await updateDoc(doc(db, "listas", listaId, "itens", itemAtual.id), {
+    reservas: arrayUnion({ nome, reservadoEm: Date.now() })
   });
+  fecharModal();
 };
 
 init();
