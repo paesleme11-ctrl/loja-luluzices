@@ -537,13 +537,27 @@
   .adicionais-globais-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
   .adicional-global-card { position:relative; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; cursor:pointer; background:#fff; }
   .adicional-global-card.selecionado { border-color:var(--rose); box-shadow:0 0 0 2px var(--rose-light); }
+  .adicional-global-card { text-align:left; font:inherit; padding:0; }
   .adicional-global-foto { aspect-ratio:1; background:linear-gradient(135deg,var(--rose-light),var(--warm)); display:flex; align-items:center; justify-content:center; font-size:30px; }
   .adicional-global-foto img { width:100%; height:100%; object-fit:cover; }
-  .adicional-global-check { position:absolute; top:7px; right:7px; width:22px; height:22px; accent-color:var(--rose); }
+  .adicional-global-status { position:absolute; top:7px; right:7px; padding:3px 7px; border-radius:20px; color:#fff; background:var(--rose); font-size:10px; font-weight:700; }
   .adicional-global-info { padding:8px; }
   .adicional-global-nome { font-size:12px; line-height:1.3; min-height:32px; font-weight:600; }
   .adicional-global-preco { color:var(--rose); font-size:13px; font-weight:700; margin-top:4px; }
   .ofertas-footer { padding:14px 22px 20px; border-top:1px solid var(--border); }
+  .extra-detalhe-overlay { position:fixed; inset:0; z-index:1003; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(26,18,20,.66); }
+  .extra-detalhe-overlay.open { display:flex; }
+  .extra-detalhe-modal { width:420px; max-width:100%; max-height:90vh; overflow:auto; background:#fff; border-radius:18px; box-shadow:var(--shadow-lg); }
+  .extra-detalhe-foto { width:100%; max-height:280px; aspect-ratio:16/10; display:flex; align-items:center; justify-content:center; overflow:hidden; background:linear-gradient(135deg,var(--rose-light),var(--warm)); font-size:54px; }
+  .extra-detalhe-foto img { width:100%; height:100%; object-fit:cover; }
+  .extra-detalhe-conteudo { padding:18px 20px 20px; }
+  .extra-detalhe-conteudo h3 { font-size:21px; margin-bottom:7px; }
+  .extra-detalhe-descricao { color:var(--ink-light); font-size:14px; line-height:1.6; white-space:pre-line; }
+  .extra-detalhe-preco { color:var(--rose); font-size:18px; font-weight:700; margin:14px 0; }
+  .extra-detalhe-acoes { display:flex; gap:9px; }
+  .extra-detalhe-acoes button { flex:1; }
+  .extra-detalhe-acoes .recusar { padding:12px; border-radius:10px; background:#fff; border:1px solid var(--border); color:var(--ink-light); font-weight:700; }
+  .extra-detalhe-acoes .incluir { padding:12px; border-radius:10px; background:var(--rose); border:0; color:#fff; font-weight:700; }
   @media(max-width:420px) { .ofertas-body,.ofertas-header,.ofertas-footer { padding-left:15px; padding-right:15px; } .adicionais-globais-grid { gap:7px; } .adicional-global-info { padding:6px; } }
 
   .cart-empty { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
@@ -835,6 +849,9 @@
     <div class="ofertas-footer"><button class="btn-finalizar" onclick="confirmarOfertas()">Adicionar selecionados e continuar</button><button class="voltar-etapa" onclick="fecharOfertas()">Agora não, continuar sem extras</button></div>
   </div>
 </div>
+<div class="extra-detalhe-overlay" id="extraDetalheOverlay" role="dialog" aria-modal="true" aria-labelledby="extraDetalheTitulo" onclick="if(event.target===this) fecharDetalheAdicional(false)">
+  <div class="extra-detalhe-modal" id="extraDetalheConteudo"></div>
+</div>
 
 <!-- ═══════════════════ MODAL DE CHECKOUT ═══════════════════ -->
 <div class="modal-overlay" id="checkoutOverlay">
@@ -1005,6 +1022,7 @@ let ofertaCrossSellGlobal = { produtoId:'', descontoTipo:'fixo', descontoValor:0
 let adicionaisGlobais = [];
 let produtoPendenteOfertas = null;
 let adicionaisGlobaisSelecionados = new Set();
+let adicionalGlobalEmDetalhe = null;
 
 async function salvarProdutosSite() {
   return db.collection('config').doc('produtosSite').set({
@@ -1431,18 +1449,38 @@ function renderOfertasGlobais() {
   const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).slice(0, 3);
   let html = '';
   if (extras.length) {
-    html += `<div class="adicionais-globais-titulo">Que tal deixar seu convite mais completo? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; return `<label class="adicional-global-card" id="adicionalGlobalCard_${p.id}"><input class="adicional-global-check" type="checkbox" value="${p.id}" onchange="toggleAdicionalGlobal('${p.id}')"><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></label>`; }).join('')}</div>`;
+    html += `<div class="adicionais-globais-titulo">Quer incluir mais algum serviço? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; const incluido=adicionaisGlobaisSelecionados.has(p.id); return `<button type="button" class="adicional-global-card ${incluido?'selecionado':''}" id="adicionalGlobalCard_${p.id}" onclick="abrirDetalheAdicionalGlobal('${p.id}')"><span class="adicional-global-status">${incluido?'Incluído':'Ver detalhes'}</span><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></button>`; }).join('')}</div>`;
   }
   if (!html) html = '<p style="text-align:center;color:var(--ink-muted);padding:18px 0">Seu produto já está no carrinho. Você pode continuar.</p>';
   body.innerHTML = html;
 }
 
-function toggleAdicionalGlobal(id) {
-  if (adicionaisGlobaisSelecionados.has(id)) adicionaisGlobaisSelecionados.delete(id);
-  else if (adicionaisGlobaisSelecionados.size < 3) adicionaisGlobaisSelecionados.add(id);
-  else { const check = document.querySelector(`.adicional-global-check[value="${id}"]`); if (check) check.checked = false; showToast('Você pode escolher até 3 produtos extras.', 'error'); return; }
-  const card = document.getElementById('adicionalGlobalCard_' + id);
-  if (card) card.classList.toggle('selecionado', adicionaisGlobaisSelecionados.has(id));
+function abrirDetalheAdicionalGlobal(id) {
+  const p = produtos.find(item => item.id === id);
+  if (!p) return;
+  adicionalGlobalEmDetalhe = p;
+  const foto = (p.fotos && p.fotos[0]) || p.foto;
+  const descricao = p.descricao?.trim() || 'Um serviço extra para complementar seu pedido.';
+  document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${BRL(p.preco)}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${adicionaisGlobaisSelecionados.has(id) ? 'Remover dos extras' : 'Recusar'}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${adicionaisGlobaisSelecionados.has(id) ? 'Manter no pedido' : 'Incluir no carrinho'}</button></div></div>`;
+  document.getElementById('extraDetalheOverlay').classList.add('open');
+}
+
+function fecharDetalheAdicional(incluir) {
+  const id = adicionalGlobalEmDetalhe?.id;
+  if (incluir && id) {
+    if (adicionaisGlobaisSelecionados.has(id)) {
+      // Já incluído: mantém selecionado.
+    } else if (adicionaisGlobaisSelecionados.size < 3) {
+      adicionaisGlobaisSelecionados.add(id);
+    } else {
+      showToast('Você pode escolher até 3 serviços extras.', 'error');
+    }
+  } else if (id && adicionaisGlobaisSelecionados.has(id)) {
+    adicionaisGlobaisSelecionados.delete(id);
+  }
+  document.getElementById('extraDetalheOverlay').classList.remove('open');
+  adicionalGlobalEmDetalhe = null;
+  renderOfertasGlobais();
 }
 
 function confirmarOfertas() {
