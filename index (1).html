@@ -81,7 +81,7 @@
   body, body * { transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
 
   /* SIDEBAR */
-  .sidebar { width: 230px; background: var(--ink); min-height: 100vh; position: fixed; left:0; top:0; display:flex; flex-direction:column; padding:28px 0 20px; z-index:100; }
+  .sidebar { width: 230px; background: var(--ink); height: 100vh; overflow-y: auto; position: fixed; left:0; top:0; display:flex; flex-direction:column; padding:28px 0 20px; z-index:100; }
   .logo { padding: 0 24px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom:16px; }
   .logo-title { font-family:'DM Serif Display',serif; font-size:22px; color:#fff; }
   .logo-sub { font-size:11px; color:var(--rose); font-weight:600; letter-spacing:1.5px; text-transform:uppercase; margin-top:2px; }
@@ -654,8 +654,8 @@
   <div class="nav-item" onclick="goTo('confirmacao')"><span class="nav-icon">📲</span> Confirmação Presença</div>
   <div class="nav-item" onclick="goTo('clientes')"><span class="nav-icon">👥</span> Clientes</div>
   <div class="nav-section">Ferramentas</div>
-  <a class="nav-item" href="../master.html" target="_blank" style="text-decoration:none"><span class="nav-icon">📲</span> Confirmação + QR Code</a>
-  <a class="nav-item" href="../master.html#listas-card" target="_blank" style="text-decoration:none"><span class="nav-icon">🎁</span> Lista de Presentes</a>
+  <div class="nav-item" onclick="goTo('eventosrsvp')"><span class="nav-icon">📲</span> Eventos & QR Code</div>
+  <div class="nav-item" onclick="goTo('presentes')"><span class="nav-icon">🎁</span> Lista de Presentes</div>
   <a class="nav-item" href="https://lojaluluzices.com.br/?painel=luluzices2026admin" target="_blank" style="text-decoration:none"><span class="nav-icon">🛍️</span> Loja Online (admin)</a>
   <div class="nav-section">Configurações</div>
   <div class="nav-item" onclick="goTo('produtos')"><span class="nav-icon">🛒</span> Produtos</div>
@@ -1032,6 +1032,83 @@
       <button class="btn btn-primary" onclick="abrirModalProduto()">+ Novo Produto</button>
     </div>
     <div class="produtos-admin-grid" id="produtosAdminGrid"></div>
+  </div>
+
+  <div class="page" id="page-eventosrsvp">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title" id="rsvpFormTitle">Novo evento</span></div>
+      <div class="card-body">
+        <input type="hidden" id="rsvp-event-id">
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Nome do evento</label><input id="rsvp-f-name" placeholder="Festa da Vi"></div>
+          <div class="form-group"><label>Nome do aniversariante/responsável</label><input id="rsvp-f-host"></div>
+        </div>
+        <div class="form-row cols-3">
+          <div class="form-group"><label>Data</label><input type="date" id="rsvp-f-date"></div>
+          <div class="form-group"><label>Horário</label><input type="time" id="rsvp-f-time"></div>
+          <div class="form-group"><label>Local</label><input id="rsvp-f-location"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>URL da imagem de capa</label><input id="rsvp-f-cover" placeholder="https://..."></div>
+          <div class="form-group"><label>URL da imagem de fundo</label><input id="rsvp-f-bg" placeholder="https://..."></div>
+        </div>
+        <div class="form-row cols-3">
+          <div class="form-group"><label>URL do logo (opcional)</label><input id="rsvp-f-logo"></div>
+          <div class="form-group"><label>Cor principal</label><input type="color" id="rsvp-f-color1" value="#d6336c"></div>
+          <div class="form-group"><label>Cor secundária</label><input type="color" id="rsvp-f-color2" value="#e8c766"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Texto personalizado (convite)</label><textarea id="rsvp-f-text" placeholder="Venha comemorar com a gente!"></textarea></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Informações adicionais</label><textarea id="rsvp-f-extra" placeholder="Traje, estacionamento, etc."></textarea></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="btn btn-primary" onclick="salvarEventoRsvp()">Salvar evento</button>
+          <button class="btn btn-ghost" onclick="resetFormEventoRsvp()">Cancelar</button>
+        </div>
+        <div id="rsvp-form-msg"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Eventos cadastrados</span></div>
+      <div class="card-body" id="rsvp-events-list">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="page" id="page-presentes">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title">📦 Catálogo de Produtos</span></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--ink-muted);margin-top:-4px">Produtos com foto real que os clientes podem escolher ao montar a lista de presentes.</p>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Nome do produto</label><input id="cat-nome" placeholder="Caixa de som JBL"></div>
+          <div class="form-group"><label>URL da imagem</label><input id="cat-img" placeholder="https://..."></div>
+        </div>
+        <button class="btn btn-primary" onclick="addCatalogo()">Adicionar ao catálogo</button>
+        <div id="catalogo-msg"></div>
+        <div id="catalogo-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:16px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">🎁 Listas de Presentes</span></div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--ink-muted);margin-top:-4px">O cliente recebe um link próprio e monta a lista sozinho. Quando um convidado escolhe, some da lista na hora.</p>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Nome da lista</label><input id="lp-nome" placeholder="Chá de bebê da Marina"></div>
+          <div class="form-group"><label>Tipo (opcional)</label><input id="lp-tipo" placeholder="Chá de bebê, casamento..."></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Cor principal</label><input type="color" id="lp-color1" value="#d6336c"></div>
+          <div class="form-group"><label>Cor secundária</label><input type="color" id="lp-color2" value="#e8c766"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveLista()">Criar lista</button>
+        <div id="lista-msg"></div>
+        <div id="listas-list" style="margin-top:16px"></div>
+      </div>
+    </div>
   </div>
 
   <div class="page" id="page-metas">
@@ -1523,8 +1600,8 @@ setTimeout(() => {
 // ============================================================
 // NAVIGATION
 // ============================================================
-const PAGES = ['dashboard','anual','tarefas','vendas','fluxo','confirmacao','clientes','produtos','metas'];
-const PAGE_TITLES = { dashboard:'Dashboard', anual:'Dashboard Anual', tarefas:'Tarefas do Dia', vendas:'Vendas', fluxo:'Fluxo de Caixa', confirmacao:'Confirmação de Presença', clientes:'Clientes', produtos:'Produtos', metas:'Configurações' };
+const PAGES = ['dashboard','anual','tarefas','vendas','fluxo','confirmacao','clientes','produtos','metas','eventosrsvp','presentes'];
+const PAGE_TITLES = { dashboard:'Dashboard', anual:'Dashboard Anual', tarefas:'Tarefas do Dia', vendas:'Vendas', fluxo:'Fluxo de Caixa', confirmacao:'Confirmação de Presença', clientes:'Clientes', produtos:'Produtos', metas:'Configurações', eventosrsvp:'Eventos & QR Code', presentes:'Lista de Presentes' };
 let currentPage = 'dashboard';
 
 function goTo(page) {
@@ -1536,7 +1613,7 @@ function goTo(page) {
   });
   document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
   const btn = document.getElementById('topbarAction');
-  if (page === 'metas' || page === 'tarefas' || page === 'confirmacao' || page === 'anual' || page === 'produtos' || page === 'clientes') { btn.style.display = 'none'; }
+  if (page === 'metas' || page === 'tarefas' || page === 'confirmacao' || page === 'anual' || page === 'produtos' || page === 'clientes' || page === 'eventosrsvp' || page === 'presentes') { btn.style.display = 'none'; }
   else { btn.style.display = ''; btn.textContent = page === 'fluxo' ? '+ Transação' : '+ Nova Venda'; btn.onclick = page === 'fluxo' ? () => document.getElementById('fluxoDesc').focus() : openModalVenda; }
   renderPage(page);
 }
@@ -1551,6 +1628,8 @@ function renderPage(p) {
   if (p === 'produtos') renderProdutos();
   if (p === 'confirmacao') renderConfirmacaoPage();
   if (p === 'clientes') renderClientes();
+  if (p === 'eventosrsvp') renderEventosRsvp();
+  if (p === 'presentes') renderPresentes();
 }
 
 // ============================================================
@@ -5080,6 +5159,300 @@ firebase.auth().onAuthStateChanged(user => {
     });
   }
 });
+
+// ============================================================
+// EVENTOS RSVP + QR CODE (usa o mesmo login/db da gestão)
+// ============================================================
+const RSVP_BASE = "https://lojaluluzices.com.br/rsvp/";
+
+function slugifyRsvp(name) {
+  const base = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${base || "evento"}-${suffix}`;
+}
+function randomTokenRsvp() {
+  return crypto.getRandomValues(new Uint32Array(4)).join("").slice(0, 20);
+}
+
+function resetFormEventoRsvp() {
+  document.getElementById("rsvp-event-id").value = "";
+  ["rsvp-f-name","rsvp-f-host","rsvp-f-date","rsvp-f-time","rsvp-f-location","rsvp-f-cover","rsvp-f-bg","rsvp-f-logo","rsvp-f-text","rsvp-f-extra"]
+    .forEach(id => document.getElementById(id).value = "");
+  document.getElementById("rsvp-f-color1").value = "#d6336c";
+  document.getElementById("rsvp-f-color2").value = "#e8c766";
+  document.getElementById("rsvpFormTitle").textContent = "Novo evento";
+  document.getElementById("rsvp-form-msg").innerHTML = "";
+}
+
+async function salvarEventoRsvp() {
+  const msg = document.getElementById("rsvp-form-msg");
+  const name = document.getElementById("rsvp-f-name").value.trim();
+  if (!name) { msg.innerHTML = '<p style="color:var(--red);font-size:13px">Dê um nome ao evento.</p>'; return; }
+
+  let eventId = document.getElementById("rsvp-event-id").value;
+  const isNew = !eventId;
+  if (isNew) eventId = slugifyRsvp(name);
+
+  const data = {
+    name,
+    hostName: document.getElementById("rsvp-f-host").value.trim(),
+    date: document.getElementById("rsvp-f-date").value,
+    time: document.getElementById("rsvp-f-time").value,
+    location: document.getElementById("rsvp-f-location").value.trim(),
+    coverImage: document.getElementById("rsvp-f-cover").value.trim(),
+    bgImage: document.getElementById("rsvp-f-bg").value.trim(),
+    logoUrl: document.getElementById("rsvp-f-logo").value.trim(),
+    colorPrimary: document.getElementById("rsvp-f-color1").value,
+    colorSecondary: document.getElementById("rsvp-f-color2").value,
+    customText: document.getElementById("rsvp-f-text").value.trim(),
+    extraInfo: document.getElementById("rsvp-f-extra").value.trim(),
+    active: true,
+  };
+  if (isNew) data.createdAt = Date.now();
+
+  try {
+    await db.collection("events").doc(eventId).set(data, { merge: true });
+    if (isNew) {
+      const token = randomTokenRsvp();
+      await db.collection("clientAccess").doc(token).set({ eventId, createdAt: Date.now() });
+    }
+    msg.innerHTML = '<p style="color:var(--green);font-size:13px">Evento salvo!</p>';
+    resetFormEventoRsvp();
+    renderEventosRsvp();
+  } catch (e) {
+    msg.innerHTML = `<p style="color:var(--red);font-size:13px">Erro: ${e.message}</p>`;
+  }
+}
+
+async function editarEventoRsvp(eventId) {
+  const snap = await db.collection("events").doc(eventId).get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  document.getElementById("rsvp-event-id").value = eventId;
+  document.getElementById("rsvp-f-name").value = d.name || "";
+  document.getElementById("rsvp-f-host").value = d.hostName || "";
+  document.getElementById("rsvp-f-date").value = d.date || "";
+  document.getElementById("rsvp-f-time").value = d.time || "";
+  document.getElementById("rsvp-f-location").value = d.location || "";
+  document.getElementById("rsvp-f-cover").value = d.coverImage || "";
+  document.getElementById("rsvp-f-bg").value = d.bgImage || "";
+  document.getElementById("rsvp-f-logo").value = d.logoUrl || "";
+  document.getElementById("rsvp-f-color1").value = d.colorPrimary || "#d6336c";
+  document.getElementById("rsvp-f-color2").value = d.colorSecondary || "#e8c766";
+  document.getElementById("rsvp-f-text").value = d.customText || "";
+  document.getElementById("rsvp-f-extra").value = d.extraInfo || "";
+  document.getElementById("rsvpFormTitle").textContent = `Editando: ${d.name}`;
+  document.getElementById("page-eventosrsvp").scrollIntoView({ behavior: "smooth" });
+}
+
+async function toggleEventoAtivo(eventId, current) {
+  await db.collection("events").doc(eventId).update({ active: !current });
+  renderEventosRsvp();
+}
+
+async function excluirEventoRsvp(eventId, name) {
+  if (!confirm(`Excluir "${name}"? Isso não apaga os convidados já cadastrados, apenas o evento.`)) return;
+  await db.collection("events").doc(eventId).delete();
+  renderEventosRsvp();
+}
+
+function copiarLinkRsvp(id, text) {
+  navigator.clipboard.writeText(text);
+  const el = document.getElementById(id);
+  if (el) { el.textContent = "Copiado!"; setTimeout(() => el.textContent = "Copiar", 1500); }
+}
+
+async function findClientTokenRsvp(eventId) {
+  const snap = await db.collection("clientAccess").get();
+  for (const d of snap.docs) if (d.data().eventId === eventId) return d.id;
+  return null;
+}
+
+async function renderEventosRsvp() {
+  const listEl = document.getElementById("rsvp-events-list");
+  listEl.textContent = "Carregando...";
+  const snap = await db.collection("events").orderBy("createdAt", "desc").get();
+  if (snap.empty) { listEl.innerHTML = "<p style='color:var(--ink-muted)'>Nenhum evento cadastrado ainda.</p>"; return; }
+
+  listEl.innerHTML = "";
+  for (const docSnap of snap.docs) {
+    const eventId = docSnap.id;
+    const d = docSnap.data();
+
+    const guestsSnap = await db.collection("events").doc(eventId).collection("guests").get();
+    let totalConf = 0, totalPeople = 0, totalCheckin = 0;
+    guestsSnap.forEach(g => {
+      const gd = g.data();
+      if (gd.status !== "cancelado") { totalConf++; totalPeople += (gd.totalPessoas || 1); }
+      if (gd.status === "entrada_realizada") totalCheckin++;
+    });
+
+    const token = await findClientTokenRsvp(eventId);
+    const guestLink = `${RSVP_BASE}evento.html?e=${eventId}`;
+    const clientLink = token ? `${RSVP_BASE}cliente.html?e=${eventId}&t=${token}` : "(token não encontrado)";
+
+    const div = document.createElement("div");
+    div.style.cssText = "border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px";
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <b>${d.name}</b> <span class="badge ${d.active ? 'badge-up' : 'badge-neutral'}" style="padding:2px 9px;border-radius:20px;font-size:11px">${d.active ? 'Ativo' : 'Inativo'}</span>
+          <div style="font-size:12.5px;color:var(--ink-muted);margin-top:2px">${d.date || "sem data"} ${d.time || ""} · ${d.location || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="editarEventoRsvp('${eventId}')">Editar</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleEventoAtivo('${eventId}', ${d.active})">${d.active ? 'Desativar' : 'Ativar'}</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirEventoRsvp('${eventId}', '${(d.name||'').replace(/'/g,"")}')">Excluir</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap">
+        <div style="background:var(--cream);border-radius:10px;padding:8px 14px;font-size:12.5px"><b style="display:block;font-size:16px;color:var(--rose)">${totalConf}</b>confirmações</div>
+        <div style="background:var(--cream);border-radius:10px;padding:8px 14px;font-size:12.5px"><b style="display:block;font-size:16px;color:var(--rose)">${totalPeople}</b>pessoas</div>
+        <div style="background:var(--cream);border-radius:10px;padding:8px 14px;font-size:12.5px"><b style="display:block;font-size:16px;color:var(--rose)">${totalCheckin}</b>check-ins</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px">
+        <input readonly value="${guestLink}" style="flex:1;font-size:11.5px;background:var(--cream)"><button class="btn btn-ghost btn-sm" id="cp-g-${eventId}" onclick="copiarLinkRsvp('cp-g-${eventId}','${guestLink}')">Copiar</button><span style="color:var(--ink-muted)">convite</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12px">
+        <input readonly value="${clientLink}" style="flex:1;font-size:11.5px;background:var(--cream)"><button class="btn btn-ghost btn-sm" id="cp-c-${eventId}" onclick="copiarLinkRsvp('cp-c-${eventId}','${clientLink}')">Copiar</button><span style="color:var(--ink-muted)">cliente (lista + check-in)</span>
+      </div>
+    `;
+    listEl.appendChild(div);
+  }
+}
+
+// ============================================================
+// LISTA DE PRESENTES — CATÁLOGO + LISTAS (produto avulso)
+// ============================================================
+const LISTAS_BASE = "https://lojaluluzices.com.br/rsvp/";
+
+async function addCatalogo() {
+  const msg = document.getElementById("catalogo-msg");
+  const nome = document.getElementById("cat-nome").value.trim();
+  const imagemUrl = document.getElementById("cat-img").value.trim();
+  if (!nome || !imagemUrl) { msg.innerHTML = '<p style="color:var(--red);font-size:13px">Preencha nome e imagem.</p>'; return; }
+  try {
+    await db.collection("catalogo").add({ nome, imagemUrl, createdAt: Date.now() });
+    document.getElementById("cat-nome").value = "";
+    document.getElementById("cat-img").value = "";
+    msg.innerHTML = "";
+    renderCatalogoGestao();
+  } catch (e) {
+    msg.innerHTML = `<p style="color:var(--red);font-size:13px">Erro: ${e.message}</p>`;
+  }
+}
+
+async function deleteCatalogoGestao(id) {
+  if (!confirm("Remover este produto do catálogo?")) return;
+  await db.collection("catalogo").doc(id).delete();
+  renderCatalogoGestao();
+}
+
+async function renderCatalogoGestao() {
+  const el = document.getElementById("catalogo-list");
+  const snap = await db.collection("catalogo").get();
+  if (snap.empty) { el.innerHTML = "<p style='color:var(--ink-muted)'>Nenhum produto cadastrado ainda.</p>"; return; }
+  el.innerHTML = snap.docs.map(d => {
+    const c = d.data();
+    return `<div style="text-align:center">
+      <img src="${c.imagemUrl}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px">
+      <div style="font-size:12px;margin:4px 0">${c.nome}</div>
+      <button class="btn btn-danger btn-sm" onclick="deleteCatalogoGestao('${d.id}')">Excluir</button>
+    </div>`;
+  }).join("");
+}
+
+async function saveLista() {
+  const msg = document.getElementById("lista-msg");
+  const nome = document.getElementById("lp-nome").value.trim();
+  if (!nome) { msg.innerHTML = '<p style="color:var(--red);font-size:13px">Dê um nome à lista.</p>'; return; }
+
+  const listaId = slugifyRsvp(nome);
+  try {
+    await db.collection("listas").doc(listaId).set({
+      nome,
+      tipo: document.getElementById("lp-tipo").value.trim(),
+      colorPrimary: document.getElementById("lp-color1").value,
+      colorSecondary: document.getElementById("lp-color2").value,
+      active: true,
+      createdAt: Date.now()
+    });
+    const token = randomTokenRsvp();
+    await db.collection("listaAccess").doc(token).set({ listaId, createdAt: Date.now() });
+
+    document.getElementById("lp-nome").value = "";
+    document.getElementById("lp-tipo").value = "";
+    msg.innerHTML = '<p style="color:var(--green);font-size:13px">Lista criada!</p>';
+    renderListasGestao();
+  } catch (e) {
+    msg.innerHTML = `<p style="color:var(--red);font-size:13px">Erro: ${e.message}</p>`;
+  }
+}
+
+async function deleteListaGestao(listaId, nome) {
+  if (!confirm(`Excluir a lista "${nome}"? Os itens cadastrados também serão perdidos.`)) return;
+  const itensSnap = await db.collection("listas").doc(listaId).collection("itens").get();
+  await Promise.all(itensSnap.docs.map(d => d.ref.delete()));
+  await db.collection("listas").doc(listaId).delete();
+  renderListasGestao();
+}
+
+async function saveListaCoresGestao(listaId) {
+  await db.collection("listas").doc(listaId).update({
+    colorPrimary: document.getElementById(`lc1-${listaId}`).value,
+    colorSecondary: document.getElementById(`lc2-${listaId}`).value
+  });
+}
+
+async function findListaTokenGestao(listaId) {
+  const snap = await db.collection("listaAccess").get();
+  for (const d of snap.docs) if (d.data().listaId === listaId) return d.id;
+  return null;
+}
+
+async function renderListasGestao() {
+  const el = document.getElementById("listas-list");
+  el.textContent = "Carregando...";
+  const snap = await db.collection("listas").orderBy("createdAt", "desc").get();
+  if (snap.empty) { el.innerHTML = "<p style='color:var(--ink-muted)'>Nenhuma lista criada ainda.</p>"; return; }
+
+  el.innerHTML = "";
+  for (const docSnap of snap.docs) {
+    const listaId = docSnap.id;
+    const d = docSnap.data();
+    const token = await findListaTokenGestao(listaId);
+    const clientLink = token ? `${LISTAS_BASE}lista-cliente.html?l=${listaId}&t=${token}` : "(token não encontrado)";
+    const guestLink = `${LISTAS_BASE}lista.html?l=${listaId}`;
+
+    const div = document.createElement("div");
+    div.style.cssText = "border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px";
+    div.innerHTML = `
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div><b>${d.nome}</b><div style="font-size:12.5px;color:var(--ink-muted)">${d.tipo || ""}</div></div>
+        <button class="btn btn-danger btn-sm" onclick="deleteListaGestao('${listaId}','${(d.nome||'').replace(/'/g,"")}')">Excluir</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px">
+        <input readonly value="${clientLink}" style="flex:1;font-size:11.5px;background:var(--cream)"><button class="btn btn-ghost btn-sm" id="cp-lc-${listaId}" onclick="copiarLinkRsvp('cp-lc-${listaId}','${clientLink}')">Copiar</button><span style="color:var(--ink-muted)">cliente</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:12px">
+        <input readonly value="${guestLink}" style="flex:1;font-size:11.5px;background:var(--cream)"><button class="btn btn-ghost btn-sm" id="cp-lg-${listaId}" onclick="copiarLinkRsvp('cp-lg-${listaId}','${guestLink}')">Copiar</button><span style="color:var(--ink-muted)">convidado</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+        <label style="margin:0;font-size:12px">Cores:</label>
+        <input type="color" id="lc1-${listaId}" value="${d.colorPrimary || '#d6336c'}">
+        <input type="color" id="lc2-${listaId}" value="${d.colorSecondary || '#e8c766'}">
+        <button class="btn btn-ghost btn-sm" onclick="saveListaCoresGestao('${listaId}')">Salvar cores</button>
+      </div>
+    `;
+    el.appendChild(div);
+  }
+}
+
+function renderPresentes() {
+  renderCatalogoGestao();
+  renderListasGestao();
+}
 </script>
 </body>
 </html>
