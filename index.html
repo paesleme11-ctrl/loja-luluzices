@@ -1317,8 +1317,10 @@ function abrirProduto(id) {
 
   const adicionaisHtml = '';
 
-  // Cross-sell: produtos do mesmo tema (se tiver) ou marcados manualmente na lista crossSell
-  const crossProdutos = [];
+  // Sugestões de convites do mesmo tema na tela de detalhes do produto.
+  const crossProdutos = p.temaId
+    ? produtos.filter(x => x.id !== p.id && x.temaId === p.temaId && !x.sobConsulta).slice(0, 8)
+    : [];
 
   const crossSellHtml = crossProdutos.length ? `
     <div class="produto-crosssell">
@@ -1426,16 +1428,10 @@ function abrirOfertasParaItem(item) {
 function renderOfertasGlobais() {
   const body = document.getElementById('ofertasBody');
   const idsNoCarrinho = new Set(carrinho.map(i => i.id));
-  const cross = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id);
   const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).slice(0, 3);
   let html = '';
-  if (cross) {
-    const preco = calcularPrecoCrossSellGlobal(cross);
-    const foto = (cross.fotos && cross.fotos[0]) || cross.foto;
-    html += `<section class="oferta-global"><div class="oferta-global-titulo">🎁 ${ofertaCrossSellGlobal.texto || 'Oferta especial para o seu carrinho'}</div><label class="oferta-global-card"><input type="checkbox" id="crossSellGlobalCheck"><div class="orderbump-thumb">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${cross.nome}">` : emojiPara(cross.categoria)}</div><div class="orderbump-info"><div class="orderbump-texto">${cross.nome}</div><div class="orderbump-precos"><span class="orderbump-preco-antigo">${BRL(cross.preco)}</span><span class="orderbump-preco-novo">${BRL(preco)}</span></div></div><span class="orderbump-btn-add">+ Incluir</span></label></section>`;
-  }
   if (extras.length) {
-    html += `<div class="adicionais-globais-titulo">Que tal deixar seu convite ainda mais completo? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; return `<label class="adicional-global-card" id="adicionalGlobalCard_${p.id}"><input class="adicional-global-check" type="checkbox" value="${p.id}" onchange="toggleAdicionalGlobal('${p.id}')"><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></label>`; }).join('')}</div>`;
+    html += `<div class="adicionais-globais-titulo">Quer incluir mais algum produto? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; return `<label class="adicional-global-card" id="adicionalGlobalCard_${p.id}"><input class="adicional-global-check" type="checkbox" value="${p.id}" onchange="toggleAdicionalGlobal('${p.id}')"><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></label>`; }).join('')}</div>`;
   }
   if (!html) html = '<p style="text-align:center;color:var(--ink-muted);padding:18px 0">Seu produto já está no carrinho. Você pode continuar.</p>';
   body.innerHTML = html;
@@ -1451,10 +1447,6 @@ function toggleAdicionalGlobal(id) {
 
 function confirmarOfertas() {
   const nomeProdutoAdicionado = produtoPendenteOfertas?.nome || 'Produto';
-  const cross = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
-  if (cross && document.getElementById('crossSellGlobalCheck')?.checked && !carrinho.some(i => i.id === cross.id)) {
-    carrinho.push({ id:cross.id, nome:cross.nome, preco:calcularPrecoCrossSellGlobal(cross), precoBase:cross.preco, foto:(cross.fotos&&cross.fotos[0])||cross.foto||null, categoria:cross.categoria, adicionais:[], _viaOrderBump:true });
-  }
   for (const id of adicionaisGlobaisSelecionados) {
     const p = produtos.find(x => x.id === id);
     if (p && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:p.preco, categoria:p.categoria, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
@@ -1477,31 +1469,12 @@ function removerDoCarrinho(idx) {
   atualizarCarrinhoUI();
 }
 
-/** Calcula o preço com desconto de um order bump, respeitando o tipo (fixo ou percentual) */
-/** O desconto do order bump é configurado no produto de ORIGEM (quem oferece o bump),
- * não no produto que é oferecido — por isso recebe os dois aqui. */
-function calcularPrecoComBumpDesconto(produtoOrigem, produtoBump) {
-  const precoBase = produtoBump.preco;
-  const tipo = produtoOrigem.orderBumpDescontoTipo || 'fixo';
-  const valor = produtoOrigem.orderBumpDescontoValor || 0;
-  let precoFinal = tipo === 'percentual'
-    ? precoBase * (1 - valor / 100)
-    : precoBase - valor;
-  return Math.max(precoFinal, 0);
-}
-
-/** Verifica se algum item do carrinho tem order bump configurado e ainda não foi adicionado */
+/** Retorna o cross-sell global enquanto o produto ainda não estiver no carrinho. */
 function getOrderBumpDisponivel() {
-  for (const item of carrinho) {
-    const produtoOrigem = produtos.find(p => p.id === item.id);
-    if (!produtoOrigem || !produtoOrigem.orderBump) continue;
-    const jaNoCarrinho = carrinho.some(c => c.id === produtoOrigem.orderBump);
-    if (jaNoCarrinho) continue;
-    const produtoBump = produtos.find(p => p.id === produtoOrigem.orderBump);
-    if (!produtoBump) continue;
-    return { origem: produtoOrigem, bump: produtoBump };
-  }
-  return null;
+  if (!carrinho.length || !ofertaCrossSellGlobal.produtoId) return null;
+  const bump = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
+  if (!bump || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
+  return { bump };
 }
 
 function renderOrderBumpNoCarrinho() {
@@ -1510,13 +1483,13 @@ function renderOrderBumpNoCarrinho() {
   const disponivel = getOrderBumpDisponivel();
   if (!disponivel || orderBumpAceito) { container.innerHTML = ''; return; }
 
-  const { origem, bump } = disponivel;
-  const precoComDesconto = calcularPrecoComBumpDesconto(origem, bump);
-  const textoOferta = origem.orderBumpTexto?.trim() || `Leve também ${bump.nome} com desconto especial!`;
+  const { bump } = disponivel;
+  const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
+  const textoOferta = ofertaCrossSellGlobal.texto?.trim() || `Leve também ${bump.nome} com desconto especial!`;
 
   container.innerHTML = `
     <div class="orderbump-card" onclick="aceitarOrderBump('${bump.id}')">
-      <div class="orderbump-thumb">${(bump.foto && !ehVideo(bump.foto)) ? `<img src="${bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
+      <div class="orderbump-thumb">${((bump.fotos && bump.fotos[0]) || bump.foto) && !ehVideo((bump.fotos && bump.fotos[0]) || bump.foto) ? `<img src="${(bump.fotos && bump.fotos[0]) || bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
       <div class="orderbump-info">
         <div class="orderbump-texto">${textoOferta}</div>
         <div class="orderbump-precos">
@@ -1532,8 +1505,8 @@ function aceitarOrderBump(bumpId) {
   const disponivel = getOrderBumpDisponivel();
   const bump = produtos.find(p => p.id === bumpId);
   if (!bump || !disponivel) return;
-  const precoComDesconto = calcularPrecoComBumpDesconto(disponivel.origem, bump);
-  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, foto: bump.foto, categoria: bump.categoria, adicionais: [], _viaOrderBump: true });
+  const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
+  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, adicionais: [], _viaOrderBump: true });
   orderBumpAceito = bumpId;
   atualizarCarrinhoUI();
   showToast(`${bump.nome} adicionado com desconto ✓`, 'success');
@@ -1546,6 +1519,8 @@ function atualizarCarrinhoUI() {
   const footer = document.getElementById('cartFooter');
 
   if (carrinho.length === 0) {
+    const offerContainer = document.getElementById('cartOrderBumpContainer');
+    if (offerContainer) offerContainer.innerHTML = '';
     badge.style.display = 'none';
     if (badgeNav) badgeNav.style.display = 'none';
     footer.style.display = 'none';
@@ -1585,7 +1560,7 @@ function atualizarCarrinhoUI() {
   if (orderBumpAceito && !carrinho.some(c => c.id === orderBumpAceito)) {
     orderBumpAceito = null;
   }
-  // A oferta global é apresentada na tela exibida ao adicionar um produto.
+  renderOrderBumpNoCarrinho();
 
   const total = carrinho.reduce((s, i) => s + i.preco, 0);
   document.getElementById('cartTotalValor').textContent = BRL(total);
