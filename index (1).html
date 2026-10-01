@@ -1366,7 +1366,8 @@
     <div class="modal-body" id="detalhesFormBody"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modalDetalhesForm')">Fechar</button>
-      <button class="btn btn-primary" id="btnIrParaConfirmacao" onclick="irParaConfirmacaoPresenca()">📲 Gerar Confirmação</button>
+      <button class="btn btn-ghost" id="btnCriarFormularioRsvp" onclick="criarFormularioRsvpFromVenda()">📝 Criar formulário RSVP</button>
+      <button class="btn btn-primary" id="btnIrParaConfirmacao" onclick="irParaConfirmacaoPresenca()">📲 Gerar Confirmação WhatsApp</button>
     </div>
   </div>
 </div>
@@ -1919,11 +1920,13 @@ function abrirDetalhesFormulario(vendaId) {
   if (!campos) {
     body.innerHTML = `<p style="font-size:13.5px;color:var(--ink-light);white-space:pre-wrap;">${(v.obs||'Sem observações.').replace(/</g,'&lt;')}</p>`;
     document.getElementById('btnIrParaConfirmacao').style.display = 'none';
+    document.getElementById('btnCriarFormularioRsvp').style.display = 'none';
     document.getElementById('modalDetalhesForm').classList.add('open');
     return;
   }
 
   document.getElementById('btnIrParaConfirmacao').style.display = '';
+  document.getElementById('btnCriarFormularioRsvp').style.display = '';
 
   const linhas = Object.entries(campos).map(([chave, valor]) => {
     const url = extrairURL(valor);
@@ -1952,6 +1955,37 @@ function abrirDetalhesFormulario(vendaId) {
 function irParaConfirmacaoPresenca() {
   closeModal('modalDetalhesForm');
   abrirModalConfirmacaoWpp(_vendaDetalhesAtual);
+}
+
+function dataParaInputRsvp(valor) {
+  if (!valor) return '';
+  const texto = String(valor).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) return texto.slice(0, 10);
+  const br = texto.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (br) return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
+  return '';
+}
+
+function criarFormularioRsvpFromVenda() {
+  const venda = _vendaDetalhesAtual;
+  if (!venda) return;
+  const campos = parseObsFormulario(venda.obs) || {};
+  const nome = buscarCampo(campos, 'nome do aniversariante', 'aniversariante', 'nome') || venda.contato || '';
+  const data = buscarCampo(campos, 'data do evento', 'data da festa', 'data') || '';
+  const horario = buscarCampo(campos, 'horário', 'horario', 'hora') || '';
+  const local = buscarCampo(campos, 'local do evento', 'local', 'endereço', 'endereco') || '';
+
+  resetFormEventoRsvp();
+  document.getElementById('rsvp-f-name').value = nome ? `Aniversário de ${nome}` : 'Aniversário';
+  document.getElementById('rsvp-f-host').value = nome;
+  document.getElementById('rsvp-f-date').value = dataParaInputRsvp(data);
+  document.getElementById('rsvp-f-time').value = String(horario).match(/\b\d{1,2}:\d{2}\b/)?.[0] || '';
+  document.getElementById('rsvp-f-location').value = local;
+  document.getElementById('rsvp-f-text').value = nome ? `Venha comemorar o aniversário de ${nome} com a gente!` : 'Venha comemorar com a gente!';
+  closeModal('modalDetalhesForm');
+  goTo('eventosrsvp');
+  document.getElementById('page-eventosrsvp').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('Formulário preenchido com os dados do pedido. Revise e salve o evento.', 'success');
 }
 
 function abrirModalConfirmacaoWpp(venda) {
