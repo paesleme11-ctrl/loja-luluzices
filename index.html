@@ -1023,6 +1023,7 @@ let adicionaisGlobais = [];
 let produtoPendenteOfertas = null;
 let adicionaisGlobaisSelecionados = new Set();
 let adicionalGlobalEmDetalhe = null;
+let tipoDetalheOferta = 'extra';
 
 async function salvarProdutosSite() {
   return db.collection('config').doc('produtosSite').set({
@@ -1455,19 +1456,27 @@ function renderOfertasGlobais() {
   body.innerHTML = html;
 }
 
-function abrirDetalheAdicionalGlobal(id) {
+function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   const p = produtos.find(item => item.id === id);
   if (!p) return;
   adicionalGlobalEmDetalhe = p;
+  tipoDetalheOferta = tipo;
   const foto = (p.fotos && p.fotos[0]) || p.foto;
   const descricao = p.descricao?.trim() || 'Um serviço extra para complementar seu pedido.';
-  document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${BRL(p.preco)}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${adicionaisGlobaisSelecionados.has(id) ? 'Remover dos extras' : 'Recusar'}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${adicionaisGlobaisSelecionados.has(id) ? 'Manter no pedido' : 'Incluir no carrinho'}</button></div></div>`;
+  const jaIncluido = tipo === 'extra' && adicionaisGlobaisSelecionados.has(id);
+  const textoRecusar = tipo === 'crossSell' ? 'Voltar ao carrinho' : (jaIncluido ? 'Remover dos extras' : 'Recusar');
+  const textoIncluir = tipo === 'crossSell' ? 'Adicionar oferta' : (jaIncluido ? 'Manter no pedido' : 'Incluir no carrinho');
+  const preco = tipo === 'crossSell' ? `<span class="orderbump-preco-antigo" style="font-size:14px;margin-right:6px">${BRL(p.preco)}</span>${BRL(calcularPrecoCrossSellGlobal(p))}` : BRL(p.preco);
+  document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${preco}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${textoRecusar}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${textoIncluir}</button></div></div>`;
   document.getElementById('extraDetalheOverlay').classList.add('open');
 }
 
 function fecharDetalheAdicional(incluir) {
   const id = adicionalGlobalEmDetalhe?.id;
-  if (incluir && id) {
+  const tipo = tipoDetalheOferta;
+  if (tipo === 'crossSell' && incluir && id) {
+    aceitarOrderBump(id);
+  } else if (tipo === 'extra' && incluir && id) {
     if (adicionaisGlobaisSelecionados.has(id)) {
       // Já incluído: mantém selecionado.
     } else if (adicionaisGlobaisSelecionados.size < 3) {
@@ -1475,12 +1484,13 @@ function fecharDetalheAdicional(incluir) {
     } else {
       showToast('Você pode escolher até 3 serviços extras.', 'error');
     }
-  } else if (id && adicionaisGlobaisSelecionados.has(id)) {
+  } else if (tipo === 'extra' && id && adicionaisGlobaisSelecionados.has(id)) {
     adicionaisGlobaisSelecionados.delete(id);
   }
   document.getElementById('extraDetalheOverlay').classList.remove('open');
   adicionalGlobalEmDetalhe = null;
-  renderOfertasGlobais();
+  tipoDetalheOferta = 'extra';
+  if (tipo === 'extra') renderOfertasGlobais();
 }
 
 function confirmarOfertas() {
@@ -1526,7 +1536,7 @@ function renderOrderBumpNoCarrinho() {
   const textoOferta = ofertaCrossSellGlobal.texto?.trim() || `Leve também ${bump.nome} com desconto especial!`;
 
   container.innerHTML = `
-    <div class="orderbump-card" onclick="aceitarOrderBump('${bump.id}')">
+    <div class="orderbump-card" onclick="abrirDetalheAdicionalGlobal('${bump.id}', 'crossSell')">
       <div class="orderbump-thumb">${((bump.fotos && bump.fotos[0]) || bump.foto) && !ehVideo((bump.fotos && bump.fotos[0]) || bump.foto) ? `<img src="${(bump.fotos && bump.fotos[0]) || bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
       <div class="orderbump-info">
         <div class="orderbump-texto">${textoOferta}</div>
@@ -1535,7 +1545,7 @@ function renderOrderBumpNoCarrinho() {
           <span class="orderbump-preco-novo">${BRL(precoComDesconto)}</span>
         </div>
       </div>
-      <button class="orderbump-btn-add">+ Adicionar</button>
+      <button class="orderbump-btn-add">Ver detalhes</button>
     </div>`;
 }
 
