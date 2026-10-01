@@ -1960,10 +1960,27 @@ function irParaConfirmacaoPresenca() {
 function dataParaInputRsvp(valor) {
   if (!valor) return '';
   const texto = String(valor).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) return texto.slice(0, 10);
-  const br = texto.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  const iso = texto.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2,'0')}-${iso[3].padStart(2,'0')}`;
+  const br = texto.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\b/);
   if (br) return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
   return '';
+}
+
+function extrairDataHoraRsvp(campos) {
+  const entradas = Object.entries(campos || {});
+  const normalizar = texto => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const dataRegex = /\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})\b/;
+  const chaveData = entradas.find(([k]) => /data|quando|dia/.test(normalizar(k)) && /festa|evento|anivers|comemor|nascimento/.test(normalizar(k)));
+  const qualquerData = entradas.find(([,v]) => dataRegex.test(String(v)));
+  const valorData = chaveData?.[1] || qualquerData?.[1] || '';
+  const data = dataParaInputRsvp(valorData);
+
+  const chaveHora = entradas.find(([k]) => /hora|horario|que horas|inicio/.test(normalizar(k)) && /festa|evento|anivers|comemor|inicio/.test(normalizar(k)));
+  const valorHora = chaveHora?.[1] || entradas.find(([,v]) => /\b\d{1,2}\s*(?::|h| horas?)\s*\d{0,2}\b/i.test(String(v)))?.[1] || '';
+  const horaMatch = String(valorHora).match(/\b(\d{1,2})\s*(?::|h| horas?)\s*(\d{0,2})\b/i);
+  const horario = horaMatch ? `${horaMatch[1].padStart(2,'0')}:${(horaMatch[2] || '00').padStart(2,'0')}` : '';
+  return { data, horario };
 }
 
 function criarFormularioRsvpFromVenda() {
@@ -1971,15 +1988,14 @@ function criarFormularioRsvpFromVenda() {
   if (!venda) return;
   const campos = parseObsFormulario(venda.obs) || {};
   const nome = buscarCampo(campos, 'nome do aniversariante', 'aniversariante', 'nome') || venda.contato || '';
-  const data = buscarCampo(campos, 'data do evento', 'data da festa', 'data') || '';
-  const horario = buscarCampo(campos, 'horário', 'horario', 'hora') || '';
+  const { data, horario } = extrairDataHoraRsvp(campos);
   const local = buscarCampo(campos, 'local do evento', 'local', 'endereço', 'endereco') || '';
 
   resetFormEventoRsvp();
   document.getElementById('rsvp-f-name').value = nome ? `Aniversário de ${nome}` : 'Aniversário';
   document.getElementById('rsvp-f-host').value = nome;
-  document.getElementById('rsvp-f-date').value = dataParaInputRsvp(data);
-  document.getElementById('rsvp-f-time').value = String(horario).match(/\b\d{1,2}:\d{2}\b/)?.[0] || '';
+  document.getElementById('rsvp-f-date').value = data;
+  document.getElementById('rsvp-f-time').value = horario;
   document.getElementById('rsvp-f-location').value = local;
   document.getElementById('rsvp-f-text').value = nome ? `Venha comemorar o aniversário de ${nome} com a gente!` : 'Venha comemorar com a gente!';
   closeModal('modalDetalhesForm');
@@ -5197,7 +5213,7 @@ firebase.auth().onAuthStateChanged(user => {
 // ============================================================
 // EVENTOS RSVP + QR CODE (usa o mesmo login/db da gestão)
 // ============================================================
-const RSVP_BASE = "https://lojaluluzices.com.br/rsvp/";
+const RSVP_BASE = "https://lojaluluzices.com.br/";
 
 function slugifyRsvp(name) {
   const base = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
