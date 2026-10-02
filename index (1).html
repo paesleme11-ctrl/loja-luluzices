@@ -18,6 +18,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
 <style>
   :root {
@@ -1049,11 +1050,11 @@
           <div class="form-group"><label>Local</label><input id="rsvp-f-location"></div>
         </div>
         <div class="form-row cols-2">
-          <div class="form-group"><label>URL da imagem de capa</label><input id="rsvp-f-cover" placeholder="https://..."></div>
-          <div class="form-group"><label>URL da imagem de fundo</label><input id="rsvp-f-bg" placeholder="https://..."></div>
+          <div class="form-group"><label>Imagem de capa</label><input type="file" id="rsvp-file-cover" accept="image/*" onchange="previewImagemRsvp('cover')"><input type="hidden" id="rsvp-f-cover-url"><div id="rsvp-preview-cover" style="margin-top:8px"></div></div>
+          <div class="form-group"><label>Imagem de fundo</label><input type="file" id="rsvp-file-bg" accept="image/*" onchange="previewImagemRsvp('bg')"><input type="hidden" id="rsvp-f-bg-url"><div id="rsvp-preview-bg" style="margin-top:8px"></div></div>
         </div>
         <div class="form-row cols-3">
-          <div class="form-group"><label>URL do logo (opcional)</label><input id="rsvp-f-logo"></div>
+          <div class="form-group"><label>Logo (opcional)</label><input type="file" id="rsvp-file-logo" accept="image/*" onchange="previewImagemRsvp('logo')"><input type="hidden" id="rsvp-f-logo-url"><div id="rsvp-preview-logo" style="margin-top:8px"></div></div>
           <div class="form-group"><label>Cor principal</label><input type="color" id="rsvp-f-color1" value="#d6336c"></div>
           <div class="form-group"><label>Cor secundária</label><input type="color" id="rsvp-f-color2" value="#e8c766"></div>
         </div>
@@ -5227,12 +5228,36 @@ function randomTokenRsvp() {
 
 function resetFormEventoRsvp() {
   document.getElementById("rsvp-event-id").value = "";
-  ["rsvp-f-name","rsvp-f-host","rsvp-f-date","rsvp-f-time","rsvp-f-location","rsvp-f-cover","rsvp-f-bg","rsvp-f-logo","rsvp-f-text","rsvp-f-extra"]
+  ["rsvp-f-name","rsvp-f-host","rsvp-f-date","rsvp-f-time","rsvp-f-location","rsvp-f-text","rsvp-f-extra","rsvp-f-cover-url","rsvp-f-bg-url","rsvp-f-logo-url"]
     .forEach(id => document.getElementById(id).value = "");
+  ["cover","bg","logo"].forEach(tipo => {
+    document.getElementById(`rsvp-file-${tipo}`).value = "";
+    document.getElementById(`rsvp-preview-${tipo}`).innerHTML = "";
+  });
   document.getElementById("rsvp-f-color1").value = "#d6336c";
   document.getElementById("rsvp-f-color2").value = "#e8c766";
   document.getElementById("rsvpFormTitle").textContent = "Novo evento";
   document.getElementById("rsvp-form-msg").innerHTML = "";
+}
+
+function previewImagemRsvp(tipo, urlAtual = null) {
+  const arquivo = document.getElementById(`rsvp-file-${tipo}`).files[0];
+  const url = arquivo ? URL.createObjectURL(arquivo) : (urlAtual || document.getElementById(`rsvp-f-${tipo}-url`).value);
+  const preview = document.getElementById(`rsvp-preview-${tipo}`);
+  preview.innerHTML = url ? `<img src="${url}" alt="Prévia ${tipo}" style="max-width:180px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : "";
+}
+
+async function obterUrlImagemRsvp(tipo, eventId) {
+  const input = document.getElementById(`rsvp-file-${tipo}`);
+  const arquivo = input.files[0];
+  const urlAtual = document.getElementById(`rsvp-f-${tipo}-url`).value.trim();
+  if (!arquivo) return urlAtual;
+  if (!arquivo.type.startsWith("image/")) throw new Error("Selecione um arquivo de imagem válido.");
+  if (arquivo.size > 10 * 1024 * 1024) throw new Error("Cada imagem deve ter no máximo 10 MB.");
+  const nomeSeguro = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const ref = firebase.storage().ref().child(`eventos/${eventId}/${tipo}-${Date.now()}-${nomeSeguro}`);
+  const snapshot = await ref.put(arquivo);
+  return snapshot.ref.getDownloadURL();
 }
 
 async function salvarEventoRsvp() {
@@ -5244,15 +5269,22 @@ async function salvarEventoRsvp() {
   const isNew = !eventId;
   if (isNew) eventId = slugifyRsvp(name);
 
-  const data = {
+  msg.innerHTML = '<p style="color:var(--ink-muted);font-size:13px">Enviando imagens e salvando evento...</p>';
+  try {
+    const [coverImage, bgImage, logoUrl] = await Promise.all([
+      obterUrlImagemRsvp("cover", eventId),
+      obterUrlImagemRsvp("bg", eventId),
+      obterUrlImagemRsvp("logo", eventId),
+    ]);
+    const data = {
     name,
     hostName: document.getElementById("rsvp-f-host").value.trim(),
     date: document.getElementById("rsvp-f-date").value,
     time: document.getElementById("rsvp-f-time").value,
     location: document.getElementById("rsvp-f-location").value.trim(),
-    coverImage: document.getElementById("rsvp-f-cover").value.trim(),
-    bgImage: document.getElementById("rsvp-f-bg").value.trim(),
-    logoUrl: document.getElementById("rsvp-f-logo").value.trim(),
+    coverImage,
+    bgImage,
+    logoUrl,
     colorPrimary: document.getElementById("rsvp-f-color1").value,
     colorSecondary: document.getElementById("rsvp-f-color2").value,
     customText: document.getElementById("rsvp-f-text").value.trim(),
@@ -5261,7 +5293,6 @@ async function salvarEventoRsvp() {
   };
   if (isNew) data.createdAt = Date.now();
 
-  try {
     await db.collection("events").doc(eventId).set(data, { merge: true });
     if (isNew) {
       const token = randomTokenRsvp();
@@ -5285,9 +5316,12 @@ async function editarEventoRsvp(eventId) {
   document.getElementById("rsvp-f-date").value = d.date || "";
   document.getElementById("rsvp-f-time").value = d.time || "";
   document.getElementById("rsvp-f-location").value = d.location || "";
-  document.getElementById("rsvp-f-cover").value = d.coverImage || "";
-  document.getElementById("rsvp-f-bg").value = d.bgImage || "";
-  document.getElementById("rsvp-f-logo").value = d.logoUrl || "";
+  document.getElementById("rsvp-f-cover-url").value = d.coverImage || "";
+  document.getElementById("rsvp-f-bg-url").value = d.bgImage || "";
+  document.getElementById("rsvp-f-logo-url").value = d.logoUrl || "";
+  previewImagemRsvp("cover", d.coverImage || "");
+  previewImagemRsvp("bg", d.bgImage || "");
+  previewImagemRsvp("logo", d.logoUrl || "");
   document.getElementById("rsvp-f-color1").value = d.colorPrimary || "#d6336c";
   document.getElementById("rsvp-f-color2").value = d.colorSecondary || "#e8c766";
   document.getElementById("rsvp-f-text").value = d.customText || "";
