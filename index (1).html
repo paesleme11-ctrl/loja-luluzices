@@ -1283,10 +1283,12 @@
         </div>
         <div class="form-group" style="position:relative;">
           <label>Fonte do Lead</label>
-          <input type="text" id="vFonte" placeholder="Digite p/ buscar — ex: tráfego, orgânico" autocomplete="off"
-                 oninput="onFonteInput();onFonteChangeCheckConjunto()" onfocus="onFonteInput()" onblur="setTimeout(fecharSugestoesFonte, 150)"
-                 onkeydown="onFonteKeydown(event)">
-          <div id="fonteSugestoes" class="produto-sugestoes"></div>
+          <select id="vFonte" onchange="onFonteChangeCheckConjunto()">
+            <option value="tráfego pago">Tráfego pago</option>
+            <option value="orgânico">Orgânico</option>
+            <option value="recorrente">Recorrente</option>
+            <option value="indicação">Indicação</option>
+          </select>
         </div>
       </div>
 
@@ -1322,7 +1324,12 @@
       <div class="form-row">
         <div class="form-group">
           <label>Nº de Contatos até Fechar</label>
-          <input type="number" id="vNumContatos" min="0" step="1" placeholder="Ex: 3">
+          <div class="checkbox-group" id="vNumContatos">
+            <label class="checkbox-pill"><input type="radio" name="vNumContatos" value="1"> 1</label>
+            <label class="checkbox-pill"><input type="radio" name="vNumContatos" value="2"> 2</label>
+            <label class="checkbox-pill"><input type="radio" name="vNumContatos" value="3"> 3</label>
+            <label class="checkbox-pill"><input type="radio" name="vNumContatos" value="4+"> 4+</label>
+          </div>
         </div>
       </div>
 
@@ -1442,6 +1449,35 @@
       <div class="form-row">
         <div class="form-group"><label>Preço (R$)</label>
           <input type="number" id="pPreco" step="0.01" min="0" placeholder="0,00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Categoria</label>
+          <select id="pCategoria">
+            <option value="Aniversário">Aniversário</option>
+            <option value="Casamento">Casamento</option>
+            <option value="Debutante">Debutante</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Descrição</label>
+          <textarea id="pDescricao" rows="3" placeholder="Descrição do produto"></textarea>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>URL da foto</label>
+          <input type="url" id="pFotoUrl" placeholder="https://..." oninput="atualizarPreviewFoto()">
+          <div id="fotoPreviewPlaceholder" style="margin-top:8px;padding:14px;text-align:center;color:var(--ink-muted);background:var(--cream);border-radius:8px;"><span class="icon">📷</span>Cole o link da imagem abaixo</div>
+          <img id="fotoPreviewImg" alt="Prévia da foto do produto" style="display:none;max-width:100%;max-height:180px;object-fit:contain;margin-top:8px;border-radius:8px;">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Adicionais</label>
+          <div id="adicionaisContainer"></div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="adicionarLinhaAdicional()" style="margin-top:8px;">+ Adicionar opção</button>
         </div>
       </div>
     </div>
@@ -3095,7 +3131,13 @@ function openModalVenda(v=null) {
   document.getElementById('vData').value = v?.data || defaultDate;
 
   document.getElementById('vContato').value = v?.contato || '';
-  document.getElementById('vFonte').value = v?.fonte || 'tráfego pago';
+  const fonteSelect = document.getElementById('vFonte');
+  const fonteInicial = v?.fonte || 'tráfego pago';
+  if (![...fonteSelect.options].some(o => o.value === fonteInicial)) {
+    const legado = new Option(fonteInicial, fonteInicial);
+    fonteSelect.add(legado);
+  }
+  fonteSelect.value = fonteInicial;
   document.getElementById('vValorProd').value = v?.valorProd || '';
   // Reseta flag de preço automático
   const valorEl = document.getElementById('vValorProd');
@@ -3111,7 +3153,10 @@ function openModalVenda(v=null) {
   document.querySelectorAll('input[name="vPagamento"]').forEach(r => r.checked = (r.value === v?.pagamento));
   document.querySelectorAll('input[name="vAvaliacao"]').forEach(r => r.checked = (r.value === v?.avaliacao));
   atualizarOpcoesConjuntoModal(v?.conjuntoOrigem);
-  document.getElementById('vNumContatos').value = v?.numContatos ?? '';
+  document.querySelectorAll('input[name="vNumContatos"]').forEach(r => {
+    const quantidade = String(v?.numContatos ?? '');
+    r.checked = r.value === quantidade || (r.value === '4+' && Number(quantidade) >= 4);
+  });
   onFonteChangeCheckConjunto();
 
   // Prazo editável — mostra campo apenas para personalizados
@@ -3249,7 +3294,9 @@ function abrirModalProduto(idx = null) {
     titulo.textContent = 'Editar Produto';
     nomeInput.value = p.nome;
     precoInput.value = p.preco || '';
-    categoriaInput.value = p.categoria || 'Aniversário';
+    const categoria = p.categoria || 'Aniversário';
+    if (![...categoriaInput.options].some(o => o.value === categoria)) categoriaInput.add(new Option(categoria, categoria));
+    categoriaInput.value = categoria;
     descricaoInput.value = p.descricao || '';
     fotoInput.value = p.foto || '';
     (p.adicionais || []).forEach(a => adicionarLinhaAdicional(a.nome, a.preco));
@@ -3747,7 +3794,7 @@ function saveVenda(forcarSalvar=false) {
     pagamento: document.querySelector('input[name="vPagamento"]:checked')?.value || null,
     avaliacao: document.querySelector('input[name="vAvaliacao"]:checked')?.value || null,
     conjuntoOrigem: document.querySelector('input[name="vConjunto"]:checked')?.value || null,
-    numContatos: document.getElementById('vNumContatos').value ? parseInt(document.getElementById('vNumContatos').value) : null,
+    numContatos: document.querySelector('input[name="vNumContatos"]:checked')?.value || null,
     ...(dataFinalizacao ? { dataFinalizacao } : {}),
   };
   if (!v.contato) { showToast('Preencha o contato','error'); return; }
