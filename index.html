@@ -1970,11 +1970,12 @@ document.addEventListener('keydown', (e) => {
           <button type="button" class="admin-btn-ghost" onclick="adminAdicionarFoto()">+ Add</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;">
-          <input type="file" id="aFotoNovaArquivo" accept="image/*,video/*" style="flex:1;min-width:200px;">
-          <button type="button" class="admin-btn-primary" id="btnUploadFotoProduto" onclick="adminEnviarFotoProduto()">📤 Enviar imagem</button>
+          <input type="file" id="aFotoNovaArquivo" accept="image/*,video/*" multiple style="flex:1;min-width:200px;">
+          <button type="button" class="admin-btn-primary" id="btnUploadFotoProduto" onclick="adminEnviarFotoProduto()">📤 Enviar mídias</button>
         </div>
         <div id="aFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;"></div>
-        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Imagens e vídeos podem ser selecionados do dispositivo; links de vídeo também continuam aceitos.</p>
+        <div id="adminFotosContador" style="font-size:11px;color:#9a8890;margin-top:4px;"></div>
+        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Selecione até 5 arquivos por vez. A galeria aceita no máximo 5 mídias; use as setas para reordenar. Links de vídeo também continuam aceitos.</p>
       </div>
       <div class="admin-row2">
         <div class="admin-field" style="position:relative;">
@@ -2117,10 +2118,15 @@ document.addEventListener('keydown', (e) => {
   .admin-row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .admin-check-row { background:#fdf6f0; border-radius:9px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; }
   .admin-check-row input { margin-right:8px; }
-  .admin-fotos-galeria { display:flex; flex-wrap:wrap; gap:6px; }
-  .admin-foto-item { position:relative; width:60px; height:60px; border-radius:8px; overflow:hidden; border:1.5px solid #ecddd6; }
+  .admin-fotos-galeria { display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-foto-item { position:relative; width:72px; height:78px; border-radius:8px; overflow:hidden; border:1.5px solid #ecddd6; background:#fdf6f0; }
   .admin-foto-item img, .admin-foto-item video { width:100%; height:100%; object-fit:cover; }
-  .admin-foto-item button { position:absolute; top:1px; right:1px; width:16px; height:16px; border-radius:50%; background:rgba(0,0,0,0.6); color:#fff; border:none; font-size:10px; cursor:pointer; }
+  .admin-foto-item button { cursor:pointer; }
+  .admin-foto-numero { position:absolute; top:3px; left:4px; background:rgba(0,0,0,.62); color:#fff; border-radius:10px; padding:1px 5px; font-size:9px; }
+  .admin-foto-item .admin-foto-remover { position:absolute; top:2px; right:2px; width:18px; height:18px; border-radius:50%; background:rgba(0,0,0,.68); color:#fff; border:0; font-size:11px; line-height:18px; padding:0; }
+  .admin-foto-controles { position:absolute; left:0; right:0; bottom:0; display:flex; background:rgba(0,0,0,.68); }
+  .admin-foto-controles button { position:static; width:50%; height:22px; border:0; border-right:1px solid rgba(255,255,255,.3); border-radius:0; background:transparent; color:#fff; font-size:14px; line-height:20px; padding:0; }
+  .admin-foto-controles button:disabled { opacity:.35; cursor:default; }
   .admin-foto-video-badge { position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.65); color:#fff; font-size:9px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .admin-sugestoes { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #e8546a; border-radius:9px; max-height:160px; overflow-y:auto; z-index:10; margin-top:3px; }
   .admin-sugestoes.open { display:block; }
@@ -2310,19 +2316,37 @@ async function adminEnviarFotoProduto() {
   const input = document.getElementById('aFotoNovaArquivo');
   const botao = document.getElementById('btnUploadFotoProduto');
   const status = document.getElementById('aFotoUploadStatus');
-  if (!input.files[0]) { showToast('Selecione uma imagem','error'); return; }
+  const arquivos = Array.from(input.files || []);
+  if (!arquivos.length) { showToast('Selecione uma ou mais imagens/vídeos','error'); return; }
+  if (arquivos.length > 5) { showToast('Selecione no máximo 5 arquivos por vez','error'); return; }
+  if (_fotosGaleriaAdmin.length + arquivos.length > 5) {
+    showToast(`A galeria aceita até 5 mídias. Há ${5 - _fotosGaleriaAdmin.length} vaga(s) disponível(is).`,'error');
+    return;
+  }
   botao.disabled = true;
+  let enviadas = 0;
   try {
-    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando mídia... ${p}%`, true);
-    _fotosGaleriaAdmin.push(url);
-    input.value = '';
-    status.textContent = 'Imagem enviada ✓';
-    adminRenderFotosGaleria();
-    showToast('Mídia adicionada à galeria ✓','success');
+    for (let i = 0; i < arquivos.length; i++) {
+      const arquivo = arquivos[i];
+      const nome = arquivo.name.length > 24 ? arquivo.name.slice(0, 21) + '…' : arquivo.name;
+      const url = await adminUploadImagemCloudinary(arquivo, p => {
+        status.textContent = `Enviando ${i + 1}/${arquivos.length}: ${nome} (${p}%)`;
+      }, true);
+      _fotosGaleriaAdmin.push(url);
+      enviadas++;
+      adminRenderFotosGaleria();
+    }
+    status.textContent = `${enviadas} mídia(s) enviada(s) e adicionada(s) à galeria.`;
+    showToast(`${enviadas} mídia(s) adicionada(s) ✓`,'success');
   } catch(e) {
-    status.textContent = `Erro: ${e.message}`;
+    status.textContent = enviadas
+      ? `${enviadas} mídia(s) enviada(s). Falha no próximo arquivo: ${e.message}`
+      : `Erro: ${e.message}`;
     showToast(e.message,'error');
-  } finally { botao.disabled = false; }
+  } finally {
+    input.value = '';
+    botao.disabled = false;
+  }
 }
 
 async function carregarLogoAdmin() {
@@ -2624,12 +2648,14 @@ function ehVideo(url) {
 
 function adminRenderFotosGaleria() {
   const el = document.getElementById('adminFotosGaleria');
+  const contador = document.getElementById('adminFotosContador');
+  if (contador) contador.textContent = `${_fotosGaleriaAdmin.length}/5 mídias na galeria`;
   el.innerHTML = _fotosGaleriaAdmin.length
     ? _fotosGaleriaAdmin.map((url, i) => {
         const conteudo = ehVideo(url)
           ? `<video src="${url}" muted></video><span class="admin-foto-video-badge">▶</span>`
-          : `<img src="${url}">`;
-        return `<div class="admin-foto-item">${conteudo}<button onclick="adminRemoverFoto(${i})">✕</button></div>`;
+          : `<img src="${url}" alt="Mídia ${i + 1}">`;
+        return `<div class="admin-foto-item" title="Mídia ${i + 1}">${conteudo}<span class="admin-foto-numero">${i + 1}</span><button class="admin-foto-remover" onclick="adminRemoverFoto(${i})" aria-label="Remover mídia ${i + 1}">✕</button><div class="admin-foto-controles"><button onclick="adminMoverFoto(${i},-1)" ${i === 0 ? 'disabled' : ''} aria-label="Mover para a esquerda">←</button><button onclick="adminMoverFoto(${i},1)" ${i === _fotosGaleriaAdmin.length - 1 ? 'disabled' : ''} aria-label="Mover para a direita">→</button></div></div>`;
       }).join('')
     : '<p style="font-size:11.5px;color:#9a8890;">Nenhuma foto ou vídeo ainda.</p>';
 }
@@ -2637,8 +2663,15 @@ function adminAdicionarFoto() {
   const input = document.getElementById('aFotoNovaUrl');
   const url = input.value.trim();
   if (!url) return;
+  if (_fotosGaleriaAdmin.length >= 5) { showToast('A galeria aceita no máximo 5 mídias','error'); return; }
   _fotosGaleriaAdmin.push(url);
   input.value = '';
+  adminRenderFotosGaleria();
+}
+function adminMoverFoto(i, deslocamento) {
+  const destino = i + deslocamento;
+  if (i < 0 || destino < 0 || destino >= _fotosGaleriaAdmin.length) return;
+  [_fotosGaleriaAdmin[i], _fotosGaleriaAdmin[destino]] = [_fotosGaleriaAdmin[destino], _fotosGaleriaAdmin[i]];
   adminRenderFotosGaleria();
 }
 function adminRemoverFoto(i) { _fotosGaleriaAdmin.splice(i,1); adminRenderFotosGaleria(); }
