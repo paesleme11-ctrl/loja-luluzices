@@ -1947,7 +1947,10 @@ document.addEventListener('keydown', (e) => {
         <div id="adminLogoPreview" style="height:70px;display:flex;align-items:center;justify-content:center;background:#fdf6f0;border-radius:9px;margin-bottom:12px;overflow:hidden;">
           <span style="color:#9a8890;font-size:12px;">Sem logo</span>
         </div>
-        <input type="text" id="alogoUrl" placeholder="Link da imagem da logo" oninput="adminPreviewLogo()" style="width:100%;padding:10px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;margin-bottom:10px;">
+        <input type="hidden" id="alogoUrl">
+        <input type="file" id="alogoArquivo" accept="image/*" onchange="adminPreviewLogo()" style="width:100%;margin-bottom:8px;">
+        <div id="alogoUploadStatus" style="font-size:11px;color:#9a8890;margin-bottom:8px;"></div>
+        <button class="admin-btn-ghost" id="btnUploadLogo" onclick="adminEnviarLogo()" style="width:100%;margin-bottom:8px;">📤 Enviar imagem da logo</button>
         <button class="admin-btn-primary" onclick="adminSalvarLogo()" style="width:100%;">Salvar Logo</button>
       </div>
     </div>
@@ -1966,7 +1969,12 @@ document.addEventListener('keydown', (e) => {
           <input type="text" id="aFotoNovaUrl" placeholder="Link da imagem ou vídeo .mp4" style="flex:1;">
           <button type="button" class="admin-btn-ghost" onclick="adminAdicionarFoto()">+ Add</button>
         </div>
-        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Links terminados em .mp4 são reconhecidos automaticamente como vídeo.</p>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+          <input type="file" id="aFotoNovaArquivo" accept="image/*" style="flex:1;min-width:200px;">
+          <button type="button" class="admin-btn-primary" id="btnUploadFotoProduto" onclick="adminEnviarFotoProduto()">📤 Enviar imagem</button>
+        </div>
+        <div id="aFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;"></div>
+        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Para vídeos, continue colando o link acima. Imagens podem ser selecionadas do dispositivo.</p>
       </div>
       <div class="admin-row2">
         <div class="admin-field" style="position:relative;">
@@ -2042,7 +2050,13 @@ document.addEventListener('keydown', (e) => {
   <div class="admin-modal" style="max-width:420px;">
     <div class="admin-modal-header"><span id="adminModalBannerTitle">Novo Banner</span><button onclick="adminFecharModal('adminModalBanner')">✕</button></div>
     <div class="admin-modal-body">
-      <div class="admin-field"><label>Foto do banner</label><input type="text" id="abFotoUrl" placeholder="Link da imagem"></div>
+      <div class="admin-field"><label>Foto do banner</label>
+        <input type="hidden" id="abFotoUrl">
+        <input type="file" id="abFotoArquivo" accept="image/*" onchange="adminPreviewBannerFoto()">
+        <div id="abFotoPreview" style="margin-top:8px;"></div>
+        <button type="button" class="admin-btn-ghost" id="btnUploadBannerFoto" onclick="adminEnviarFotoBanner()" style="margin-top:8px;">📤 Enviar imagem do banner</button>
+        <div id="abFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;"></div>
+      </div>
       <div class="admin-field"><label>Tag</label><input type="text" id="abTag" placeholder="Ex: Novidade"></div>
       <div class="admin-field"><label>Título</label><input type="text" id="abTitulo"></div>
       <div class="admin-field"><label>Subtítulo</label><input type="text" id="abSubtitulo"></div>
@@ -2258,6 +2272,53 @@ async function adminSalvarCores() {
   };
   try { await db.collection('config').doc('coresSite').set(cores); showToast('Cores salvas ✓','success'); } catch(e) {}
 }
+const CLOUDINARY_CLOUD_NAME = 'dtseuwgwi';
+const CLOUDINARY_UPLOAD_PRESET = 'ml_default';
+
+function adminUploadImagemCloudinary(arquivo, aoProgredir) {
+  if (!arquivo) return Promise.reject(new Error('Selecione uma imagem.'));
+  if (!arquivo.type.startsWith('image/')) return Promise.reject(new Error('Selecione um arquivo de imagem válido.'));
+  if (arquivo.size > 10 * 1024 * 1024) return Promise.reject(new Error('A imagem deve ter no máximo 10 MB.'));
+  const form = new FormData();
+  form.append('file', arquivo);
+  form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
+    xhr.timeout = 90000;
+    xhr.upload.onprogress = e => { if (e.lengthComputable && aoProgredir) aoProgredir(Math.round(e.loaded / e.total * 100)); };
+    xhr.onload = () => {
+      let resposta = {};
+      try { resposta = JSON.parse(xhr.responseText || '{}'); } catch {}
+      if (xhr.status >= 200 && xhr.status < 300 && resposta.secure_url) resolve(resposta.secure_url);
+      else reject(new Error(resposta.error?.message || `Cloudinary respondeu com HTTP ${xhr.status}. Confira se o preset '${CLOUDINARY_UPLOAD_PRESET}' é Unsigned.`));
+    };
+    xhr.onerror = () => reject(new Error('Falha de rede ao enviar imagem ao Cloudinary.'));
+    xhr.ontimeout = () => reject(new Error('O envio passou de 90 segundos.'));
+    xhr.onabort = () => reject(new Error('O envio da imagem foi cancelado.'));
+    xhr.send(form);
+  });
+}
+
+async function adminEnviarFotoProduto() {
+  const input = document.getElementById('aFotoNovaArquivo');
+  const botao = document.getElementById('btnUploadFotoProduto');
+  const status = document.getElementById('aFotoUploadStatus');
+  if (!input.files[0]) { showToast('Selecione uma imagem','error'); return; }
+  botao.disabled = true;
+  try {
+    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando imagem... ${p}%`);
+    _fotosGaleriaAdmin.push(url);
+    input.value = '';
+    status.textContent = 'Imagem enviada ✓';
+    adminRenderFotosGaleria();
+    showToast('Imagem adicionada à galeria ✓','success');
+  } catch(e) {
+    status.textContent = `Erro: ${e.message}`;
+    showToast(e.message,'error');
+  } finally { botao.disabled = false; }
+}
+
 async function carregarLogoAdmin() {
   try {
     const doc = await db.collection('config').doc('logoSite').get();
@@ -2268,13 +2329,29 @@ async function carregarLogoAdmin() {
   } catch(e) {}
 }
 function adminPreviewLogo() {
-  const url = document.getElementById('alogoUrl').value.trim();
+  const arquivo = document.getElementById('alogoArquivo')?.files[0];
+  const url = arquivo ? URL.createObjectURL(arquivo) : document.getElementById('alogoUrl').value.trim();
   const el = document.getElementById('adminLogoPreview');
-  el.innerHTML = url ? `<img src="${url}" style="max-height:100%;">` : '<span style="color:#9a8890;font-size:12px;">Sem logo</span>';
+  el.innerHTML = url ? `<img src="${url}" style="max-height:100%;max-width:100%;object-fit:contain;">` : '<span style="color:#9a8890;font-size:12px;">Sem logo</span>';
+}
+async function adminEnviarLogo() {
+  const input = document.getElementById('alogoArquivo');
+  const botao = document.getElementById('btnUploadLogo');
+  const status = document.getElementById('alogoUploadStatus');
+  if (!input.files[0]) { showToast('Selecione uma imagem para a logo','error'); return; }
+  botao.disabled = true;
+  try {
+    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando logo... ${p}%`);
+    document.getElementById('alogoUrl').value = url;
+    input.value = '';
+    status.textContent = 'Imagem enviada. Clique em “Salvar Logo” para aplicar.';
+    adminPreviewLogo();
+  } catch(e) { status.textContent = `Erro: ${e.message}`; showToast(e.message,'error'); }
+  finally { botao.disabled = false; }
 }
 async function adminSalvarLogo() {
   const url = document.getElementById('alogoUrl').value.trim() || null;
-  try { await db.collection('config').doc('logoSite').set({ url }); showToast('Logo salva ✓','success'); } catch(e) {}
+  try { await db.collection('config').doc('logoSite').set({ url }); showToast('Logo salva ✓','success'); } catch(e) { showToast('Erro ao salvar logo: '+e.message,'error'); }
 }
 
 // ── PRODUTOS ──────────────────────────────────────────────────────────────────
@@ -2811,12 +2888,35 @@ function adminBannerDestinoChange() {
     sel.innerHTML = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   }
 }
-function adminNovoBanner() { _editandoBannerIdx = null; document.getElementById('adminModalBannerTitle').textContent='Novo Banner'; ['abFotoUrl','abTag','abTitulo','abSubtitulo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('abTipoDestino').value='categoria'; adminBannerDestinoChange(); document.getElementById('adminModalBanner').classList.add('open'); }
+function adminPreviewBannerFoto() {
+  const arquivo = document.getElementById('abFotoArquivo')?.files[0];
+  const url = arquivo ? URL.createObjectURL(arquivo) : document.getElementById('abFotoUrl').value.trim();
+  document.getElementById('abFotoPreview').innerHTML = url ? `<img src="${url}" alt="Prévia do banner" style="max-width:100%;max-height:130px;object-fit:cover;border-radius:8px;">` : '';
+}
+async function adminEnviarFotoBanner() {
+  const input = document.getElementById('abFotoArquivo');
+  const botao = document.getElementById('btnUploadBannerFoto');
+  const status = document.getElementById('abFotoUploadStatus');
+  if (!input.files[0]) { showToast('Selecione uma imagem para o banner','error'); return; }
+  botao.disabled = true;
+  try {
+    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando banner... ${p}%`);
+    document.getElementById('abFotoUrl').value = url;
+    input.value = '';
+    status.textContent = 'Imagem enviada ✓';
+    adminPreviewBannerFoto();
+  } catch(e) { status.textContent = `Erro: ${e.message}`; showToast(e.message,'error'); }
+  finally { botao.disabled = false; }
+}
+function adminNovoBanner() { _editandoBannerIdx = null; document.getElementById('adminModalBannerTitle').textContent='Novo Banner'; ['abFotoUrl','abTag','abTitulo','abSubtitulo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('abFotoArquivo').value=''; document.getElementById('abFotoUploadStatus').textContent=''; adminPreviewBannerFoto(); document.getElementById('abTipoDestino').value='categoria'; adminBannerDestinoChange(); document.getElementById('adminModalBanner').classList.add('open'); }
 function adminEditarBanner(idx) {
   _editandoBannerIdx = idx;
   const b = bannersSite[idx];
   document.getElementById('adminModalBannerTitle').textContent='Editar Banner';
   document.getElementById('abFotoUrl').value = b.foto||'';
+  document.getElementById('abFotoArquivo').value = '';
+  document.getElementById('abFotoUploadStatus').textContent = '';
+  adminPreviewBannerFoto();
   document.getElementById('abTag').value = b.tag||'';
   document.getElementById('abTitulo').value = b.titulo||'';
   document.getElementById('abSubtitulo').value = b.subtitulo||'';
