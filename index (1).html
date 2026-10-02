@@ -18,7 +18,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
 <style>
   :root {
@@ -1065,7 +1064,7 @@
           <div class="form-group"><label>Informações adicionais</label><textarea id="rsvp-f-extra" placeholder="Traje, estacionamento, etc."></textarea></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:4px">
-          <button class="btn btn-primary" onclick="salvarEventoRsvp()">Salvar evento</button>
+          <button class="btn btn-primary" id="btnSalvarEventoRsvp" onclick="salvarEventoRsvp()">Salvar evento</button>
           <button class="btn btn-ghost" onclick="resetFormEventoRsvp()">Cancelar</button>
         </div>
         <div id="rsvp-form-msg"></div>
@@ -5216,6 +5215,8 @@ firebase.auth().onAuthStateChanged(user => {
 // ============================================================
 const RSVP_BASE = "https://lojaluluzices.com.br/";
 
+let rsvpSaveInProgress = false;
+
 function slugifyRsvp(name) {
   const base = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -5247,62 +5248,112 @@ function previewImagemRsvp(tipo, urlAtual = null) {
   preview.innerHTML = url ? `<img src="${url}" alt="Prévia ${tipo}" style="max-width:180px;max-height:110px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">` : "";
 }
 
-async function obterUrlImagemRsvp(tipo, eventId) {
+const CLOUDINARY_CLOUD_NAME = 'dtseuwgwi';
+const CLOUDINARY_UPLOAD_PRESET = 'ml_default';
+
+function mensagemErroUploadRsvp(erro) {
+  return erro?.message || 'Não foi possível enviar a imagem.';
+}
+
+function uploadImagemRsvp(tipo, eventId) {
   const input = document.getElementById(`rsvp-file-${tipo}`);
   const arquivo = input.files[0];
   const urlAtual = document.getElementById(`rsvp-f-${tipo}-url`).value.trim();
-  if (!arquivo) return urlAtual;
-  if (!arquivo.type.startsWith("image/")) throw new Error("Selecione um arquivo de imagem válido.");
-  if (arquivo.size > 10 * 1024 * 1024) throw new Error("Cada imagem deve ter no máximo 10 MB.");
-  const nomeSeguro = arquivo.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const ref = firebase.storage().ref().child(`eventos/${eventId}/${tipo}-${Date.now()}-${nomeSeguro}`);
-  const snapshot = await ref.put(arquivo);
-  return snapshot.ref.getDownloadURL();
+  if (!arquivo) return Promise.resolve(urlAtual);
+  if (!arquivo.type.startsWith('image/')) return Promise.reject(new Error('Selecione um arquivo de imagem válido.'));
+  if (arquivo.size > 10 * 1024 * 1024) return Promise.reject(new Error('Cada imagem deve ter no máximo 10 MB.'));
+
+  const dados = new FormData();
+  dados.append('file', arquivo);
+  dados.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
+    xhr.timeout = 90000;
+    xhr.upload.onprogress = evento => {
+      if (!evento.lengthComputable) return;
+      const porcentagem = Math.round(evento.loaded / evento.total * 100);
+      const nomeTipo = { cover: 'capa', bg: 'fundo', logo: 'logo' }[tipo] || tipo;
+      document.getElementById('rsvp-form-msg').innerHTML = `<p style="color:var(--ink-muted);font-size:13px">Enviando ${nomeTipo} (${porcentagem}%)...</p>`;
+    };
+    xhr.onload = () => {
+      let resposta = {};
+      try { resposta = JSON.parse(xhr.responseText || '{}'); } catch {}
+      if (xhr.status >= 200 && xhr.status < 300 && resposta.secure_url) {
+        resolve(resposta.secure_url);
+      } else {
+        reject(new Error(resposta.error?.message || `Cloudinary respondeu com erro HTTP ${xhr.status}. Confira se o preset '${CLOUDINARY_UPLOAD_PRESET}' está configurado como Unsigned.`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Falha de rede ao enviar imagem ao Cloudinary.'));
+    xhr.ontimeout = () => reject(new Error(`O envio da imagem ${tipo} passou de 90 segundos.`));
+    xhr.onabort = () => reject(new Error(`O envio da imagem ${tipo} foi cancelado.`));
+    xhr.send(dados);
+  });
 }
 
 async function salvarEventoRsvp() {
-  const msg = document.getElementById("rsvp-form-msg");
-  const name = document.getElementById("rsvp-f-name").value.trim();
+  const msg = document.getElementById('rsvp-form-msg');
+  const botaoSalvar = document.getElementById('btnSalvarEventoRsvp');
+  const name = document.getElementById('rsvp-f-name').value.trim();
   if (!name) { msg.innerHTML = '<p style="color:var(--red);font-size:13px">Dê um nome ao evento.</p>'; return; }
+  if (rsvpSaveInProgress) return;
+  if (!db || !firebase.auth().currentUser) {
+    msg.innerHTML = '<p style="color:var(--red);font-size:13px">Firebase desconectado. Entre novamente e tente salvar.</p>';
+    return;
+  }
 
-  let eventId = document.getElementById("rsvp-event-id").value;
+  rsvpSaveInProgress = true;
+  botaoSalvar.disabled = true;
+  botaoSalvar.textContent = 'Salvando...';
+  let etapa = 'upload das imagens';
+  let eventId = document.getElementById('rsvp-event-id').value;
   const isNew = !eventId;
   if (isNew) eventId = slugifyRsvp(name);
 
-  msg.innerHTML = '<p style="color:var(--ink-muted);font-size:13px">Enviando imagens e salvando evento...</p>';
   try {
+    msg.innerHTML = '<p style="color:var(--ink-muted);font-size:13px">Preparando imagens...</p>';
     const [coverImage, bgImage, logoUrl] = await Promise.all([
-      obterUrlImagemRsvp("cover", eventId),
-      obterUrlImagemRsvp("bg", eventId),
-      obterUrlImagemRsvp("logo", eventId),
+      uploadImagemRsvp('cover', eventId),
+      uploadImagemRsvp('bg', eventId),
+      uploadImagemRsvp('logo', eventId),
     ]);
+    etapa = 'gravação do evento no Firestore';
+    msg.innerHTML = '<p style="color:var(--ink-muted);font-size:13px">Imagens enviadas. Salvando evento...</p>';
     const data = {
-    name,
-    hostName: document.getElementById("rsvp-f-host").value.trim(),
-    date: document.getElementById("rsvp-f-date").value,
-    time: document.getElementById("rsvp-f-time").value,
-    location: document.getElementById("rsvp-f-location").value.trim(),
-    coverImage,
-    bgImage,
-    logoUrl,
-    colorPrimary: document.getElementById("rsvp-f-color1").value,
-    colorSecondary: document.getElementById("rsvp-f-color2").value,
-    customText: document.getElementById("rsvp-f-text").value.trim(),
-    extraInfo: document.getElementById("rsvp-f-extra").value.trim(),
-    active: true,
-  };
-  if (isNew) data.createdAt = Date.now();
+      name,
+      hostName: document.getElementById('rsvp-f-host').value.trim(),
+      date: document.getElementById('rsvp-f-date').value,
+      time: document.getElementById('rsvp-f-time').value,
+      location: document.getElementById('rsvp-f-location').value.trim(),
+      coverImage,
+      bgImage,
+      logoUrl,
+      colorPrimary: document.getElementById('rsvp-f-color1').value,
+      colorSecondary: document.getElementById('rsvp-f-color2').value,
+      customText: document.getElementById('rsvp-f-text').value.trim(),
+      extraInfo: document.getElementById('rsvp-f-extra').value.trim(),
+      active: true,
+    };
+    if (isNew) data.createdAt = Date.now();
+    await db.collection('events').doc(eventId).set(data, { merge: true });
 
-    await db.collection("events").doc(eventId).set(data, { merge: true });
     if (isNew) {
+      etapa = 'criação do acesso do cliente no Firestore';
       const token = randomTokenRsvp();
-      await db.collection("clientAccess").doc(token).set({ eventId, createdAt: Date.now() });
+      await db.collection('clientAccess').doc(token).set({ eventId, createdAt: Date.now() });
     }
-    msg.innerHTML = '<p style="color:var(--green);font-size:13px">Evento salvo!</p>';
     resetFormEventoRsvp();
-    renderEventosRsvp();
-  } catch (e) {
-    msg.innerHTML = `<p style="color:var(--red);font-size:13px">Erro: ${e.message}</p>`;
+    msg.innerHTML = '<p style="color:var(--green);font-size:13px">Evento salvo com sucesso!</p>';
+    renderEventosRsvp().catch(erro => console.warn('Falha ao atualizar lista de eventos:', erro));
+  } catch (erro) {
+    msg.innerHTML = `<p style="color:var(--red);font-size:13px">${etapa}: ${mensagemErroUploadRsvp(erro)}</p>`;
+    console.error('Falha ao salvar evento RSVP:', etapa, erro);
+  } finally {
+    rsvpSaveInProgress = false;
+    botaoSalvar.disabled = false;
+    botaoSalvar.textContent = 'Salvar evento';
   }
 }
 
