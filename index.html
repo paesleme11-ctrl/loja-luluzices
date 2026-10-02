@@ -388,10 +388,22 @@
     display: flex; gap: 6px; z-index: 2;
   }
   .produto-midia-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: rgba(255,255,255,0.55); transition: background 0.15s, width 0.15s;
+    width: 10px; height: 10px; border: 0; border-radius: 50%; padding: 0;
+    background: rgba(255,255,255,0.62); box-shadow: 0 1px 4px rgba(0,0,0,.28);
+    cursor: pointer; transition: background 0.18s, transform 0.18s;
   }
-  .produto-midia-dot.ativa { background: #fff; width: 18px; border-radius: 4px; }
+  .produto-midia-dot.ativa { background: #fff; transform: scale(1.3); }
+  .produto-midia-swipe-hint {
+    position:absolute; left:12px; bottom:8px; z-index:2; padding:4px 8px;
+    border-radius:20px; color:#fff; background:rgba(0,0,0,.48); font-size:10px;
+    letter-spacing:.2px; pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.35);
+  }
+  .produto-midia-som {
+    position:absolute; right:10px; bottom:10px; z-index:3; border:0;
+    border-radius:20px; padding:7px 10px; background:rgba(0,0,0,.68); color:#fff;
+    font:600 11px 'DM Sans',sans-serif; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.22);
+  }
+  .produto-midia-som:hover { background:rgba(0,0,0,.84); }
 
   .produto-detalhe-info .produto-categoria { font-size: 12px; }
   .produto-detalhe-info h1 { font-size: 28px; margin: 8px 0 14px; word-break: break-word; }
@@ -1018,6 +1030,8 @@ let carrinho = [];        // [{ id, nome, preco, categoria }]
 let orderBumpAceito = null; // id do produto de order bump aceito pelo cliente, ou null
 let produtoAtual = null;  // produto sendo visualizado na página de detalhe
 let adicionaisSelecionados = []; // [{ id, nome, preco }] — adicionais marcados na página atual
+let produtoMidiaSomAtivo = false;
+let produtoSlideAtivo = 0;
 let ofertaCrossSellGlobal = { produtoId:'', descontoTipo:'fixo', descontoValor:0, texto:'' };
 let adicionaisGlobais = [];
 let produtoPendenteOfertas = null;
@@ -1274,17 +1288,83 @@ function irParaBannerSlide(idx) {
 }
 
 // ── Página de produto ──────────────────────────────────────────────────────
-/** Atualiza os dots do carrossel conforme o usuário arrasta (swipe) entre foto/vídeo */
+/** Mantém o carrossel, a paginação e a reprodução de vídeo sincronizados. */
 function onProdutoMidiaScroll() {
   const track = document.getElementById('produtoMidiaTrack');
   const dotsContainer = document.getElementById('produtoMidiaDots');
-  if (!track || !dotsContainer) return;
+  if (!track) return;
   const largura = track.clientWidth;
   if (!largura) return;
-  const indiceAtual = Math.round(track.scrollLeft / largura);
-  dotsContainer.querySelectorAll('.produto-midia-dot').forEach((dot, i) => {
-    dot.classList.toggle('ativa', i === indiceAtual);
+  const indiceAtual = Math.max(0, Math.min(Math.round(track.scrollLeft / largura), track.children.length - 1));
+  if (dotsContainer) {
+    dotsContainer.querySelectorAll('.produto-midia-dot').forEach((dot, i) => {
+      dot.classList.toggle('ativa', i === indiceAtual);
+      dot.setAttribute('aria-current', i === indiceAtual ? 'true' : 'false');
+    });
+  }
+  if (indiceAtual !== produtoSlideAtivo) {
+    produtoSlideAtivo = indiceAtual;
+    sincronizarVideosProduto(indiceAtual);
+  }
+}
+
+function navegarMidiaProduto(indice) {
+  const track = document.getElementById('produtoMidiaTrack');
+  if (!track || !track.children[indice]) return;
+  track.children[indice].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+}
+
+function atualizarBotaoSomProduto() {
+  const botao = document.getElementById('produtoMidiaSomBtn');
+  if (!botao) return;
+  botao.textContent = produtoMidiaSomAtivo ? '🔊 Áudio ativado' : '🔇 Ativar áudio';
+  botao.setAttribute('aria-pressed', String(produtoMidiaSomAtivo));
+  botao.setAttribute('aria-label', produtoMidiaSomAtivo ? 'Desativar áudio dos vídeos' : 'Ativar áudio dos vídeos');
+}
+
+function sincronizarVideosProduto(indiceAtivo) {
+  const track = document.getElementById('produtoMidiaTrack');
+  if (!track) return;
+  Array.from(track.querySelectorAll('video')).forEach(video => {
+    const indiceSlide = Array.from(track.children).indexOf(video.closest('.produto-midia-slide'));
+    if (indiceSlide === indiceAtivo) {
+      video.muted = !produtoMidiaSomAtivo;
+      const reproducao = video.play();
+      if (reproducao && typeof reproducao.catch === 'function') {
+        reproducao.catch(() => {
+          video.muted = true;
+          produtoMidiaSomAtivo = false;
+          atualizarBotaoSomProduto();
+        });
+      }
+    } else {
+      video.pause();
+      video.currentTime = 0;
+      video.muted = true;
+    }
   });
+  atualizarBotaoSomProduto();
+}
+
+function toggleSomProduto() {
+  produtoMidiaSomAtivo = !produtoMidiaSomAtivo;
+  const track = document.getElementById('produtoMidiaTrack');
+  const videoAtivo = track?.children[produtoSlideAtivo]?.querySelector('video');
+  if (videoAtivo) {
+    videoAtivo.muted = !produtoMidiaSomAtivo;
+    if (produtoMidiaSomAtivo) {
+      const reproducao = videoAtivo.play();
+      if (reproducao && typeof reproducao.catch === 'function') {
+        reproducao.catch(() => {
+          videoAtivo.muted = true;
+          produtoMidiaSomAtivo = false;
+          atualizarBotaoSomProduto();
+          showToast('O navegador bloqueou o áudio. Toque em ativar áudio novamente.','error');
+        });
+      }
+    }
+  }
+  atualizarBotaoSomProduto();
 }
 
 function abrirProduto(id) {
@@ -1292,6 +1372,8 @@ function abrirProduto(id) {
   if (!p) return;
   produtoAtual = p;
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
+  produtoMidiaSomAtivo = false;
+  produtoSlideAtivo = 0;
 
   const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
   const temMidia = fotos.length > 0;
@@ -1299,22 +1381,25 @@ function abrirProduto(id) {
   const slidesHtml = temMidia
     ? fotos.map(url => {
         const conteudo = ehVideo(url)
-          ? `<video src="${url}" controls playsinline></video>`
+          ? `<video src="${url}" autoplay muted loop playsinline preload="metadata"></video>`
           : `<img src="${url}" alt="${p.nome}">`;
         return `<div class="produto-midia-slide">${conteudo}</div>`;
       }).join('')
     : `<div class="produto-midia-slide"><span class="emoji-fallback">${emojiPara(p.categoria)}</span></div>`;
 
   const dotsHtml = fotos.length > 1
-    ? `<div class="produto-midia-dots" id="produtoMidiaDots">${fotos.map((_,i) => `<div class="produto-midia-dot ${i===0?'ativa':''}"></div>`).join('')}</div>`
+    ? `<div class="produto-midia-dots" id="produtoMidiaDots" aria-label="Navegação da galeria">${fotos.map((_,i) => `<button type="button" class="produto-midia-dot ${i===0?'ativa':''}" onclick="navegarMidiaProduto(${i})" aria-label="Ver mídia ${i + 1} de ${fotos.length}" aria-current="${i===0?'true':'false'}"></button>`).join('')}</div><div class="produto-midia-swipe-hint">← Deslize para ver mais →</div>`
     : '';
+  const temVideo = fotos.some(ehVideo);
+  const botaoSomHtml = temVideo ? `<button type="button" class="produto-midia-som" id="produtoMidiaSomBtn" onclick="toggleSomProduto()" aria-pressed="false">🔇 Ativar áudio</button>` : '';
 
   const thumbHtml = `
-    <div class="produto-midia-carrossel">
+    <div class="produto-midia-carrossel" aria-label="Galeria do produto. Deslize para os lados para ver as mídias.">
       <div class="produto-midia-track" id="produtoMidiaTrack" onscroll="onProdutoMidiaScroll()">
         ${slidesHtml}
       </div>
       ${dotsHtml}
+      ${botaoSomHtml}
     </div>`;
   const galeriaHtml = ''; // as miniaturas antigas foram substituídas pelo carrossel de arraste acima
 
@@ -1372,6 +1457,8 @@ function abrirProduto(id) {
     </div>
     ${crossSellHtml}
   `;
+
+  sincronizarVideosProduto(0);
 
   document.getElementById('view-catalogo').classList.remove('active');
   document.getElementById('view-produto').classList.add('active');
