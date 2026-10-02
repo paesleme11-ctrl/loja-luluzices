@@ -1970,11 +1970,11 @@ document.addEventListener('keydown', (e) => {
           <button type="button" class="admin-btn-ghost" onclick="adminAdicionarFoto()">+ Add</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;">
-          <input type="file" id="aFotoNovaArquivo" accept="image/*" style="flex:1;min-width:200px;">
+          <input type="file" id="aFotoNovaArquivo" accept="image/*,video/*" style="flex:1;min-width:200px;">
           <button type="button" class="admin-btn-primary" id="btnUploadFotoProduto" onclick="adminEnviarFotoProduto()">📤 Enviar imagem</button>
         </div>
         <div id="aFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;"></div>
-        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Para vídeos, continue colando o link acima. Imagens podem ser selecionadas do dispositivo.</p>
+        <p style="font-size:11px;color:#9a8890;margin-top:5px;">Imagens e vídeos podem ser selecionados do dispositivo; links de vídeo também continuam aceitos.</p>
       </div>
       <div class="admin-row2">
         <div class="admin-field" style="position:relative;">
@@ -2275,17 +2275,23 @@ async function adminSalvarCores() {
 const CLOUDINARY_CLOUD_NAME = 'dtseuwgwi';
 const CLOUDINARY_UPLOAD_PRESET = 'ml_default';
 
-function adminUploadImagemCloudinary(arquivo, aoProgredir) {
-  if (!arquivo) return Promise.reject(new Error('Selecione uma imagem.'));
-  if (!arquivo.type.startsWith('image/')) return Promise.reject(new Error('Selecione um arquivo de imagem válido.'));
-  if (arquivo.size > 10 * 1024 * 1024) return Promise.reject(new Error('A imagem deve ter no máximo 10 MB.'));
+function adminUploadImagemCloudinary(arquivo, aoProgredir, aceitarVideo = false) {
+  if (!arquivo) return Promise.reject(new Error('Selecione um arquivo.'));
+  const tipoVideo = arquivo.type.startsWith('video/');
+  if (!arquivo.type.startsWith('image/') && !(aceitarVideo && tipoVideo)) {
+    return Promise.reject(new Error(aceitarVideo ? 'Selecione uma imagem ou vídeo válido.' : 'Selecione um arquivo de imagem válido.'));
+  }
+  const limiteBytes = tipoVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+  const limiteTexto = tipoVideo ? '100 MB' : '10 MB';
+  if (arquivo.size > limiteBytes) return Promise.reject(new Error(`O arquivo deve ter no máximo ${limiteTexto}.`));
+  const resourceType = tipoVideo ? 'video' : 'image';
   const form = new FormData();
   form.append('file', arquivo);
   form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`);
-    xhr.timeout = 90000;
+    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`);
+    xhr.timeout = tipoVideo ? 600000 : 90000;
     xhr.upload.onprogress = e => { if (e.lengthComputable && aoProgredir) aoProgredir(Math.round(e.loaded / e.total * 100)); };
     xhr.onload = () => {
       let resposta = {};
@@ -2307,12 +2313,12 @@ async function adminEnviarFotoProduto() {
   if (!input.files[0]) { showToast('Selecione uma imagem','error'); return; }
   botao.disabled = true;
   try {
-    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando imagem... ${p}%`);
+    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando mídia... ${p}%`, true);
     _fotosGaleriaAdmin.push(url);
     input.value = '';
     status.textContent = 'Imagem enviada ✓';
     adminRenderFotosGaleria();
-    showToast('Imagem adicionada à galeria ✓','success');
+    showToast('Mídia adicionada à galeria ✓','success');
   } catch(e) {
     status.textContent = `Erro: ${e.message}`;
     showToast(e.message,'error');
