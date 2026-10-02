@@ -1078,24 +1078,10 @@
   </div>
 
   <div class="page" id="page-presentes">
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-header"><span class="card-title">📦 Catálogo de Produtos</span></div>
-      <div class="card-body">
-        <p style="font-size:13px;color:var(--ink-muted);margin-top:-4px">Produtos com foto real que os clientes podem escolher ao montar a lista de presentes.</p>
-        <div class="form-row cols-2">
-          <div class="form-group"><label>Nome do produto</label><input id="cat-nome" placeholder="Caixa de som JBL"></div>
-          <div class="form-group"><label>URL da imagem</label><input id="cat-img" placeholder="https://..."></div>
-        </div>
-        <button class="btn btn-primary" onclick="addCatalogo()">Adicionar ao catálogo</button>
-        <div id="catalogo-msg"></div>
-        <div id="catalogo-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:16px"></div>
-      </div>
-    </div>
-
     <div class="card">
       <div class="card-header"><span class="card-title">🎁 Listas de Presentes</span></div>
       <div class="card-body">
-        <p style="font-size:13px;color:var(--ink-muted);margin-top:-4px">O cliente recebe um link próprio e monta a lista sozinho. Quando um convidado escolhe, some da lista na hora.</p>
+        <p style="font-size:13px;color:var(--ink-muted);margin-top:-4px">O cliente recebe um link privado para criar a própria lista: escolhe o nome dos presentes, envia as imagens, define quantidades e informa valor no Pix ou link do produto.</p>
         <div class="form-row cols-2">
           <div class="form-group"><label>Nome da lista</label><input id="lp-nome" placeholder="Chá de bebê da Marina"></div>
           <div class="form-group"><label>Tipo (opcional)</label><input id="lp-tipo" placeholder="Chá de bebê, casamento..."></div>
@@ -5505,45 +5491,9 @@ async function renderEventosRsvp() {
 }
 
 // ============================================================
-// LISTA DE PRESENTES — CATÁLOGO + LISTAS (produto avulso)
+// LISTA DE PRESENTES — listas personalizadas pelos clientes
 // ============================================================
 const LISTAS_BASE = "https://lojaluluzices.com.br/rsvp/";
-
-async function addCatalogo() {
-  const msg = document.getElementById("catalogo-msg");
-  const nome = document.getElementById("cat-nome").value.trim();
-  const imagemUrl = document.getElementById("cat-img").value.trim();
-  if (!nome || !imagemUrl) { msg.innerHTML = '<p style="color:var(--red);font-size:13px">Preencha nome e imagem.</p>'; return; }
-  try {
-    await db.collection("catalogo").add({ nome, imagemUrl, createdAt: Date.now() });
-    document.getElementById("cat-nome").value = "";
-    document.getElementById("cat-img").value = "";
-    msg.innerHTML = "";
-    renderCatalogoGestao();
-  } catch (e) {
-    msg.innerHTML = `<p style="color:var(--red);font-size:13px">Erro: ${e.message}</p>`;
-  }
-}
-
-async function deleteCatalogoGestao(id) {
-  if (!confirm("Remover este produto do catálogo?")) return;
-  await db.collection("catalogo").doc(id).delete();
-  renderCatalogoGestao();
-}
-
-async function renderCatalogoGestao() {
-  const el = document.getElementById("catalogo-list");
-  const snap = await db.collection("catalogo").get();
-  if (snap.empty) { el.innerHTML = "<p style='color:var(--ink-muted)'>Nenhum produto cadastrado ainda.</p>"; return; }
-  el.innerHTML = snap.docs.map(d => {
-    const c = d.data();
-    return `<div style="text-align:center">
-      <img src="${c.imagemUrl}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px">
-      <div style="font-size:12px;margin:4px 0">${c.nome}</div>
-      <button class="btn btn-danger btn-sm" onclick="deleteCatalogoGestao('${d.id}')">Excluir</button>
-    </div>`;
-  }).join("");
-}
 
 async function saveLista() {
   const msg = document.getElementById("lista-msg");
@@ -5632,7 +5582,6 @@ async function renderListasGestao() {
 }
 
 function renderPresentes() {
-  renderCatalogoGestao();
   renderListasGestao();
 }
 </script>
