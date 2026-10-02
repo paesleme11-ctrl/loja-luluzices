@@ -1047,6 +1047,24 @@ function emojiPara(categoria) {
   return EMOJI_CATEGORIA[key] || EMOJI_CATEGORIA['default'];
 }
 
+/** Produtos reservados para ofertas aparecem nas ofertas do carrinho, não no catálogo. */
+function produtoEhAdicional(p) {
+  return adicionaisGlobais.includes(p.id) || ofertaCrossSellGlobal.produtoId === p.id;
+}
+
+function getProdutosCatalogo() {
+  return produtos.filter(p => !produtoEhAdicional(p));
+}
+
+/** URL pública que abre diretamente os detalhes do produto escolhido. */
+function linkProdutoDireto(produtoId) {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('produto', produtoId);
+  return url.href;
+}
+
 // ── Estado global ──────────────────────────────────────────────────────────
 let produtos = [];       // catálogo carregado do Firestore
 let categoriaAtiva = 'todas';
@@ -1107,6 +1125,8 @@ async function carregarProdutos() {
     }));
     renderCategorias();
     renderCatalogo();
+    const produtoDireto = new URLSearchParams(window.location.search).get('produto');
+    if (produtoDireto) abrirProduto(produtoDireto);
   } catch (e) {
     console.error('Erro ao carregar produtos:', e);
     document.getElementById('catalogoGrid').innerHTML = `
@@ -1124,7 +1144,7 @@ const ICONE_CATEGORIA_NAV = {
 };
 
 function renderCategorias() {
-  const categorias = ['todas', ...new Set(produtos.map(p => p.categoria))];
+  const categorias = ['todas', ...new Set(getProdutosCatalogo().map(p => p.categoria))];
   const el = document.getElementById('categoriasScroll');
   el.innerHTML = categorias.map(cat => {
     const icone = ICONE_CATEGORIA_NAV[cat.toLowerCase()] || emojiPara(cat);
@@ -1153,7 +1173,7 @@ function onSearchInput() {
 /** Lista de temas únicos existentes no catálogo, com contagem de produtos e uma foto de exemplo */
 function getTemasDisponiveis() {
   const mapa = {};
-  produtos.forEach(p => {
+  getProdutosCatalogo().forEach(p => {
     const nomeTema = p.temaNome || p.categoria;
     if (!nomeTema) return;
     if (!mapa[nomeTema]) {
@@ -1257,7 +1277,8 @@ function produtoBateComBusca(p, termo) {
 
 function renderCatalogo() {
   const grid = document.getElementById('catalogoGrid');
-  let lista = categoriaAtiva === 'todas' ? produtos : produtos.filter(p => p.categoria === categoriaAtiva);
+  const produtosVisiveis = getProdutosCatalogo();
+  let lista = categoriaAtiva === 'todas' ? produtosVisiveis : produtosVisiveis.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
     lista = lista.filter(p => produtoBateComBusca(p, termoBusca));
   }
@@ -1502,7 +1523,7 @@ function abrirProduto(id) {
 
   // Sugestões de convites do mesmo tema na tela de detalhes do produto.
   const crossProdutos = p.temaId
-    ? produtos.filter(x => x.id !== p.id && x.temaId === p.temaId && !x.sobConsulta).slice(0, 8)
+    ? getProdutosCatalogo().filter(x => x.id !== p.id && x.temaId === p.temaId && !x.sobConsulta).slice(0, 8)
     : [];
 
   const crossSellHtml = crossProdutos.length ? `
@@ -1924,7 +1945,7 @@ async function finalizarPedido(meioPagamento) {
     const adicionaisTxt = (i.adicionais && i.adicionais.length > 0)
       ? ` (+ ${i.adicionais.map(a => a.nome).join(', ')})`
       : '';
-    return `• ${i.nome}${adicionaisTxt} — ${BRL(i.preco)}`;
+    return `• ${i.nome}${adicionaisTxt} — ${BRL(i.preco)}\n  Modelo escolhido: ${linkProdutoDireto(i.id)}`;
   }).join('\n');
   const valorTotal = carrinho.reduce((s, i) => s + i.preco, 0);
 
