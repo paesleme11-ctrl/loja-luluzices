@@ -5036,7 +5036,7 @@ function renderTarefas() {
             <div class="tarefa-dias-label" style="font-size:7px;">PAGO</div>
           </div>
           <div class="tarefa-info">
-            <div class="tarefa-contato">${v.contato || '—'}</div>
+            <div class="tarefa-contato">${v.contato || '—'} ${v.contato ? `<button class="btn-copy-tel" onclick="event.stopPropagation();copiarTelefone('${v.contato.replace(/'/g,"\\'")}')" title="Copiar número" aria-label="Copiar número do contato">📋</button><a href="${linkWhatsApp(v.contato)}" target="_blank" rel="noopener noreferrer" class="btn-copy-tel" onclick="event.stopPropagation()" title="Abrir conversa no WhatsApp" aria-label="Abrir conversa no WhatsApp">💬</a>` : ''}</div>
             <div class="tarefa-produto">${v.produto || '—'}</div>
             <div class="tarefa-meta">${BRL(v.valorPago)} pago · pedido de ${v.data ? v.data.split('-').reverse().join('/') : '—'}</div>
           </div>
