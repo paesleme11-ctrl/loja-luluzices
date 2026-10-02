@@ -8,6 +8,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <style>
     :root{--rose:#d6336c;--gold:#e8c766;--cream:#fff9f5;--ink:#281d20;--muted:#8d7b80;--line:#f0e1e3;--green:#25815f}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:15px 'DM Sans',sans-serif}.wrap{max-width:940px;margin:auto;padding:24px 16px 60px}.hero{text-align:center;padding:22px 14px 20px}.hero .mark{font-size:36px}.hero h1{font:34px 'DM Serif Display',serif;margin:8px 0}.hero p{margin:0;color:var(--muted)}.guest{max-width:450px;margin:14px auto 22px}.guest label{display:block;font-size:12px;font-weight:700;margin-bottom:6px}.guest input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}.gift{overflow:hidden;background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 6px 18px #5127380b}.gift img{width:100%;aspect-ratio:1.2;object-fit:cover;background:#f6ebeb}.body{padding:13px}.body h2{font-size:16px;margin:0 0 6px}.body p{color:var(--muted);font-size:12px;margin:4px 0}.price{font-weight:700;color:var(--rose);font-size:15px;margin:9px 0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions a,.actions button{flex:1;text-align:center;text-decoration:none;border:0;border-radius:8px;padding:9px 10px;font:700 12px 'DM Sans',sans-serif;cursor:pointer}.link{background:#fff;color:var(--rose);border:1px solid var(--rose)!important}.reserve{background:var(--rose);color:#fff}.qty{width:72px;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit}.done{opacity:.7}.done .status{color:var(--green);font-weight:700}.empty,.loading{text-align:center;padding:35px;color:var(--muted);line-height:1.6}.msg{min-height:18px;margin:0 0 12px;text-align:center;color:var(--green);font-size:13px}.key{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px auto 0;color:var(--muted);font-size:12px}.key button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 9px;cursor:pointer}@media(max-width:520px){.wrap{padding:12px 12px 40px}.hero h1{font-size:29px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.body{padding:10px}.body h2{font-size:14px}.actions{gap:5px}.actions a,.actions button{padding:8px 5px;font-size:11px}.qty{width:58px}}
+    .pix-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:16px;background:#21151dcc}.pix-modal.open{display:flex}.pix-card{position:relative;width:min(100%,460px);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;padding:24px;box-shadow:0 18px 60px #0004}.pix-close{position:absolute;top:12px;right:12px;border:0;background:transparent;font-size:24px;color:var(--muted);cursor:pointer}.pix-card h2{font:26px 'DM Serif Display',serif;margin:0 32px 8px 0}.pix-card p{font-size:13px;color:var(--muted);line-height:1.55}.pix-gift{padding:12px;background:var(--cream);border-radius:10px;margin:14px 0}.pix-gift strong{display:block;font-size:15px}.pix-gift span{display:block;margin-top:5px;color:var(--rose);font-weight:700}.pix-label{display:block;font-size:12px;font-weight:700;margin:15px 0 6px}.pix-key-box{display:flex;gap:7px}.pix-key-box input{min-width:0;flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;font:13px 'DM Sans',sans-serif}.pix-key-box button,.pix-copy-again{border:1px solid var(--rose);border-radius:8px;padding:9px 11px;color:var(--rose);background:#fff;font:700 12px 'DM Sans',sans-serif;cursor:pointer}.pix-status{min-height:20px;margin:8px 0;font-size:12px;color:var(--green)}.pix-error{padding:10px;border-radius:8px;background:#fff0f1;color:#a32334;font-size:13px;line-height:1.45}.pix-confirm{width:100%;margin-top:14px;padding:13px;border:0;border-radius:9px;background:var(--rose);color:#fff;font:700 14px 'DM Sans',sans-serif;cursor:pointer}.pix-confirm:disabled{opacity:.5;cursor:not-allowed}.pix-cancel{display:block;margin:10px auto 0;border:0;background:transparent;color:var(--muted);font:600 13px 'DM Sans',sans-serif;cursor:pointer}
   </style>
 </head>
 <body><main class="wrap">
@@ -15,11 +16,128 @@
   <div class="guest"><label for="guestName">Seu nome</label><input id="guestName" maxlength="80" placeholder="Como podemos identificar seu presente?"></div>
   <div id="message" class="loading">Carregando a lista…</div><div id="items" class="grid"></div>
 </main>
+<div class="pix-modal" id="pixModal" role="dialog" aria-modal="true" aria-labelledby="pixModalTitle" onclick="if(event.target===this)fecharModalPix()">
+  <section class="pix-card">
+    <button class="pix-close" type="button" onclick="fecharModalPix()" aria-label="Fechar">×</button>
+    <h2 id="pixModalTitle">Presentear via Pix</h2>
+    <p>Confira os dados e faça o pagamento pelo aplicativo do seu banco. A confirmação abaixo registra sua escolha na lista, mas não confirma o recebimento bancário do Pix.</p>
+    <label class="pix-label" for="pixNomeConvidado">Seu nome</label><input id="pixNomeConvidado" maxlength="80" placeholder="Seu nome para registrar a escolha" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font:14px 'DM Sans',sans-serif">
+    <div class="pix-gift"><strong id="pixNomeItem"></strong><span id="pixValorItem"></span><span id="pixQuantidadeItem" style="color:var(--muted);font-size:12px;font-weight:500"></span></div>
+    <div id="pixSemChave" class="pix-error" style="display:none"></div>
+    <div id="pixDadosChave" style="display:none">
+      <label class="pix-label" for="pixChaveModal">Chave Pix da lista</label>
+      <div class="pix-key-box"><input id="pixChaveModal" readonly aria-label="Chave Pix"><button type="button" onclick="copiarChavePixModal()">Copiar chave Pix</button></div>
+      <div id="pixCopyStatus" class="pix-status" role="status" aria-live="polite"></div>
+      <p>Abra o aplicativo do seu banco, faça o Pix no valor indicado e depois toque em “Já fiz o Pix”.</p>
+    </div>
+    <button id="pixConfirmarBtn" class="pix-confirm" type="button" onclick="confirmarPix()">Já fiz o Pix</button>
+    <button class="pix-cancel" type="button" onclick="fecharModalPix()">Voltar para a lista</button>
+  </section>
+</div>
 <script>
 const firebaseConfig={apiKey:"AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",authDomain:"luluzices-4254e.firebaseapp.com",projectId:"luluzices-4254e",storageBucket:"luluzices-4254e.firebasestorage.app",messagingSenderId:"328419813225",appId:"1:328419813225:web:6f168623f3edd148ee7ff8"};firebase.initializeApp(firebaseConfig);const db=firebase.firestore(),listaId=new URLSearchParams(location.search).get('l');let lista=null;
 const $=id=>document.getElementById(id);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}function msg(text,error=false){$('message').textContent=text;$('message').style.color=error?'#b42336':'var(--muted)';}
 async function init(){if(!listaId)return msg('Link da lista inválido.',true);try{const ref=db.collection('listas').doc(listaId),snap=await ref.get();if(!snap.exists)return msg('Esta lista não foi encontrada.',true);lista=snap.data();$('title').textContent=lista.nome||'Lista de Presentes';$('subtitle').textContent=lista.tipo?`Celebre com a gente: ${lista.tipo}`:'Escolha um presente e ajude a tornar esse momento especial.';if(lista.colorPrimary)document.documentElement.style.setProperty('--rose',lista.colorPrimary);if(lista.colorSecondary)document.documentElement.style.setProperty('--gold',lista.colorSecondary);if(lista.chavePix){$('pixKey').textContent=lista.chavePix;$('pixKeyRow').style.display='flex';}db.collection('listas').doc(listaId).collection('itens').orderBy('createdAt','asc').onSnapshot(renderItems,()=>msg('Não foi possível carregar os presentes.',true));}catch(e){console.error(e);msg('Não foi possível abrir esta lista.',true);}}
-function renderItems(snap){$('message').textContent='';if(snap.empty){$('items').innerHTML='<div class="empty">Esta lista ainda não tem presentes cadastrados.</div>';return;}$('items').innerHTML=snap.docs.map(doc=>{const x=doc.data(),total=Math.max(1,Number(x.quantidade)||1),claimed=Number(x.reservado)||0,available=Math.max(0,total-claimed),pix=x.tipoPagamento!=='link',kind=pix?`${money(x.valorPix)} no Pix`:'Presente com link do produto';if(!available)return `<article class="gift done"><img src="${esc(x.imagemUrl||'')}" alt="${esc(x.nome)}"><div class="body"><h2>${esc(x.nome)}</h2><div class="price">${kind}</div><p class="status">✓ Todos escolhidos (${claimed}/${total})</p></div></article>`;const options=Array.from({length:available},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');const buyLink=!pix&&x.linkProduto?`<a class="link" href="${esc(x.linkProduto)}" target="_blank" rel="noopener noreferrer">Ver produto</a>`:'';return `<article class="gift" id="gift-${doc.id}"><img src="${esc(x.imagemUrl||'')}" alt="${esc(x.nome)}"><div class="body"><h2>${esc(x.nome)}</h2><p>Disponíveis: ${available} de ${total}</p><div class="price">${kind}</div><div class="actions">${buyLink}<select class="qty" id="qty-${doc.id}" aria-label="Quantidade">${options}</select><button class="reserve" onclick="chooseGift('${doc.id}')">${pix?'Vou presentear':'Já comprei'}</button></div></div></article>`;}).join('');}
-async function chooseGift(id){const guest=$('guestName').value.trim();if(!guest){$('guestName').focus();return msg('Digite seu nome antes de escolher um presente.',true);}const qty=Number($(`qty-${id}`).value)||1,ref=db.collection('listas').doc(listaId).collection('itens').doc(id),button=document.querySelector(`#gift-${CSS.escape(id)} .reserve`);if(button)button.disabled=true;try{await db.runTransaction(async tx=>{const snap=await tx.get(ref);if(!snap.exists)throw new Error('Esse presente não está mais disponível.');const data=snap.data(),total=Math.max(1,Number(data.quantidade)||1),claimed=Number(data.reservado)||0;if(claimed+qty>total)throw new Error('Outra pessoa acabou de escolher parte desse presente. Atualize a lista e tente novamente.');const reservas=Array.isArray(data.reservas)?data.reservas.slice():[];reservas.push({nome:guest,quantidade:qty,createdAt:Date.now()});tx.update(ref,{reservado:claimed+qty,reservas});});msg('Obrigado! Sua escolha foi registrada 💝');}catch(e){msg(e.message||'Não foi possível registrar sua escolha.',true);}finally{if(button)button.disabled=false;}}
+function renderItems(snap){
+  $('message').textContent='';
+  if(snap.empty){$('items').innerHTML='<div class="empty">Esta lista ainda não tem presentes cadastrados.</div>';return;}
+  $('items').innerHTML=snap.docs.map(doc=>{
+    const x=doc.data(),total=Math.max(1,Number(x.quantidade)||1),claimed=Number(x.reservado)||0,available=Math.max(0,total-claimed),pix=x.tipoPagamento!=='link';
+    const kind=pix?`${money(x.valorPix)} no Pix`:'Presente com link do produto';
+    if(!available)return `<article class="gift done"><img src="${esc(x.imagemUrl||'')}" alt="${esc(x.nome)}"><div class="body"><h2>${esc(x.nome)}</h2><div class="price">${kind}</div><p class="status">✓ Todos escolhidos (${claimed}/${total})</p></div></article>`;
+    const options=Array.from({length:available},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+    const buyLink=!pix&&x.linkProduto?`<a class="link" href="${esc(x.linkProduto)}" target="_blank" rel="noopener noreferrer">Ver produto</a>`:'';
+    const action=pix?`abrirModalPix('${doc.id}')`:`chooseGift('${doc.id}')`;
+    const label=pix?'Presentear':'Já comprei';
+    return `<article class="gift" id="gift-${doc.id}"><img src="${esc(x.imagemUrl||'')}" alt="${esc(x.nome)}"><div class="body"><h2>${esc(x.nome)}</h2><p>Disponíveis: ${available} de ${total}</p><div class="price">${kind}</div><div class="actions">${buyLink}<select class="qty" id="qty-${doc.id}" aria-label="Quantidade">${options}</select><button class="reserve" onclick="${action}">${label}</button></div></div></article>`;
+  }).join('');
+}
+async function chooseGift(id){
+  const guest=$('guestName').value.trim();
+  if(!guest){$('guestName').focus();return msg('Digite seu nome antes de escolher um presente.',true);}
+  const qty=Number($(`qty-${id}`).value)||1,button=document.querySelector(`#gift-${CSS.escape(id)} .reserve`);
+  if(button)button.disabled=true;
+  try{await registrarEscolhaPresente(id,qty,guest);msg('Obrigado! Sua escolha foi registrada 💝');}
+  catch(e){msg(e.message||'Não foi possível registrar sua escolha.',true);}
+  finally{if(button)button.disabled=false;}
+}
+async function registrarEscolhaPresente(id,qty,guest){
+  const ref=db.collection('listas').doc(listaId).collection('itens').doc(id);
+  await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists)throw new Error('Esse presente não está mais disponível.');
+    const data=snap.data(),total=Math.max(1,Number(data.quantidade)||1),claimed=Number(data.reservado)||0;
+    if(claimed+qty>total)throw new Error('Outra pessoa acabou de escolher parte desse presente. Atualize a lista e tente novamente.');
+    const reservas=Array.isArray(data.reservas)?data.reservas.slice():[];
+    reservas.push({nome:guest,quantidade:qty,createdAt:Date.now()});
+    tx.update(ref,{reservado:claimed+qty,reservas});
+  });
+}
+let pixSelecionado=null;
+async function abrirModalPix(id){
+  const cardButton=document.querySelector(`#gift-${CSS.escape(id)} .reserve`);
+  if(cardButton)cardButton.disabled=true;
+  try{
+    const itemRef=db.collection('listas').doc(listaId).collection('itens').doc(id);
+    const [itemSnap,listaSnap]=await Promise.all([itemRef.get(),db.collection('listas').doc(listaId).get()]);
+    if(!itemSnap.exists)throw new Error('Esse presente não está mais disponível. Atualize a lista.');
+    const item=itemSnap.data();
+    // Se o item mudou para link enquanto a página estava aberta, preserva o caminho de link.
+    if(item.tipoPagamento==='link'){if(cardButton)cardButton.disabled=false;return chooseGift(id);}
+    const quantidade=Math.max(1,Number($(`qty-${id}`).value)||1);
+    const chavePix=listaSnap.exists?String(listaSnap.data().chavePix||'').trim():'';
+    const valorUnitario=Number(item.valorPix);
+    const valorValido=Number.isFinite(valorUnitario)&&valorUnitario>0;
+    pixSelecionado={id,quantidade,guest:$('guestName').value.trim(),nome:String(item.nome||'Presente'),valorUnitario,chavePix};
+    $('pixNomeConvidado').value=pixSelecionado.guest;
+    $('pixNomeItem').textContent=pixSelecionado.nome;
+    $('pixValorItem').textContent=valorValido?(quantidade>1?`${money(valorUnitario)} cada · Total ${money(valorUnitario*quantidade)}`:money(valorUnitario)):'Valor Pix não configurado para este presente.';
+    $('pixQuantidadeItem').textContent=quantidade>1?`Quantidade: ${quantidade}`:'';
+    $('pixCopyStatus').textContent='';
+    $('pixDadosChave').style.display=chavePix?'':'none';
+    $('pixChaveModal').value=chavePix;
+    const erros=[];
+    if(!chavePix)erros.push('A chave Pix ainda não foi configurada para esta lista. Avise o responsável para cadastrá-la antes de prosseguir.');
+    if(!valorValido)erros.push('O valor Pix deste presente não está configurado. Avise o responsável pela lista.');
+    $('pixSemChave').textContent=erros.join(' ');
+    $('pixSemChave').style.display=erros.length?'':'none';
+    $('pixConfirmarBtn').disabled=erros.length>0;
+    $('pixModal').classList.add('open');
+    document.body.style.overflow='hidden';
+    if(chavePix)await copiarChavePixModal(true);
+  }catch(e){msg(e.message||'Não foi possível abrir a confirmação do Pix.',true);}
+  finally{if(cardButton)cardButton.disabled=false;}
+}
+function fecharModalPix(){
+  $('pixModal').classList.remove('open');
+  document.body.style.overflow='';
+  pixSelecionado=null;
+}
+async function copiarChavePixModal(automatico=false){
+  const chave=pixSelecionado?.chavePix||$('pixChaveModal').value.trim();
+  if(!chave){$('pixCopyStatus').textContent='Não há chave Pix configurada para esta lista.';return false;}
+  try{
+    if(!navigator.clipboard?.writeText)throw new Error('Clipboard API indisponível');
+    await navigator.clipboard.writeText(chave);
+    $('pixCopyStatus').textContent='Chave Pix copiada!';
+    return true;
+  }catch(e){
+    $('pixChaveModal').focus();$('pixChaveModal').select();
+    $('pixCopyStatus').textContent=automatico?'Não foi possível copiar automaticamente. A chave está selecionada; copie manualmente ou toque em “Copiar chave Pix”.':'Não foi possível copiar automaticamente. A chave está selecionada; copie manualmente com Ctrl+C ou ⌘C.';
+    return false;
+  }
+}
+async function confirmarPix(){
+  if(!pixSelecionado||!pixSelecionado.chavePix){$('pixSemChave').textContent='A chave Pix ainda não foi configurada para esta lista. Não é possível registrar esta escolha.';$('pixSemChave').style.display='';$('pixConfirmarBtn').disabled=true;return;}
+  const guest=$('pixNomeConvidado').value.trim();
+  if(!guest){$('pixCopyStatus').textContent='Informe seu nome para registrar a escolha.';$('pixNomeConvidado').focus();return;}
+  const btn=$('pixConfirmarBtn');btn.disabled=true;btn.textContent='Registrando escolha…';
+  try{
+    await registrarEscolhaPresente(pixSelecionado.id,pixSelecionado.quantidade,guest);
+    fecharModalPix();
+    msg('Obrigado! Sua escolha foi registrada 💝');
+  }catch(e){$('pixCopyStatus').textContent=e.message||'Não foi possível registrar sua escolha. Tente novamente.';}
+  finally{btn.disabled=false;btn.textContent='Já fiz o Pix';}
+}
 async function copyPixKey(){try{await navigator.clipboard.writeText(lista.chavePix);$('pixKeyRow').querySelector('button').textContent='Copiada!';}catch(e){prompt('Copie a chave Pix:',lista.chavePix);}}init();
 </script></body></html>
