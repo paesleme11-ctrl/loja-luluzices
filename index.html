@@ -329,12 +329,17 @@
     width: 100%;
     box-sizing: border-box;
   }
-  .voltar-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 13.5px; font-weight: 600; color: var(--ink-light);
-    margin-bottom: 20px;
+  .produto-voltar-row { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .produto-voltar-btn {
+    display:inline-flex; align-items:center; gap:9px; padding:7px 12px 7px 7px;
+    border:1px solid var(--border); border-radius:100px; background:#fff;
+    color:var(--ink-light); font-size:13px; font-weight:700; cursor:pointer;
+    box-shadow:0 2px 8px rgba(26,18,20,.06); transition:transform .15s,color .15s,border-color .15s;
   }
-  .voltar-link:hover { color: var(--rose); }
+  .produto-voltar-btn:hover { color:var(--rose); border-color:var(--rose); transform:translateX(-2px); }
+  .produto-voltar-icone { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; background:var(--rose-light); color:var(--rose-dark); border-radius:50%; font-size:20px; line-height:1; }
+  .produto-voltar-dica { display:none; color:var(--ink-muted); font-size:11px; }
+  @media (max-width: 768px) { .produto-voltar-dica { display:inline; } }
 
   .produto-detalhe {
     display: grid;
@@ -816,7 +821,12 @@
 <!-- ═══════════════════ VIEW: PRODUTO ═══════════════════ -->
 <div class="view" id="view-produto">
   <div class="produto-page">
-    <a href="#" class="voltar-link" onclick="voltarCatalogo();return false;">← Voltar ao catálogo</a>
+    <div class="produto-voltar-row">
+      <button type="button" class="produto-voltar-btn" onclick="voltarCatalogo()" aria-label="Voltar para os produtos">
+        <span class="produto-voltar-icone" aria-hidden="true">‹</span><span>Voltar aos produtos</span>
+      </button>
+      <span class="produto-voltar-dica">ou deslize da borda esquerda</span>
+    </div>
     <div class="produto-detalhe" id="produtoDetalheContainer"></div>
   </div>
 </div>
@@ -1163,9 +1173,17 @@ function renderSugestoesBusca() {
 
 function selecionarSugestaoBusca(nomeTema) {
   document.getElementById('searchInput').value = nomeTema;
-  termoBusca = nomeTema.toLowerCase();
+  aplicarBuscaCatalogo();
+}
+
+function aplicarBuscaCatalogo() {
+  const input = document.getElementById('searchInput');
+  termoBusca = (input?.value || '').trim().toLowerCase();
+  categoriaAtiva = 'todas';
   fecharSugestoesBusca();
+  if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
   renderCatalogo();
+  requestAnimationFrame(() => document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
 function fecharSugestoesBusca() {
@@ -1176,6 +1194,12 @@ function fecharSugestoesBusca() {
 function onSearchKeydown(event) {
   const el = document.getElementById('buscaSugestoes');
   const itens = el.querySelectorAll('.busca-sugestao-item');
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    if (sugestaoBuscaIndex >= 0 && itens[sugestaoBuscaIndex]) itens[sugestaoBuscaIndex].dispatchEvent(new Event('mousedown'));
+    else aplicarBuscaCatalogo();
+    return;
+  }
   if (!itens.length) return;
 
   if (event.key === 'ArrowDown') {
@@ -1186,9 +1210,6 @@ function onSearchKeydown(event) {
     event.preventDefault();
     sugestaoBuscaIndex = Math.max(sugestaoBuscaIndex - 1, 0);
     itens.forEach((it, i) => it.classList.toggle('ativa', i === sugestaoBuscaIndex));
-  } else if (event.key === 'Enter' && sugestaoBuscaIndex >= 0) {
-    event.preventDefault();
-    itens[sugestaoBuscaIndex].dispatchEvent(new Event('mousedown'));
   } else if (event.key === 'Escape') {
     fecharSugestoesBusca();
   }
@@ -1468,6 +1489,27 @@ function abrirProduto(id) {
 function voltarCatalogo() {
   document.getElementById('view-produto').classList.remove('active');
   document.getElementById('view-catalogo').classList.add('active');
+}
+
+function configurarGestoVoltarProduto() {
+  const view = document.getElementById('view-produto');
+  if (!view) return;
+  let inicioX = 0, inicioY = 0, gestoValido = false;
+  view.addEventListener('touchstart', evento => {
+    const toque = evento.touches[0];
+    inicioX = toque.clientX;
+    inicioY = toque.clientY;
+    gestoValido = inicioX <= 28 && !evento.target.closest('.produto-midia-carrossel,button,a,input,textarea,select');
+  }, { passive: true });
+  view.addEventListener('touchend', evento => {
+    if (!gestoValido) return;
+    gestoValido = false;
+    const toque = evento.changedTouches[0];
+    const deslocamentoX = toque.clientX - inicioX;
+    const deslocamentoY = Math.abs(toque.clientY - inicioY);
+    if (deslocamentoX >= 85 && deslocamentoY <= 65) voltarCatalogo();
+  }, { passive: true });
+  view.addEventListener('touchcancel', () => { gestoValido = false; }, { passive: true });
 }
 
 // ── Carrinho ───────────────────────────────────────────────────────────────
@@ -3078,6 +3120,7 @@ async function adminExcluirBanner(idx) {
 }
 
 checarAcessoAdmin();
+configurarGestoVoltarProduto();
 </script>
 </body>
 </html>
