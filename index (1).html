@@ -249,7 +249,10 @@
   .convite-editor-stage { position:relative; width:min(100%,300px); aspect-ratio:9/16; margin:0 auto; overflow:hidden; display:flex; align-items:center; justify-content:center; border:2px solid var(--border); border-radius:14px; background:#16121a; color:#fff; touch-action:pan-y; }
   .convite-editor-stage > video,.convite-editor-stage > img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
   .convite-editor-hotspots { position:absolute; inset:0; pointer-events:none; }
-  .convite-editor-hotspot { position:absolute; z-index:3; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:2px; border:2px solid #7c3aed; border-radius:8px; background:#7c3aedaa; color:#fff; font-size:10px; font-weight:700; cursor:move; pointer-events:auto; touch-action:none; text-align:center; }
+  .convite-editor-hotspot { position:absolute; z-index:3; display:flex; align-items:center; justify-content:center; overflow:visible; padding:2px 14px 2px 4px; border:2px solid #7c3aed; border-radius:8px; background:#7c3aedaa; color:#fff; font-size:10px; font-weight:700; cursor:grab; pointer-events:auto; touch-action:none; text-align:center; user-select:none; will-change:left,top,width,height; }
+  .convite-editor-hotspot:active { cursor:grabbing; }
+  .convite-editor-hotspot > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; pointer-events:none; }
+  .convite-editor-resize { position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; border:2px solid #fff; border-radius:4px; background:#7c3aed; box-shadow:0 1px 5px #0008; cursor:nwse-resize; touch-action:none; }
   .convite-editor-hotspot.selecionado { border-color:#fbbf24; box-shadow:0 0 0 2px #fbbf24aa; }
   .convite-list-card { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--border); }
   .convite-public-link { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:7px; }
@@ -5737,10 +5740,34 @@ function renderEditorConvite() {
   const giftFile=document.getElementById('convitePresentesFile')?.files?.[0];
   const giftUrl=giftFile?URL.createObjectURL(giftFile):document.getElementById('convitePresentesUrl')?.value;
   const pos=conviteSugestaoPosicao;
-  stage.innerHTML=`${src?`<video class="convite-stage-video" src="${escapeConvite(src)}" controls muted playsinline></video>`:giftUrl?'<div class="muted convite-editor-placeholder">Envie o vídeo para posicionar sobre ele.</div>':'<div class="muted">Envie o vídeo para posicionar os links.</div>'}${conviteDigitalLinks.map((l,i)=>`<button type="button" class="convite-editor-hotspot" data-index="${i}" style="left:${Math.min(100,Math.max(0,l.x))}%;top:${Math.min(100,Math.max(0,l.y))}%;width:${Math.min(70,Math.max(8,l.w))}%;height:${Math.min(30,Math.max(5,l.h))}%" title="Arraste para posicionar">${escapeConvite(l.label || `Link ${i+1}`)}</button>`).join('')}${giftUrl?`<button type="button" class="convite-editor-hotspot convite-editor-sugestao" data-suggestion-hotspot="true" style="left:${Math.min(100,Math.max(0,pos.x))}%;top:${Math.min(100,Math.max(0,pos.y))}%;width:${Math.min(70,Math.max(8,pos.w))}%;height:${Math.min(30,Math.max(5,pos.h))}%" title="Arraste para posicionar o link da sugestão">🎁 Sugestão de presentes</button>`:''}`;
-  stage.querySelectorAll('.convite-editor-hotspot').forEach(button=>button.addEventListener('pointerdown',event=>{event.preventDefault();button.setPointerCapture(event.pointerId);conviteArraste=button.hasAttribute('data-suggestion-hotspot')?{kind:'suggestion'}:{kind:'link',index:+button.dataset.index};}));
-  stage.onpointermove=event=>{if(!conviteArraste)return;const rect=stage.getBoundingClientRect(),posicao=conviteArraste.kind==='suggestion'?conviteSugestaoPosicao:conviteDigitalLinks[conviteArraste.index];if(!posicao)return;posicao.x=Math.max(0,Math.min(100,(event.clientX-rect.left)/rect.width*100));posicao.y=Math.max(0,Math.min(100,(event.clientY-rect.top)/rect.height*100));const el=conviteArraste.kind==='suggestion'?stage.querySelector('[data-suggestion-hotspot]'):stage.querySelector(`[data-index="${conviteArraste.index}"]`);if(el){el.style.left=`${posicao.x}%`;el.style.top=`${posicao.y}%`;}};
-  stage.onpointerup=stage.onpointercancel=()=>{conviteArraste=null;};
+  const hotspot=(link,index)=>`<div class="convite-editor-hotspot" role="button" tabindex="0" data-index="${index}" style="left:${Math.min(100,Math.max(0,link.x))}%;top:${Math.min(100,Math.max(0,link.y))}%;width:${Math.min(70,Math.max(8,link.w))}%;height:${Math.min(30,Math.max(5,link.h))}%" title="Arraste para mover; use o puxador para redimensionar"><span>${escapeConvite(link.label||`Link ${index+1}`)}</span><i class="convite-editor-resize" data-resize-handle aria-hidden="true"></i></div>`;
+  stage.innerHTML=`${src?`<video class="convite-stage-video" src="${escapeConvite(src)}" controls muted playsinline></video>`:giftUrl?'<div class="muted convite-editor-placeholder">Envie o vídeo para posicionar sobre ele.</div>':'<div class="muted">Envie o vídeo para posicionar os links.</div>'}${conviteDigitalLinks.map(hotspot).join('')}${giftUrl?`<div class="convite-editor-hotspot convite-editor-sugestao" role="button" tabindex="0" data-suggestion-hotspot="true" style="left:${Math.min(100,Math.max(0,pos.x))}%;top:${Math.min(100,Math.max(0,pos.y))}%;width:${Math.min(70,Math.max(8,pos.w))}%;height:${Math.min(30,Math.max(5,pos.h))}%" title="Arraste para mover; use o puxador para redimensionar"><span>🎁 Sugestão de presentes</span><i class="convite-editor-resize" data-resize-handle aria-hidden="true"></i></div>`:''}`;
+  stage.querySelectorAll('.convite-editor-hotspot').forEach(box=>box.addEventListener('pointerdown',event=>{
+    event.preventDefault();box.setPointerCapture(event.pointerId);
+    const boxBounds=box.getBoundingClientRect(),isSuggestion=box.hasAttribute('data-suggestion-hotspot');
+    const position=isSuggestion?conviteSugestaoPosicao:conviteDigitalLinks[+box.dataset.index];
+    conviteArraste={kind:isSuggestion?'suggestion':'link',index:+box.dataset.index,mode:event.target.closest('[data-resize-handle]')?'resize':'move',offsetX:event.clientX-boxBounds.left,offsetY:event.clientY-boxBounds.top,startX:event.clientX,startY:event.clientY,startW:position.w,startH:position.h};
+  }));
+  stage.onpointermove=event=>{
+    if(!conviteArraste)return;
+    const pointerX=event.clientX,pointerY=event.clientY;
+    if(conviteArraste.frame)cancelAnimationFrame(conviteArraste.frame);
+    conviteArraste.frame=requestAnimationFrame(()=>{
+      const drag=conviteArraste;if(!drag)return;
+      const rect=stage.getBoundingClientRect(),position=drag.kind==='suggestion'?conviteSugestaoPosicao:conviteDigitalLinks[drag.index];if(!position)return;
+      if(drag.mode==='resize'){
+        position.w=Math.max(8,Math.min(70,drag.startW+(pointerX-drag.startX)/rect.width*100));
+        position.h=Math.max(5,Math.min(30,drag.startH+(pointerY-drag.startY)/rect.height*100));
+        position.w=Math.min(position.w,100-position.x);position.h=Math.min(position.h,100-position.y);
+      } else {
+        position.x=Math.max(0,Math.min(100-position.w,(pointerX-rect.left-drag.offsetX)/rect.width*100));
+        position.y=Math.max(0,Math.min(100-position.h,(pointerY-rect.top-drag.offsetY)/rect.height*100));
+      }
+      const box=drag.kind==='suggestion'?stage.querySelector('[data-suggestion-hotspot]'):stage.querySelector(`[data-index="${drag.index}"]`);
+      if(box){box.style.left=`${position.x}%`;box.style.top=`${position.y}%`;box.style.width=`${position.w}%`;box.style.height=`${position.h}%`;}
+    });
+  };
+  stage.onpointerup=stage.onpointercancel=()=>{if(conviteArraste?.frame)cancelAnimationFrame(conviteArraste.frame);conviteArraste=null;};
 }
 async function uploadMidiaConvite(file,tipo) {
   if(!file) return '';
