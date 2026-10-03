@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101020">
+  <title>Convite especial</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#101020;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{min-height:100svh;display:grid;place-items:center}.shell{width:min(100%,560px);height:100svh;max-height:1000px;position:relative;overflow:hidden;background:#080b16;display:grid;place-items:center}.screen{position:absolute;inset:0;display:grid;place-items:center}.cover{z-index:3;background:#080b16;cursor:pointer}.cover img,.video-frame video{width:100%;height:100%;object-fit:contain}.cover-hint{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:16px;right:16px;text-align:center;padding:12px;border-radius:999px;background:#111827d9;backdrop-filter:blur(8px);font-size:14px;font-weight:700}.video-frame{position:absolute;inset:0;background:#05060b;display:none}.video-frame video{display:block}.hotspots{position:absolute;inset:0;pointer-events:none}.hotspot{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:4px 8px;border-radius:999px;background:#6426d9e8;color:#fff;text-decoration:none;text-align:center;font-size:clamp(11px,3.4vw,15px);font-weight:800;line-height:1.15;box-shadow:0 3px 16px #0008;border:1px solid #ffffff99;overflow:hidden}.gift-button,.retry,.details-button{position:absolute;z-index:2;border:0;border-radius:999px;background:#fff;color:#171225;font-weight:800;padding:12px 18px;box-shadow:0 4px 20px #0008;cursor:pointer}.gift-button{left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom))}.details-button{top:max(16px,env(safe-area-inset-top));left:14px;padding:9px 13px}.retry{left:50%;transform:translate(-50%,-50%);top:50%;display:none}.modal{position:absolute;inset:0;z-index:5;background:#000c;display:none;place-items:center;padding:18px}.modal-card{position:relative;width:min(100%,480px);max-height:90%;overflow:auto;background:#fff;border-radius:18px;padding:20px;color:#171225}.modal-card h1{font-size:22px;margin:0 42px 14px 0}.modal-card p{margin:8px 0;line-height:1.45;white-space:pre-wrap}.close{position:sticky;top:0;float:right;margin-top:-8px;margin-right:-8px;border:0;border-radius:50%;width:38px;height:38px;background:#211833;color:white;font-size:23px;cursor:pointer}.status{padding:22px;text-align:center;color:#d5d5e5}.error{color:#ffcbcb}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  </style>
+</head>
+<body>
+  <main class="shell" id="app"><div class="status" id="status">Carregando convite…</div></main>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig={apiKey:"AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",authDomain:"luluzices-4254e.firebaseapp.com",projectId:"luluzices-4254e",storageBucket:"luluzices-4254e.firebasestorage.app",messagingSenderId:"328419813225",appId:"1:328419813225:web:6f168623f3edd148ee7ff8"};
+    firebase.initializeApp(firebaseConfig);const db=firebase.firestore();
+    const app=document.getElementById('app'),statusEl=document.getElementById('status');
+    const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const validMedia=url=>{try{const u=new URL(url);return u.protocol==='https:'||u.protocol==='http:'}catch{return false}};
+    async function iniciar(){
+        const params=new URLSearchParams(location.search);const id=params.get('e')||params.get('c');
+        if(!id||id.length>150||!/^[A-Za-z0-9_-]+$/.test(id)){statusEl.textContent='Este link de convite é inválido.';return;}
+      try{
+        const snap=await db.collection('convitesDigitais').doc(id).get();
+        if(!snap.exists){statusEl.textContent='Convite não encontrado.';return;}
+        const d=snap.data();
+        if(!validMedia(d.capaUrl)||!validMedia(d.videoUrl)){statusEl.textContent='Este convite está sem uma capa ou vídeo válidos.';return;}
+        document.title=d.nome||'Convite especial';
+        const suggestionPage=new URL('sugestao-presente.html',location.href);suggestionPage.search='';suggestionPage.searchParams.set('e',id);
+        const giftUrl=d.suggestionUrl||suggestionPage.href;
+        app.innerHTML=`<section class="screen cover" id="cover" role="button" tabindex="0" aria-label="Abrir convite"><img src="${safe(d.capaUrl)}" alt="Capa do convite"><div class="cover-hint">Toque na capa para abrir o convite</div></section><section class="video-frame" id="videoFrame"><video id="invitationVideo" src="${safe(d.videoUrl)}" playsinline preload="auto"></video><div class="hotspots" id="hotspots"></div>${d.presentesUrl?`<a class="gift-button" id="giftButton" href="${safe(giftUrl)}">Sugestões de presentes</a>`:''}<button class="details-button" id="detailsButton" type="button">Informações</button><button class="retry" id="retry" type="button">Toque para iniciar o vídeo com áudio</button></section><div class="modal" id="detailsModal" role="dialog" aria-modal="true" aria-label="Informações do evento"><div class="modal-card"><button class="close" id="closeModal" aria-label="Fechar">×</button><h1>${safe(d.eventName||d.nome||'Convite')}</h1>${d.aniversariante?`<p><b>Aniversariante:</b> ${safe(d.aniversariante)}</p>`:''}${d.date?`<p><b>Data:</b> ${safe(d.date.split('-').reverse().join('/'))}</p>`:''}${d.time?`<p><b>Horário:</b> ${safe(d.time)}</p>`:''}${d.local?`<p><b>Local:</b> ${safe(d.local)}</p>`:''}${d.info?`<p>${safe(d.info)}</p>`:''}</div></div>`;
+        const hot=document.getElementById('hotspots');
+        (Array.isArray(d.links)?d.links:[]).forEach(l=>{if(!l||!validMedia(l.url))return;const a=document.createElement('a');a.className='hotspot';a.href=l.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.label||'Abrir link';a.style.left=`${Math.max(0,Math.min(100,Number(l.x)||0))}%`;a.style.top=`${Math.max(0,Math.min(100,Number(l.y)||0))}%`;a.style.width=`${Math.max(8,Math.min(70,Number(l.w)||25))}%`;a.style.height=`${Math.max(5,Math.min(30,Number(l.h)||10))}%`;hot.appendChild(a);});
+        const cover=document.getElementById('cover'),video=document.getElementById('invitationVideo'),retry=document.getElementById('retry');
+        const start=()=>{cover.style.display='none';document.getElementById('videoFrame').style.display='block';video.muted=false;const play=video.play();if(play&&play.catch)play.catch(()=>{retry.style.display='block';});};
+        cover.addEventListener('click',start);cover.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();start();}});
+        retry.addEventListener('click',()=>{video.muted=false;video.play().then(()=>retry.style.display='none').catch(()=>{});});
+        const modal=document.getElementById('detailsModal');
+        document.getElementById('detailsButton').addEventListener('click',()=>modal.style.display='grid');
+        document.getElementById('closeModal').addEventListener('click',()=>modal.style.display='none');modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none';});
+      }catch(error){console.error(error);statusEl.textContent='Não foi possível carregar este convite. Tente novamente mais tarde.';}
+    }
+    iniciar();
+  </script>
+</body>
+</html>

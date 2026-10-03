@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101020">
+  <title>Sugestão de presente</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#101020;color:#fff}body{min-height:100svh;display:grid;place-items:center;padding:18px}.page{width:min(100%,720px);text-align:center}.page h1{font-size:clamp(21px,5vw,34px);margin:0 0 8px}.sub{color:#d5d5e5;margin:0 0 18px}.image-wrap{background:#fff;border-radius:14px;padding:10px;min-height:100px;display:grid;place-items:center}.image-wrap img{max-width:100%;max-height:82svh;object-fit:contain}.message{padding:24px;color:#e5e2ed}
+  </style>
+</head>
+<body>
+  <main class="page" id="app"><div class="message" id="message">Carregando sugestão de presente…</div></main>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig={apiKey:"AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",authDomain:"luluzices-4254e.firebaseapp.com",projectId:"luluzices-4254e",storageBucket:"luluzices-4254e.firebasestorage.app",messagingSenderId:"328419813225",appId:"1:328419813225:web:6f168623f3edd148ee7ff8"};
+    firebase.initializeApp(firebaseConfig);const db=firebase.firestore();const app=document.getElementById('app');
+    const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function mediaUrl(value){try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)}catch{return false}}
+    async function load(){const params=new URLSearchParams(location.search),id=params.get('e')||params.get('c');if(!id||id.length>150||!/^[A-Za-z0-9_-]+$/.test(id)){document.getElementById('message').textContent='Link de sugestão inválido.';return;}try{const snap=await db.collection('convitesDigitais').doc(id).get();if(!snap.exists){document.getElementById('message').textContent='Evento não encontrado.';return;}const d=snap.data();if(!mediaUrl(d.presentesUrl)){document.getElementById('message').textContent='Este evento ainda não tem sugestão de presente cadastrada.';return;}document.title=`Sugestão de presente · ${d.eventName||d.nome||'Convite'}`;app.innerHTML=`<h1>${safe(d.eventName||d.nome||'Sugestão de presente')}</h1>${d.aniversariante?`<p class="sub">Para celebrar com ${safe(d.aniversariante)}</p>`:''}<div class="image-wrap"><img src="${safe(d.presentesUrl)}" alt="Sugestão de presente para ${safe(d.eventName||d.nome||'o evento')}"></div>`;}catch(error){console.error(error);document.getElementById('message').textContent='Não foi possível carregar a sugestão de presente. Tente novamente mais tarde.';}}
+    load();
+  </script>
+</body>
+</html>
