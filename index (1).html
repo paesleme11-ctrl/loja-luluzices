@@ -1105,12 +1105,26 @@
       <div class="card-body">
         <input type="hidden" id="conviteDigitalId">
         <div class="form-row">
-          <div class="form-group"><label>Nome do convite</label><input id="conviteDigitalNome" maxlength="100" placeholder="Ex.: Aniversário da Sofia"></div>
+          <div class="form-group"><label>Vincular a um evento já cadastrado</label><select id="conviteEventoSelect" onchange="selecionarEventoParaConvite()"><option value="">Convite independente (sem evento RSVP)</option></select><small class="muted">Quando selecionar um evento, o convite usará o mesmo identificador e poderá exibir as informações já cadastradas.</small></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Nome do evento/convite</label><input id="conviteDigitalNome" maxlength="100" placeholder="Ex.: Aniversário da Sofia"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Aniversariante/responsável</label><input id="conviteDigitalAniversariante" maxlength="100" placeholder="Nome do aniversariante"></div>
+          <div class="form-group"><label>Local</label><input id="conviteDigitalLocal" maxlength="180" placeholder="Endereço ou nome do local"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="form-group"><label>Data</label><input id="conviteDigitalData" type="date"></div>
+          <div class="form-group"><label>Horário</label><input id="conviteDigitalHora" type="time"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Informações adicionais (opcional)</label><textarea id="conviteDigitalInfo" maxlength="1000" placeholder="Detalhes que devem aparecer junto do convite"></textarea></div>
         </div>
         <div class="convite-media-grid">
           <div class="convite-media-field"><label for="conviteCapaFile">Capa (PNG)</label><input id="conviteCapaFile" type="file" accept="image/png" onchange="previewMidiaConvite('capa')"><input type="hidden" id="conviteCapaUrl"><div id="conviteCapaPreview" class="convite-media-preview">Selecione uma capa em PNG</div></div>
           <div class="convite-media-field"><label for="conviteVideoFile">Vídeo do convite (MP4)</label><input id="conviteVideoFile" type="file" accept="video/mp4" onchange="previewMidiaConvite('video')"><input type="hidden" id="conviteVideoUrl"><div id="conviteVideoPreview" class="convite-media-preview">Selecione um vídeo MP4</div></div>
-          <div class="convite-media-field"><label for="convitePresentesFile">Sugestão de presentes (PNG)</label><input id="convitePresentesFile" type="file" accept="image/png" onchange="previewMidiaConvite('presentes')"><input type="hidden" id="convitePresentesUrl"><div id="convitePresentesPreview" class="convite-media-preview">Selecione a imagem em PNG</div></div>
+          <div class="convite-media-field"><label for="convitePresentesFile">Sugestão de presentes (PNG, opcional)</label><input id="convitePresentesFile" type="file" accept="image/png" onchange="previewMidiaConvite('presentes')"><input type="hidden" id="convitePresentesUrl"><div id="convitePresentesPreview" class="convite-media-preview">Selecione a imagem em PNG</div></div>
         </div>
         <div id="conviteDigitalUploadStatus" class="muted" style="margin:8px 0 14px;min-height:18px"></div>
         <div class="convite-links-layout">
@@ -5647,23 +5661,28 @@ function renderPresentes() {
   renderListasGestao();
 }
 let convitesDigitaisCache = [];
+let eventosConviteCache = [];
 let conviteDigitalLinks = [];
 let conviteArraste = null;
-const CONVITE_PUBLIC_PATH = './convite-interativo.html';
+const CONVITE_PUBLIC_BASE = RSVP_BASE;
 
 function escapeConvite(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-function linkPublicoConvite(id) { return `${CONVITE_PUBLIC_PATH}?c=${encodeURIComponent(id)}`; }
+function linkPublicoConvite(id) { return `${CONVITE_PUBLIC_BASE}convite-interativo.html?e=${encodeURIComponent(id)}`; }
+function linkPublicoSugestao(id) { return `${CONVITE_PUBLIC_BASE}sugestao-presente.html?e=${encodeURIComponent(id)}`; }
 function renderConvitesDigitais() {
   const area = document.getElementById('convitesDigitaisLista');
   if (!area) return;
   if (!db) { area.textContent = 'Firebase indisponível.'; return; }
   area.textContent = 'Carregando convites...';
-  db.collection('convitesDigitais').orderBy('updatedAt','desc').get().then(snapshot => {
+  return Promise.all([db.collection('convitesDigitais').orderBy('updatedAt','desc').get(),db.collection('events').orderBy('createdAt','desc').get()]).then(([snapshot,eventSnapshot]) => {
     convitesDigitaisCache = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
+    eventosConviteCache = eventSnapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
+    const select=document.getElementById('conviteEventoSelect');
+    if(select){const selected=select.value;select.innerHTML='<option value="">Convite independente (sem evento RSVP)</option>'+eventosConviteCache.map(ev=>`<option value="${escapeConvite(ev.id)}">${escapeConvite(ev.name||ev.id)}${ev.date?` · ${escapeConvite(ev.date)}`:''}</option>`).join('');if(eventosConviteCache.some(ev=>ev.id===selected))select.value=selected;}
     if (!convitesDigitaisCache.length) { area.innerHTML = '<p class="muted">Nenhum convite criado ainda.</p>'; return; }
-    area.innerHTML = convitesDigitaisCache.map(item => `<article class="convite-list-card"><div><strong>${escapeConvite(item.nome || 'Convite sem nome')}</strong><div class="muted">${(item.links || []).length} link(s) interativo(s)</div><a class="convite-public-link" href="${escapeConvite(linkPublicoConvite(item.id))}" target="_blank" rel="noopener">${escapeConvite(linkPublicoConvite(item.id))}</a></div><div class="convite-card-actions"><button class="btn btn-ghost btn-sm" onclick="editarConviteDigital('${escapeConvite(item.id)}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="copiarConviteDigital('${escapeConvite(item.id)}')">Copiar link</button></div></article>`).join('');
+    area.innerHTML = convitesDigitaisCache.map(item => `<article class="convite-list-card"><div><strong>${escapeConvite(item.nome || 'Convite sem nome')}</strong><div class="muted">${(item.links || []).length} link(s) interativo(s)</div><a class="convite-public-link" href="${escapeConvite(item.publicUrl||linkPublicoConvite(item.id))}" target="_blank" rel="noopener">Abrir convite público</a>${item.presentesUrl?`<a class="convite-public-link" href="${escapeConvite(item.suggestionUrl||linkPublicoSugestao(item.id))}" target="_blank" rel="noopener">Abrir sugestão de presentes</a>`:''}</div><div class="convite-card-actions"><button class="btn btn-ghost btn-sm" onclick="editarConviteDigital('${escapeConvite(item.id)}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="copiarConviteDigital('${escapeConvite(item.id)}')">Copiar link</button></div></article>`).join('');
   }).catch(error => { console.error(error); area.textContent = 'Não foi possível carregar os convites. Verifique sua conexão e as regras do Firestore.'; });
 }
 function previewMidiaConvite(tipo) {
@@ -5677,6 +5696,8 @@ function previewMidiaConvite(tipo) {
 }
 function novoConviteDigital() {
   ['conviteDigitalId','conviteDigitalNome','conviteCapaUrl','conviteVideoUrl','convitePresentesUrl'].forEach(id => document.getElementById(id).value='');
+  ['conviteDigitalAniversariante','conviteDigitalLocal','conviteDigitalData','conviteDigitalHora','conviteDigitalInfo'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('conviteEventoSelect').value='';
   ['conviteCapaFile','conviteVideoFile','convitePresentesFile'].forEach(id => document.getElementById(id).value='');
   conviteDigitalLinks=[]; conviteArraste=null;
   document.getElementById('conviteDigitalFormTitle').textContent='💌 Novo convite interativo';
@@ -5685,6 +5706,17 @@ function novoConviteDigital() {
   document.getElementById('btnAbrirConviteDigital').style.display='none';
   previewMidiaConvite('capa'); previewMidiaConvite('video'); previewMidiaConvite('presentes');
   renderLinksConvite();
+}
+function selecionarEventoParaConvite() {
+  const eventId=document.getElementById('conviteEventoSelect').value;
+  const evento=eventosConviteCache.find(ev=>ev.id===eventId);
+  if(!evento)return;
+  document.getElementById('conviteDigitalNome').value=evento.name||'';
+  document.getElementById('conviteDigitalAniversariante').value=evento.hostName||'';
+  document.getElementById('conviteDigitalLocal').value=evento.location||'';
+  document.getElementById('conviteDigitalData').value=evento.date||'';
+  document.getElementById('conviteDigitalHora').value=evento.time||'';
+  document.getElementById('conviteDigitalInfo').value=[evento.customText,event.extraInfo].filter(Boolean).join('\n');
 }
 function adicionarLinkConvite(link={}) {
   conviteDigitalLinks.push({ id:link.id || `link-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, label:link.label || '', url:link.url || '', x:Number.isFinite(+link.x)?+link.x:38, y:Number.isFinite(+link.y)?+link.y:45, w:Number.isFinite(+link.w)?+link.w:25, h:Number.isFinite(+link.h)?+link.h:10 });
@@ -5720,16 +5752,25 @@ async function salvarConviteDigital() {
   const nome=document.getElementById('conviteDigitalNome').value.trim();
   if(!nome){msg.innerHTML='<p class="error">Informe o nome do convite.</p>';return;}
   if(!db||!firebase.auth().currentUser){msg.innerHTML='<p class="error">Faça login no painel para salvar o convite.</p>';return;}
-  if(!document.getElementById('conviteCapaFile').files[0]&&!document.getElementById('conviteCapaUrl').value||!document.getElementById('conviteVideoFile').files[0]&&!document.getElementById('conviteVideoUrl').value||!document.getElementById('convitePresentesFile').files[0]&&!document.getElementById('convitePresentesUrl').value){msg.innerHTML='<p class="error">Envie a capa, o vídeo e a imagem de sugestões de presentes.</p>';return;}
+  if((!document.getElementById('conviteCapaFile').files[0]&&!document.getElementById('conviteCapaUrl').value)||(!document.getElementById('conviteVideoFile').files[0]&&!document.getElementById('conviteVideoUrl').value)){msg.innerHTML='<p class="error">Envie a capa e o vídeo do convite.</p>';return;}
   if(conviteDigitalLinks.some(l=>!l.label.trim()||!/^https?:\/\//i.test(l.url.trim()))){msg.innerHTML='<p class="error">Preencha o nome de cada botão e informe links começando com http:// ou https://.</p>';return;}
+  const currentId=document.getElementById('conviteDigitalId').value,selectedEventId=document.getElementById('conviteEventoSelect').value;
+  if(selectedEventId&&convitesDigitaisCache.some(x=>x.eventId===selectedEventId&&x.id!==currentId)){msg.innerHTML='<p class="error">Este evento já tem um convite. Abra o convite existente na lista e edite-o para evitar duplicidade.</p>';return;}
   button.disabled=true;button.textContent='Salvando...';msg.textContent='';
   try {
     const files=[['capa',document.getElementById('conviteCapaFile'),document.getElementById('conviteCapaUrl')],['video',document.getElementById('conviteVideoFile'),document.getElementById('conviteVideoUrl')],['presentes',document.getElementById('convitePresentesFile'),document.getElementById('convitePresentesUrl')]];
     for(const [tipo,input,urlInput] of files){if(input.files[0])urlInput.value=await uploadMidiaConvite(input.files[0],tipo);}
-    const id=document.getElementById('conviteDigitalId').value||db.collection('convitesDigitais').doc().id;
+    const id=currentId||selectedEventId||db.collection('convitesDigitais').doc().id;
     const anterior=convitesDigitaisCache.find(x=>x.id===id);
-    const dados={nome,capaUrl:document.getElementById('conviteCapaUrl').value,videoUrl:document.getElementById('conviteVideoUrl').value,presentesUrl:document.getElementById('convitePresentesUrl').value,links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-    await db.collection('convitesDigitais').doc(id).set(dados,{merge:true});
+    const capaUrl=document.getElementById('conviteCapaUrl').value,videoUrl=document.getElementById('conviteVideoUrl').value,presentesUrl=document.getElementById('convitePresentesUrl').value;
+    const conviteUrl=linkPublicoConvite(id),sugestaoUrl=presentesUrl?linkPublicoSugestao(id):'';
+    const dados={eventId:selectedEventId||anterior?.eventId||null,nome,eventName:nome,aniversariante:document.getElementById('conviteDigitalAniversariante').value.trim(),local:document.getElementById('conviteDigitalLocal').value.trim(),date:document.getElementById('conviteDigitalData').value,time:document.getElementById('conviteDigitalHora').value,info:document.getElementById('conviteDigitalInfo').value.trim(),capaUrl,videoUrl,presentesUrl,publicUrl:conviteUrl,suggestionUrl:sugestaoUrl,links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const batch=db.batch();batch.set(db.collection('convitesDigitais').doc(id),dados,{merge:true});
+    const eventId=dados.eventId,previousEventId=anterior?.eventId;
+    const eventRefs=[...new Set([eventId,previousEventId].filter(Boolean))].map(value=>({id:value,ref:db.collection('events').doc(value)}));
+    const eventSnaps=await Promise.all(eventRefs.map(item=>item.ref.get()));
+    eventRefs.forEach((item,index)=>{if(!eventSnaps[index].exists)return;if(item.id===eventId)batch.set(item.ref,{conviteId:id,convitePublicUrl:conviteUrl,suggestionUrl:sugestaoUrl||firebase.firestore.FieldValue.delete(),conviteUpdatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});else batch.set(item.ref,{conviteId:firebase.firestore.FieldValue.delete(),convitePublicUrl:firebase.firestore.FieldValue.delete(),suggestionUrl:firebase.firestore.FieldValue.delete(),conviteUpdatedAt:firebase.firestore.FieldValue.delete()},{merge:true});});
+    await batch.commit();
     document.getElementById('conviteDigitalId').value=id;document.getElementById('conviteDigitalFormTitle').textContent=`💌 ${nome}`;document.getElementById('btnAbrirConviteDigital').style.display='';
     document.getElementById('conviteDigitalUploadStatus').textContent='';msg.innerHTML='<p style="color:#16834b">Convite salvo com sucesso.</p>';await renderConvitesDigitais();
   } catch(error) { console.error(error);msg.innerHTML=`<p class="error">${escapeConvite(error.message||'Não foi possível salvar o convite.')}</p>`; }
@@ -5738,6 +5779,8 @@ async function salvarConviteDigital() {
 async function editarConviteDigital(id) {
   const item=convitesDigitaisCache.find(x=>x.id===id);if(!item)return;
   document.getElementById('conviteDigitalId').value=id;document.getElementById('conviteDigitalNome').value=item.nome||'';
+  document.getElementById('conviteEventoSelect').value=item.eventId||'';
+  document.getElementById('conviteDigitalAniversariante').value=item.aniversariante||'';document.getElementById('conviteDigitalLocal').value=item.local||'';document.getElementById('conviteDigitalData').value=item.date||'';document.getElementById('conviteDigitalHora').value=item.time||'';document.getElementById('conviteDigitalInfo').value=item.info||'';
   [['capa',item.capaUrl],['video',item.videoUrl],['presentes',item.presentesUrl]].forEach(([tipo,url])=>{const key=tipo[0].toUpperCase()+tipo.slice(1);document.getElementById(`convite${key}Url`).value=url||'';document.getElementById(`convite${key}File`).value='';});
   conviteDigitalLinks=(item.links||[]).map(l=>({...l,id:`link-${Math.random().toString(36).slice(2)}`}));
   document.getElementById('conviteDigitalFormTitle').textContent=`💌 Editar: ${item.nome||'Convite'}`;document.getElementById('btnAbrirConviteDigital').style.display='';document.getElementById('conviteDigitalMsg').textContent='';
