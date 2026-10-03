@@ -1164,8 +1164,59 @@ function filtrarCategoria(cat) {
 
 let sugestaoBuscaIndex = -1;
 
+function normalizarTextoBusca(valor) {
+  return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .replace(/([a-z])([0-9])/g, '$1 $2').replace(/([0-9])([a-z])/g, '$1 $2')
+    .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+function distanciaEdicaoBusca(a, b, limite = 2) {
+  if (Math.abs(a.length - b.length) > limite) return limite + 1;
+  let anterior = Array.from({length:b.length + 1}, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const atual = [i]; let minimo = i;
+    for (let j = 1; j <= b.length; j++) {
+      atual[j] = Math.min(atual[j-1] + 1, anterior[j] + 1, anterior[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+      minimo = Math.min(minimo, atual[j]);
+    }
+    if (minimo > limite) return limite + 1;
+    anterior = atual;
+  }
+  return anterior[b.length];
+}
+
+/** Pontua correspondências exatas, parciais e aproximadas sem chamar o servidor. */
+function pontuarTextoBusca(consulta, texto) {
+  const q = normalizarTextoBusca(consulta), alvo = normalizarTextoBusca(texto);
+  if (!q || !alvo) return 0;
+  if (q === alvo) return 1500;
+  if (alvo.startsWith(q)) return 1420;
+  if (alvo.includes(q)) return 1350;
+  const stopwords = new Set(['a','o','as','os','de','da','do','das','dos','e','em','um','uma']);
+  const termos = q.split(' ').filter(p => p.length > 1 && !stopwords.has(p));
+  const palavras = alvo.split(' ');
+  if (!termos.length) return 0;
+  let soma = 0;
+  for (const termo of termos) {
+    let melhor = 0;
+    for (const palavra of palavras) {
+      if (palavra === termo) melhor = Math.max(melhor, 120);
+      else if (palavra.startsWith(termo)) melhor = Math.max(melhor, 95);
+      else if (termo.length >= 3 && palavra.includes(termo)) melhor = Math.max(melhor, 78);
+      else if (termo.length >= 4 && palavra.length >= 4) {
+        const limite = termo.length >= 8 ? 2 : 1;
+        const dist = distanciaEdicaoBusca(termo, palavra, limite);
+        if (dist <= limite) melhor = Math.max(melhor, 64 - dist * 8);
+      }
+    }
+    if (!melhor) return 0;
+    soma += melhor;
+  }
+  return 700 + soma / termos.length;
+}
+
 function onSearchInput() {
-  termoBusca = document.getElementById('searchInput').value.trim().toLowerCase();
+  termoBusca = normalizarTextoBusca(document.getElementById('searchInput').value);
   renderSugestoesBusca();
   renderCatalogo();
 }
@@ -1181,9 +1232,18 @@ function getTemasDisponiveis() {
       mapa[nomeTema] = { nome: nomeTema, count: 0, foto: null, palavrasChave: temaCadastrado?.palavrasChave || [] };
     }
     mapa[nomeTema].count++;
-    if (!mapa[nomeTema].foto && p.foto) mapa[nomeTema].foto = p.foto;
+    if (!mapa[nomeTema].foto) mapa[nomeTema].foto = imagemProdutoParaTema(p);
   });
   return Object.values(mapa);
+}
+
+function imagemProdutoParaTema(produto) {
+  const urls=[...(Array.isArray(produto.fotos)?produto.fotos:[]),produto.foto];
+  for(const valor of urls){
+    if(typeof valor!=='string'||ehVideo(valor))continue;
+    try{const url=new URL(valor.trim());if(url.protocol==='https:'||url.protocol==='http:')return url.href;}catch{}
+  }
+  return null;
 }
 
 function renderSugestoesBusca() {
@@ -1191,10 +1251,8 @@ function renderSugestoesBusca() {
   sugestaoBuscaIndex = -1;
   if (!termoBusca) { el.innerHTML = ''; el.classList.remove('open'); return; }
 
-  const temas = getTemasDisponiveis().filter(t =>
-    t.nome.toLowerCase().includes(termoBusca) ||
-    t.palavrasChave.some(pc => pc.includes(termoBusca))
-  );
+  const temas = getTemasDisponiveis().map(t=>({tema:t,score:Math.max(pontuarTextoBusca(termoBusca,t.nome),...(t.palavrasChave||[]).map(pc=>pontuarTextoBusca(termoBusca,pc)))}))
+    .filter(x=>x.score>=700).sort((a,b)=>b.score-a.score).map(x=>x.tema);
   if (!temas.length) { el.innerHTML = ''; el.classList.remove('open'); return; }
 
   el.innerHTML = temas.slice(0, 8).map(t => `
@@ -1213,7 +1271,7 @@ function selecionarSugestaoBusca(nomeTema) {
 
 function aplicarBuscaCatalogo() {
   const input = document.getElementById('searchInput');
-  termoBusca = (input?.value || '').trim().toLowerCase();
+  termoBusca = normalizarTextoBusca(input?.value || '');
   categoriaAtiva = 'todas';
   fecharSugestoesBusca();
   if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
@@ -1265,14 +1323,22 @@ function linkWhatsAppTemaPersonalizado(termo) {
 /** Verifica se um produto bate com o termo de busca — considera nome, categoria,
  * nome do tema e também as palavras-chave cadastradas no tema (busca tipo "SEO" interno) */
 function produtoBateComBusca(p, termo) {
-  if (p.nome.toLowerCase().includes(termo)) return true;
-  if (p.categoria && p.categoria.toLowerCase().includes(termo)) return true;
-  if (p.temaNome && p.temaNome.toLowerCase().includes(termo)) return true;
+  return produtoPontuacaoBusca(p, termo) > 0;
+}
+
+function produtoPontuacaoBusca(p, termo) {
+  const nome=p.nome||'', categoria=p.categoria||'', tema=p.temaNome||'';
+  const nomeScore=pontuarTextoBusca(termo,nome);
+  const categoriaScore=pontuarTextoBusca(termo,categoria);
+  const temaScore=pontuarTextoBusca(termo,tema);
+  let score=Math.max(nomeScore?nomeScore+300:0,temaScore?temaScore+100:0,categoriaScore?categoriaScore:0);
   if (p.temaId) {
     const tema = temasSite.find(t => t.id === p.temaId);
-    if (tema && tema.palavrasChave && tema.palavrasChave.some(pc => pc.includes(termo))) return true;
+    if (tema && tema.palavrasChave) {
+      for(const palavra of tema.palavrasChave) score=Math.max(score,pontuarTextoBusca(termo,palavra));
+    }
   }
-  return false;
+  return score;
 }
 
 function renderCatalogo() {
@@ -1280,7 +1346,8 @@ function renderCatalogo() {
   const produtosVisiveis = getProdutosCatalogo();
   let lista = categoriaAtiva === 'todas' ? produtosVisiveis : produtosVisiveis.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
-    lista = lista.filter(p => produtoBateComBusca(p, termoBusca));
+    lista = lista.map((produto,ordem)=>({produto,ordem,pontuacao:produtoPontuacaoBusca(produto,termoBusca)}))
+      .filter(item=>item.pontuacao>0).sort((a,b)=>b.pontuacao-a.pontuacao||a.ordem-b.ordem).map(item=>item.produto);
   }
 
   if (lista.length === 0) {
@@ -2126,6 +2193,7 @@ document.addEventListener('keydown', (e) => {
         <p style="font-size:12.5px;color:#9a8890;">Cadastre temas (ex: Bluey, Jardim Encantado, Toy Story) para organizar produtos e ativar cross-sell automático.</p>
         <button class="admin-btn-primary" onclick="adminNovoTema()">+ Novo Tema</button>
       </div>
+      <div style="margin-bottom:14px;max-width:420px;"><input id="adminBuscaTema" type="search" placeholder="🔍 Pesquisar tema..." oninput="adminRenderTemas()" style="width:100%;padding:10px 12px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;"></div>
       <div id="adminTemasGrid" class="admin-grid"></div>
     </div>
 
@@ -3053,10 +3121,17 @@ async function adminExcluirProduto(idx) {
 // ── TEMAS ────────────────────────────────────────────────────────────────────
 function adminRenderTemas() {
   const grid = document.getElementById('adminTemasGrid');
+  const busca=normalizarTextoBusca(document.getElementById('adminBuscaTema')?.value||'');
   if (!temasSite.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum tema cadastrado.</p>'; return; }
-  grid.innerHTML = temasSite.map((t, idx) => `
+  const filtrados=temasSite.map((tema,idx)=>({tema,idx})).filter(({tema})=>!busca||normalizarTextoBusca(tema.nome).includes(busca));
+  if (!filtrados.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum tema encontrado.</p>'; return; }
+  grid.innerHTML = filtrados.map(({tema:t,idx}) => {
+    const produtoComImagem=produtos.find(p=>(p.temaId===t.id||normalizarTextoBusca(p.temaNome)===normalizarTextoBusca(t.nome))&&imagemProdutoParaTema(p));
+    const imagem=produtoComImagem?imagemProdutoParaTema(produtoComImagem):null;
+    const thumb=imagem?`<img src="${String(imagem).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='🎨';">`:'🎨';
+    return `
     <div class="admin-card-item">
-      <div class="admin-card-thumb">🎨</div>
+      <div class="admin-card-thumb">${thumb}</div>
       <div class="admin-card-info">
         <div class="admin-card-nome">${t.nome}</div>
         <div class="admin-card-sub">${(t.palavrasChave && t.palavrasChave.length) ? t.palavrasChave.join(', ') : '<em style="color:#c0b0b5;">sem palavras-chave</em>'}</div>
@@ -3065,7 +3140,8 @@ function adminRenderTemas() {
           <button onclick="adminExcluirTema(${idx})">Excluir</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function adminNovoTema() {
   _editandoTemaIdx = null;
