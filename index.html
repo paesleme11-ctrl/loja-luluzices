@@ -167,8 +167,7 @@
     font-size: clamp(48px, 12vw, 76px);
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
   }
-  .banner-slide.personalizado { background-size:cover; background-position:center; }
-  .banner-slide.personalizado::before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(28,10,19,.62),rgba(28,10,19,.08)); }
+  .banner-slide.personalizado { background-size:cover; background-position:center; background-repeat:no-repeat; }
   .banner-slide.personalizado > * { position:relative; z-index:1; }
   .banner-slide.personalizado .banner-slide-text { max-width:72%; }
   .banner-dots {
@@ -1087,7 +1086,9 @@ function emojiPara(categoria) {
 
 /** Produtos reservados para ofertas aparecem nas ofertas do carrinho, não no catálogo. */
 function produtoEhAdicional(p) {
-  return adicionaisGlobais.includes(p.id) || ofertaCrossSellGlobal.produtoId === p.id;
+  // Produtos usados somente como adicionais ficam fora do catálogo; o item do cross-sell
+  // continua visível para também receber a promoção quando o cliente o escolhe diretamente.
+  return adicionaisGlobais.includes(p.id) && ofertaCrossSellGlobal.produtoId !== p.id;
 }
 
 function textoChaveCatalogo(valor) {
@@ -1228,7 +1229,9 @@ let adicionaisSelecionados = []; // [{ id, nome, preco }] — adicionais marcado
 let produtoMidiaSomAtivo = false;
 let produtoSlideAtivo = 0;
 let ofertaCrossSellGlobal = { produtoId:'', descontoTipo:'fixo', descontoValor:0, texto:'' };
+let modelosAceitosCrossSellRascunho = [];
 let adicionaisGlobais = [];
+let adicionaisGlobaisRascunho = [];
 let produtoPendenteOfertas = null;
 let adicionaisGlobaisSelecionados = new Set();
 let adicionalGlobalEmDetalhe = null;
@@ -1922,7 +1925,7 @@ function adicionarAoCarrinho(id) {
   const raw = produtos.find(x => x.id === id);
   const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
-  carrinho.push({ id: p.id, nome: p.nome, preco: precoPromocionalProduto(p), precoBase:p.preco, categoria: p.categoria, adicionais: [] });
+  carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId || null, adicionais:[] });
   atualizarCarrinhoUI();
   showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
   abrirOfertasParaItem(carrinho[carrinho.length - 1]);
@@ -1957,6 +1960,7 @@ function adicionarAoCarrinhoComAdicionais(id) {
     preco: precoPromocionalProduto(p),
     precoBase: p.preco,
     categoria: p.categoria,
+    modeloId: p.modeloId || null,
     foto: (p.fotos && p.fotos[0]) || p.foto || null,
     adicionais: [],
   });
@@ -1974,6 +1978,28 @@ function calcularPrecoCrossSellGlobal(p) {
   return Math.max(0, final);
 }
 
+function carrinhoTemModeloAceitoCrossSell() {
+  const aceitos = ofertaCrossSellGlobal.modelosAceitos;
+  return carrinho.some(item => {
+    if (item.id === ofertaCrossSellGlobal.produtoId) return false;
+    // Configurações antigas não tinham filtro de modelo; preserva nelas a regra anterior.
+    if (!Array.isArray(aceitos)) return true;
+    const raw = produtos.find(p => p.id === item.id);
+    const modeloId = item.modeloId || modeloDoProduto(raw)?.id || null;
+    return !!modeloId && aceitos.includes(modeloId);
+  });
+}
+
+function precoItemCarrinho(item) {
+  const raw = produtos.find(p => p.id === item.id);
+  const produto = raw ? produtoComModelo(raw) : null;
+  const precoNormal = produto ? precoPromocionalProduto(produto) : Number(item.preco) || 0;
+  if (item.id === ofertaCrossSellGlobal.produtoId && carrinhoTemModeloAceitoCrossSell()) {
+    return calcularPrecoCrossSellGlobal(produto || { ...item, preco:precoNormal });
+  }
+  return precoNormal;
+}
+
 function abrirOfertasParaItem(item) {
   produtoPendenteOfertas = item;
   adicionaisGlobaisSelecionados = new Set();
@@ -1984,7 +2010,7 @@ function abrirOfertasParaItem(item) {
 function renderOfertasGlobais() {
   const body = document.getElementById('ofertasBody');
   const idsNoCarrinho = new Set(carrinho.map(i => i.id));
-  const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && p.ativo !== false && temaAtivoDoProduto(p) && (Number(p.preco) > 0 || p.sobConsulta) && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).map(produtoComModelo).slice(0, 3);
+  const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && p.id !== ofertaCrossSellGlobal.produtoId && p.ativo !== false && temaAtivoDoProduto(p) && (Number(p.preco) > 0 || p.sobConsulta) && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).map(produtoComModelo).slice(0, 3);
   let html = '';
   if (extras.length) {
     html += `<div class="adicionais-globais-titulo">Quer incluir mais algum serviço?</div><div class="adicionais-globais-grid" data-count="${extras.length}">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; const incluido=adicionaisGlobaisSelecionados.has(p.id); const precoAtual=precoPromocionalProduto(p); return `<button type="button" class="adicional-global-card ${incluido?'selecionado':''}" id="adicionalGlobalCard_${p.id}" onclick="abrirDetalheAdicionalGlobal('${p.id}')"><span class="adicional-global-status">${incluido?'Incluído':'Ver detalhes'}</span><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${precoAtual < p.preco ? `<span style="text-decoration:line-through;color:var(--ink-muted);font-weight:400;">${BRL(p.preco)}</span> ` : ''}${BRL(precoAtual)}</div></div></button>`; }).join('')}</div>`;
@@ -2004,7 +2030,8 @@ function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   const jaIncluido = tipo === 'extra' && adicionaisGlobaisSelecionados.has(id);
   const textoRecusar = tipo === 'crossSell' ? 'Voltar ao carrinho' : (jaIncluido ? 'Remover dos extras' : 'Recusar');
   const textoIncluir = tipo === 'crossSell' ? 'Adicionar oferta' : (jaIncluido ? 'Manter no pedido' : 'Incluir no carrinho');
-  const preco = tipo === 'crossSell' ? `<span class="orderbump-preco-antigo" style="font-size:14px;margin-right:6px">${BRL(p.preco)}</span>${BRL(calcularPrecoCrossSellGlobal(p))}` : BRL(precoPromocionalProduto(p));
+  const precoRegular = precoPromocionalProduto(p);
+  const preco = tipo === 'crossSell' ? `<span class="orderbump-preco-antigo" style="font-size:14px;margin-right:6px">${BRL(precoRegular)}</span>${BRL(calcularPrecoCrossSellGlobal(p))}` : BRL(precoRegular);
   document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${preco}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${textoRecusar}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${textoIncluir}</button></div></div>`;
   document.getElementById('extraDetalheOverlay').classList.add('open');
 }
@@ -2036,7 +2063,7 @@ function confirmarOfertas() {
   for (const id of adicionaisGlobaisSelecionados) {
     const raw = produtos.find(x => x.id === id);
     const p = raw ? produtoComModelo(raw) : null;
-    if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
+    if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId||null, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
   }
   fecharOfertas();
   atualizarCarrinhoUI();
@@ -2058,7 +2085,7 @@ function removerDoCarrinho(idx) {
 
 /** Retorna o cross-sell global enquanto o produto ainda não estiver no carrinho. */
 function getOrderBumpDisponivel() {
-  if (!carrinho.length || !ofertaCrossSellGlobal.produtoId) return null;
+  if (!carrinho.length || !ofertaCrossSellGlobal.produtoId || !carrinhoTemModeloAceitoCrossSell()) return null;
   const raw = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
   const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || bump.ativo === false || !temaAtivoDoProduto(raw) || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
@@ -2075,13 +2102,14 @@ function renderOrderBumpNoCarrinho() {
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
   const textoOferta = ofertaCrossSellGlobal.texto?.trim() || `Leve também ${bump.nome} com desconto especial!`;
 
+  const precoNormal = precoPromocionalProduto(bump);
   container.innerHTML = `
     <div class="orderbump-card" onclick="abrirDetalheAdicionalGlobal('${bump.id}', 'crossSell')">
       <div class="orderbump-thumb">${((bump.fotos && bump.fotos[0]) || bump.foto) && !ehVideo((bump.fotos && bump.fotos[0]) || bump.foto) ? `<img src="${(bump.fotos && bump.fotos[0]) || bump.foto}" alt="${bump.nome}">` : emojiPara(bump.categoria)}</div>
       <div class="orderbump-info">
         <div class="orderbump-texto">${textoOferta}</div>
         <div class="orderbump-precos">
-          <span class="orderbump-preco-antigo">${BRL(bump.preco)}</span>
+          <span class="orderbump-preco-antigo">${BRL(precoNormal)}</span>
           <span class="orderbump-preco-novo">${BRL(precoComDesconto)}</span>
         </div>
       </div>
@@ -2095,7 +2123,7 @@ function aceitarOrderBump(bumpId) {
   const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || !disponivel) return;
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
-  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, adicionais: [], _viaOrderBump: true });
+  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, modeloId:bump.modeloId||null, adicionais: [], _viaOrderBump: true });
   orderBumpAceito = bumpId;
   atualizarCarrinhoUI();
   showToast(`${bump.nome} adicionado com desconto ✓`, 'success');
@@ -2126,11 +2154,16 @@ function atualizarCarrinhoUI() {
   if (badgeNav) { badgeNav.style.display = 'flex'; badgeNav.textContent = carrinho.length; }
   footer.style.display = 'block';
 
+  carrinho.forEach(item => { item.preco = precoItemCarrinho(item); });
   itemsContainer.innerHTML = carrinho.map((item, idx) => {
     const adicionaisTexto = (item.adicionais && item.adicionais.length > 0)
       ? `<div class="cart-item-adicionais">${item.adicionais.map(a => a.nome).join(' · ')}</div>`
       : '';
-    const selinhoOferta = item._viaOrderBump ? `<div class="cart-item-selo-oferta">🎁 Oferta especial</div>` : '';
+    const produtoAtual = produtos.find(p => p.id === item.id);
+    const precoRegular = produtoAtual ? precoPromocionalProduto(produtoComModelo(produtoAtual)) : Number(item.precoBase) || item.preco;
+    const descontoOferta = item.id === ofertaCrossSellGlobal.produtoId && Number(item.preco) < precoRegular;
+    const selinhoOferta = descontoOferta ? `<div class="cart-item-selo-oferta">🎁 Oferta especial</div>` : '';
+    const precoHtml = descontoOferta ? `<span class="orderbump-preco-antigo">${BRL(precoRegular)}</span> ${BRL(item.preco)}` : BRL(item.preco);
     return `
     <div class="cart-item">
       <div class="cart-item-thumb">${item.foto ? `<img src="${item.foto}" alt="${item.nome}">` : emojiPara(item.categoria)}</div>
@@ -2138,7 +2171,7 @@ function atualizarCarrinhoUI() {
         <div class="cart-item-nome">${item.nome}</div>
         ${adicionaisTexto}
         ${selinhoOferta}
-        <div class="cart-item-preco">${BRL(item.preco)}</div>
+        <div class="cart-item-preco">${precoHtml}</div>
       </div>
       <button class="cart-item-remove" onclick="removerDoCarrinho(${idx})" title="Remover">✕</button>
     </div>
@@ -2146,7 +2179,7 @@ function atualizarCarrinhoUI() {
   }).join('');
 
   // Se o item do order bump foi removido do carrinho, libera a oferta pra aparecer de novo
-  if (orderBumpAceito && !carrinho.some(c => c.id === orderBumpAceito)) {
+  if (orderBumpAceito && (!carrinho.some(c => c.id === orderBumpAceito) || !carrinhoTemModeloAceitoCrossSell())) {
     orderBumpAceito = null;
   }
   renderOrderBumpNoCarrinho();
@@ -2455,7 +2488,12 @@ document.addEventListener('keydown', (e) => {
         <h3 style="font-size:18px;margin-bottom:6px;">Ofertas exibidas ao adicionar ao carrinho</h3>
         <p style="font-size:12.5px;color:#9a8890;margin-bottom:18px;">Estas opções aparecem para todos os produtos depois que o cliente clica em “Adicionar ao carrinho”.</p>
         <div class="admin-field"><label>Cross-sell global (uma oferta com desconto)</label>
-          <select id="aCrossSellGlobal"><option value="">Nenhum produto selecionado</option></select>
+          <select id="aCrossSellGlobal" onchange="adminRenderModelosAceitosCrossSell()"><option value="">Nenhum produto selecionado</option></select>
+        </div>
+        <div class="admin-field" id="crossSellModelosWrap" style="display:none;">
+          <label>Modelos que liberam esta oferta</label>
+          <div id="crossSellModelosLista" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px;"></div>
+          <small style="color:#9a8890;">O desconto ativa quando o produto da oferta estiver no carrinho com um convite de pelo menos um destes modelos. Isso também vale se o cliente adicionar o produto diretamente pelo catálogo.</small>
         </div>
         <div class="admin-row2">
           <div class="admin-field"><label>Tipo de desconto</label><select id="aCrossSellGlobalTipo"><option value="fixo">Valor fixo (R$)</option><option value="percentual">Percentual (%)</option></select></div>
@@ -2463,8 +2501,12 @@ document.addEventListener('keydown', (e) => {
         </div>
         <div class="admin-field"><label>Texto da oferta</label><input type="text" id="aCrossSellGlobalTexto" placeholder="Ex.: Aproveite esta oferta especial"></div>
         <div class="admin-field"><label>Produtos adicionais</label>
-          <select id="aAdicionaisGlobais" multiple style="min-height:120px;"></select>
-          <small style="color:#9a8890;">Segure Ctrl (ou ⌘ no Mac) para selecionar mais de um. Os itens selecionados serão apresentados ao cliente.</small>
+          <div class="adicionais-admin-seletor">
+            <input id="buscaAdicionaisGlobais" type="search" placeholder="🔍 Pesquisar produto ou tema..." oninput="adminRenderSeletorAdicionais()">
+            <div id="adicionaisGlobaisSelecionados" class="adicionais-admin-selecionados"></div>
+            <div id="listaAdicionaisGlobais" class="adicionais-admin-lista"></div>
+            <small style="display:block;color:#9a8890;margin-top:8px;">Os produtos marcados aparecerão como opções para o cliente.</small>
+          </div>
         </div>
         <button class="admin-btn-primary" onclick="adminSalvarOfertasGlobais()">Salvar ofertas globais</button>
       </div>
@@ -2699,6 +2741,19 @@ document.addEventListener('keydown', (e) => {
   .admin-foto-controles { position:absolute; left:0; right:0; bottom:0; display:flex; background:rgba(0,0,0,.68); }
   .admin-foto-controles button { position:static; width:50%; height:22px; border:0; border-right:1px solid rgba(255,255,255,.3); border-radius:0; background:transparent; color:#fff; font-size:14px; line-height:20px; padding:0; }
   .admin-foto-controles button:disabled { opacity:.35; cursor:default; }
+  .adicionais-admin-seletor { border:1px solid #ecddd6; border-radius:12px; padding:12px; background:#fff; }
+  .adicionais-admin-selecionados { display:flex; flex-wrap:wrap; gap:7px; min-height:30px; margin:8px 0 12px; }
+  .adicional-admin-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid #f0c7ce; border-radius:99px; padding:5px 9px; background:#fff5f6; color:#742a3c; font-size:11px; }
+  .adicional-admin-chip button { border:0; background:transparent; color:#a63049; padding:0; font-size:14px; line-height:1; }
+  .adicionais-admin-lista { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px; max-height:300px; overflow:auto; padding:2px; }
+  .adicional-admin-opcao { display:flex; align-items:center; gap:9px; text-align:left; width:100%; padding:8px; border:1px solid #ecddd6; border-radius:10px; background:#fff; color:var(--ink); }
+  .adicional-admin-opcao.selecionado { border-color:#df7182; background:#fff5f6; box-shadow:0 0 0 1px #df7182 inset; }
+  .adicional-admin-opcao img, .adicional-admin-opcao .sem-foto { width:46px; height:46px; flex:0 0 46px; border-radius:8px; object-fit:cover; background:#fdf6f0; display:grid; place-items:center; }
+  .adicional-admin-opcao .adicional-admin-dados { min-width:0; flex:1; }
+  .adicional-admin-opcao strong { display:block; font-size:12px; line-height:1.25; }
+  .adicional-admin-opcao small { display:block; color:#9a8890; font-size:10px; margin-top:3px; }
+  .adicional-admin-check { width:20px; height:20px; border:1px solid #d4c5c8; border-radius:6px; flex:0 0 20px; display:grid; place-items:center; color:#fff; }
+  .adicional-admin-opcao.selecionado .adicional-admin-check { background:#d94661; border-color:#d94661; }
   .admin-foto-video-badge { position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.65); color:#fff; font-size:9px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .admin-sugestoes { display:none; position:absolute; top:100%; left:0; right:0; background:#fff; border:1.5px solid #e8546a; border-radius:9px; max-height:160px; overflow-y:auto; z-index:10; margin-top:3px; }
   .admin-sugestoes.open { display:block; }
@@ -2938,29 +2993,113 @@ async function adminAplicarNormalizacao() {
 
 function adminCarregarOfertasGlobais() {
   const crossSelect = document.getElementById('aCrossSellGlobal');
-  const extrasSelect = document.getElementById('aAdicionaisGlobais');
   const opcoes = produtos.map(produtoComModelo).map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   crossSelect.innerHTML = '<option value="">Nenhum produto selecionado</option>' + opcoes;
-  extrasSelect.innerHTML = opcoes;
   crossSelect.value = ofertaCrossSellGlobal.produtoId || '';
   document.getElementById('aCrossSellGlobalTipo').value = ofertaCrossSellGlobal.descontoTipo || 'fixo';
   document.getElementById('aCrossSellGlobalValor').value = ofertaCrossSellGlobal.descontoValor || '';
   document.getElementById('aCrossSellGlobalTexto').value = ofertaCrossSellGlobal.texto || '';
-  Array.from(extrasSelect.options).forEach(o => o.selected = adicionaisGlobais.includes(o.value));
+  modelosAceitosCrossSellRascunho = Array.isArray(ofertaCrossSellGlobal.modelosAceitos)
+    ? ofertaCrossSellGlobal.modelosAceitos.slice()
+    : (ofertaCrossSellGlobal.produtoId ? modelosSite.map(m => m.id) : []);
+  adminRenderModelosAceitosCrossSell();
+  adicionaisGlobaisRascunho = adicionaisGlobais.slice(0, 3);
+  adminRenderSeletorAdicionais();
+}
+
+function adminRenderModelosAceitosCrossSell() {
+  const wrap = document.getElementById('crossSellModelosWrap');
+  const lista = document.getElementById('crossSellModelosLista');
+  if (!wrap || !lista) return;
+  const ofertaSelecionada = !!document.getElementById('aCrossSellGlobal')?.value;
+  wrap.style.display = ofertaSelecionada ? '' : 'none';
+  if (!ofertaSelecionada) { lista.innerHTML = ''; return; }
+  lista.innerHTML = modelosSite.map(modelo => {
+    const marcado = modelosAceitosCrossSellRascunho.includes(modelo.id);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ecddd6;border-radius:8px;background:${marcado?'#fff5f6':'#fff'};font-size:12px;"><input type="checkbox" data-modelo-crosssell="${escaparHTMLCatalogo(modelo.id)}" ${marcado?'checked':''}>${escaparHTMLCatalogo(modelo.nome)}</label>`;
+  }).join('');
+  lista.querySelectorAll('[data-modelo-crosssell]').forEach(campo => campo.addEventListener('change', () => {
+    modelosAceitosCrossSellRascunho = Array.from(lista.querySelectorAll('[data-modelo-crosssell]:checked')).map(el => el.dataset.modeloCrosssell);
+    adminRenderModelosAceitosCrossSell();
+  }));
+}
+
+function adminRenderSeletorAdicionais() {
+  const lista = document.getElementById('listaAdicionaisGlobais');
+  const selecionados = document.getElementById('adicionaisGlobaisSelecionados');
+  if (!lista || !selecionados) return;
+  const busca = normalizarTextoBusca(document.getElementById('buscaAdicionaisGlobais')?.value || '');
+  const produtosAdicionais = produtos.map(produtoComModelo);
+  const porId = new Map(produtosAdicionais.map(p => [p.id, p]));
+  selecionados.innerHTML = adicionaisGlobaisRascunho.map(id => {
+    const produto = porId.get(id);
+    const nome = produto?.nome || 'Produto indisponível';
+    return `<span class="adicional-admin-chip">${escaparHTMLCatalogo(nome)}<button type="button" data-remover-adicional="${escaparHTMLCatalogo(id)}" aria-label="Remover ${escaparHTMLCatalogo(nome)}">×</button></span>`;
+  }).join('') || '<span style="font-size:11px;color:#9a8890;">Nenhum produto selecionado.</span>';
+  selecionados.querySelectorAll('[data-remover-adicional]').forEach(botao => botao.addEventListener('click', () => adminAlternarAdicionalGlobal(botao.dataset.removerAdicional)));
+
+  const filtrados = produtosAdicionais.filter(p => {
+    if (!busca) return true;
+    return normalizarTextoBusca(`${p.nome || ''} ${p.temaNome || ''} ${p.categoria || ''}`).includes(busca);
+  });
+  if (!filtrados.length) {
+    lista.innerHTML = '<div style="padding:12px;color:#9a8890;font-size:12px;">Nenhum produto encontrado.</div>';
+    return;
+  }
+  lista.innerHTML = filtrados.map(p => {
+    const ativo = adicionaisGlobaisRascunho.includes(p.id);
+    const foto = imagemProdutoParaTema(p);
+    const thumb = foto ? `<img src="${escaparHTMLCatalogo(foto)}" alt="" loading="lazy">` : `<span class="sem-foto">${escaparHTMLCatalogo(emojiPara(p.categoria))}</span>`;
+    const preco = p.sobConsulta ? 'Sob consulta' : BRL(precoPromocionalProduto(p));
+    const tema = p.temaNome || p.categoria || '';
+    return `<button type="button" class="adicional-admin-opcao ${ativo?'selecionado':''}" data-escolher-adicional="${escaparHTMLCatalogo(p.id)}" aria-pressed="${ativo}">${thumb}<span class="adicional-admin-dados"><strong>${escaparHTMLCatalogo(p.nome)}</strong><small>${escaparHTMLCatalogo(tema)} · ${preco}</small></span><span class="adicional-admin-check">${ativo?'✓':''}</span></button>`;
+  }).join('');
+  lista.querySelectorAll('[data-escolher-adicional]').forEach(botao => botao.addEventListener('click', () => adminAlternarAdicionalGlobal(botao.dataset.escolherAdicional)));
+}
+
+function adminAlternarAdicionalGlobal(id) {
+  const indice = adicionaisGlobaisRascunho.indexOf(id);
+  if (indice >= 0) adicionaisGlobaisRascunho.splice(indice, 1);
+  else if (adicionaisGlobaisRascunho.length >= 3) {
+    showToast('Remova um produto selecionado para escolher outro.','error');
+    return;
+  } else adicionaisGlobaisRascunho.push(id);
+  adminRenderSeletorAdicionais();
 }
 
 async function adminSalvarOfertasGlobais() {
-  const extras = Array.from(document.getElementById('aAdicionaisGlobais').selectedOptions).map(o => o.value);
+  const extras = adicionaisGlobaisRascunho.slice();
   if (extras.length > 3) { showToast('Ajuste os produtos adicionais selecionados antes de salvar.', 'error'); return; }
+  const produtoOferta = document.getElementById('aCrossSellGlobal').value;
+  const modelosAceitos = modelosAceitosCrossSellRascunho.filter(id => modelosSite.some(modelo => modelo.id === id));
+  if (produtoOferta && !modelosAceitos.length) { showToast('Selecione pelo menos um modelo que libera esta oferta.','error'); return; }
+  const descontoTipo = document.getElementById('aCrossSellGlobalTipo').value;
+  const descontoValor = parseFloat(document.getElementById('aCrossSellGlobalValor').value) || 0;
+  if (produtoOferta) {
+    const rawOferta = produtos.find(p => p.id === produtoOferta);
+    const produtoOfertaResolvido = rawOferta ? produtoComModelo(rawOferta) : null;
+    const precoOferta = produtoOfertaResolvido ? precoPromocionalProduto(produtoOfertaResolvido) : 0;
+    if (descontoValor <= 0 || (descontoTipo === 'percentual' && descontoValor >= 100) || (descontoTipo !== 'percentual' && descontoValor >= precoOferta)) {
+      showToast('Informe um desconto válido, menor que o preço do produto da oferta.','error');
+      return;
+    }
+  }
+  const ofertaAnterior = { ...ofertaCrossSellGlobal };
+  const adicionaisAnteriores = adicionaisGlobais;
   ofertaCrossSellGlobal = {
-    produtoId: document.getElementById('aCrossSellGlobal').value,
-    descontoTipo: document.getElementById('aCrossSellGlobalTipo').value,
-    descontoValor: parseFloat(document.getElementById('aCrossSellGlobalValor').value) || 0,
+    produtoId: produtoOferta,
+    descontoTipo,
+    descontoValor,
     texto: document.getElementById('aCrossSellGlobalTexto').value.trim(),
+    modelosAceitos,
   };
   adicionaisGlobais = extras;
   try { await salvarProdutosSite(); showToast('Ofertas globais salvas ✓', 'success'); }
-  catch (e) { showToast('Não foi possível salvar as ofertas.', 'error'); }
+  catch (e) {
+    ofertaCrossSellGlobal = ofertaAnterior;
+    adicionaisGlobais = adicionaisAnteriores;
+    showToast('Não foi possível salvar as ofertas.', 'error');
+  }
 }
 
 async function carregarBannersAdmin() {
@@ -3907,12 +4046,11 @@ function renderBannersPublicos() {
   if (!carrossel || !bannersSite.length) return; // mantém os banners padrão antigos se não houver cadastro
   carrossel.innerHTML = bannersSite.map((b, idx) => `
     <div class="banner-slide personalizado ${idx===0?'active':''}" data-banner-index="${idx}" role="button" tabindex="0" aria-label="${escaparHTMLCatalogo(b.titulo || 'Ver oferta')}" ${b.foto ? `style="background-image:url('${escaparHTMLCatalogo(b.foto).replace(/'/g,'%27')}')"` : ''}>
-      <div class="banner-slide-text">
+      ${b.foto ? '' : `<div class="banner-slide-text">
         ${b.tag ? `<span class="banner-slide-tag">${escaparHTMLCatalogo(b.tag)}</span>` : ''}
         ${b.titulo ? `<h2>${escaparHTMLCatalogo(b.titulo)}</h2>` : ''}
         ${b.subtitulo ? `<p>${escaparHTMLCatalogo(b.subtitulo)}</p>` : ''}
-      </div>
-      ${b.foto ? '' : '<div class="banner-slide-emoji">🎈</div>'}
+      </div><div class="banner-slide-emoji">🎈</div>`}
     </div>`).join('') + '<div class="banner-dots" id="bannerDots"></div>';
   carrossel.querySelectorAll('.banner-slide').forEach(slide => {
     const ativar = () => abrirDestinoBanner(bannersSite[Number(slide.dataset.bannerIndex)]);
