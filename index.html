@@ -63,14 +63,16 @@
     flex-shrink: 0;
   }
   .search-bar {
-    flex: 1; position: relative;
+    flex: 1; position: relative; min-width: 180px;
   }
   .search-bar input {
-    width: 100%; padding: 10px 42px 10px 16px;
-    border: none; border-radius: 100px;
-    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    width: 100%; padding: 14px 48px 14px 20px;
+    border: 2px solid rgba(255,255,255,.65); border-radius: 100px;
+    font-size: 16px; font-family: 'DM Sans', sans-serif; font-weight:600;
     outline: none; background: #fff; color: var(--ink);
+    box-shadow: 0 4px 14px rgba(70,15,33,.18); transition: box-shadow .2s, border-color .2s;
   }
+  .search-bar input:focus { border-color:#ffd7df; box-shadow:0 0 0 4px rgba(255,255,255,.22),0 6px 18px rgba(70,15,33,.2); }
   .search-bar .search-icon {
     position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
     color: var(--ink-muted); font-size: 15px; pointer-events: none;
@@ -96,6 +98,18 @@
   .busca-sugestao-thumb img { width: 100%; height: 100%; object-fit: cover; }
   .busca-sugestao-nome { font-weight: 600; }
   .busca-sugestao-count { font-size: 11px; color: var(--ink-muted); margin-left: auto; }
+  .temas-section { background:var(--rose); padding:2px 16px 22px; color:#fff; }
+  .temas-section-inner { max-width:1180px; margin:auto; }
+  .temas-section-heading { display:flex; align-items:end; justify-content:space-between; gap:12px; margin:0 0 12px; }
+  .temas-section-heading h2 { font:600 16px 'DM Sans',sans-serif; margin:0; }
+  .temas-section-heading span { font-size:11px; opacity:.8; }
+  .temas-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(94px,1fr)); gap:12px; }
+  .tema-card-loja { border:0; padding:0; background:transparent; color:#fff; text-align:center; min-width:0; }
+  .tema-card-loja .tema-card-image { width:clamp(68px,9vw,94px); aspect-ratio:1; margin:auto auto 7px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.68); box-shadow:0 3px 12px rgba(70,15,33,.16); display:grid; place-items:center; font-size:25px; }
+  .tema-card-loja img { width:100%; height:100%; object-fit:cover; }
+  .tema-card-loja strong { display:block; font-size:11px; line-height:1.25; }
+  .tema-card-loja:hover .tema-card-image { transform:translateY(-2px); }
+  .temas-vazio { opacity:.78; font-size:12px; }
   .header-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
   .btn-carrinho {
     position: relative;
@@ -132,6 +146,7 @@
     align-items: center;
     padding: 0 24px;
     color: #fff;
+    cursor:pointer;
   }
   .banner-slide.active { display: flex; }
   .banner-slide-text { flex: 1; }
@@ -149,6 +164,10 @@
     font-size: clamp(48px, 12vw, 76px);
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
   }
+  .banner-slide.personalizado { background-size:cover; background-position:center; }
+  .banner-slide.personalizado::before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(28,10,19,.62),rgba(28,10,19,.08)); }
+  .banner-slide.personalizado > * { position:relative; z-index:1; }
+  .banner-slide.personalizado .banner-slide-text { max-width:72%; }
   .banner-dots {
     position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 5px;
@@ -753,6 +772,13 @@
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
     header { padding: 14px 16px; }
+    .header-top { flex-wrap:wrap; gap:9px; }
+    .header-top .logo { order:0; }
+    .header-top .header-actions { order:1; margin-left:auto; }
+    .header-top .search-bar { order:2; flex-basis:100%; }
+    .search-bar input { font-size:15px; padding:13px 44px 13px 17px; }
+    .temas-grid { grid-template-columns:repeat(auto-fit,minmax(76px,1fr)); gap:10px 7px; }
+    .tema-card-loja .tema-card-image { width:68px; }
     .hero { padding: 44px 16px 32px; }
     .catalogo { padding: 0 16px 60px; gap: 16px; }
     .cart-drawer { width: 100%; max-width: 100%; }
@@ -813,9 +839,12 @@
     </div>
   </div>
 
-  <div class="categorias-section">
-    <div class="categorias-scroll" id="categoriasScroll"></div>
-  </div>
+  <section class="temas-section" aria-label="Temas de convites">
+    <div class="temas-section-inner">
+      <div class="temas-section-heading"><h2>Encontre por tema</h2><span>Toque para ver os convites</span></div>
+      <div class="temas-grid" id="temasLojaGrid"><div class="temas-vazio">Carregando temas…</div></div>
+    </div>
+  </section>
 
   <div class="home-body">
     <div class="secao-titulo">
@@ -1294,8 +1323,9 @@ function vendasFakePara(id) {
 async function carregarProdutos() {
   try {
     await carregarTemas();
+    await carregarBannersAdmin();
     const doc = await db.collection('config').doc('produtosSite').get();
-    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderCatalogo(); return; }
+    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderTemasLoja(); renderBannersPublicos(); renderCatalogo(); return; }
     const configProdutos = doc.data() || {};
     const lista = JSON.parse(configProdutos.data || '[]');
     ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
@@ -1307,6 +1337,14 @@ async function carregarProdutos() {
     }));
     await carregarModelos(produtos);
     renderCategorias();
+    renderTemasLoja();
+    renderBannersPublicos();
+    const buscaInicial = new URLSearchParams(window.location.search).get('busca');
+    if (buscaInicial) {
+      const inputBusca = document.getElementById('searchInput');
+      if (inputBusca) inputBusca.value = buscaInicial;
+      termoBusca = normalizarTextoBusca(buscaInicial);
+    }
     renderCatalogo();
     const produtoDireto = new URLSearchParams(window.location.search).get('produto');
     if (produtoDireto) abrirProduto(produtoDireto);
@@ -1329,6 +1367,7 @@ const ICONE_CATEGORIA_NAV = {
 function renderCategorias() {
   const categorias = ['todas', ...new Set(getProdutosCatalogo().map(p => p.categoria))];
   const el = document.getElementById('categoriasScroll');
+  if (!el) return;
   el.innerHTML = categorias.map(cat => {
     const icone = ICONE_CATEGORIA_NAV[cat.toLowerCase()] || emojiPara(cat);
     return `
@@ -1408,16 +1447,31 @@ function onSearchInput() {
 function getTemasDisponiveis() {
   const mapa = {};
   getProdutosCatalogo().forEach(p => {
-    const nomeTema = p.temaNome || p.categoria;
+    const cadastrado = temaDoProduto(p);
+    const nomeTema = cadastrado?.nome || p.temaNome;
     if (!nomeTema) return;
     if (!mapa[nomeTema]) {
-      const temaCadastrado = p.temaId ? temasSite.find(t => t.id === p.temaId) : null;
-      mapa[nomeTema] = { nome: nomeTema, count: 0, foto: null, palavrasChave: temaCadastrado?.palavrasChave || [] };
+      mapa[nomeTema] = { id:cadastrado?.id || p.temaId || '', nome:nomeTema, count:0, foto:null, imagemFallback:null, palavrasChave:cadastrado?.palavrasChave || [], ordem:cadastrado ? temasSite.indexOf(cadastrado) : Number.MAX_SAFE_INTEGER };
     }
     mapa[nomeTema].count++;
-    if (!mapa[nomeTema].foto) mapa[nomeTema].foto = imagemProdutoParaTema(p);
+    if (!mapa[nomeTema].imagemFallback) mapa[nomeTema].imagemFallback = imagemProdutoParaTema(p);
   });
-  return Object.values(mapa);
+  return Object.values(mapa).map(t => {
+    const tema = temasSite.find(x => x.id && x.id === t.id) || temasSite.find(x => textoChaveCatalogo(x.nome) === textoChaveCatalogo(t.nome));
+    return { ...t, foto:imagemProdutoParaTema({ foto:tema?.foto }) || t.imagemFallback };
+  }).sort((a,b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+function renderTemasLoja() {
+  const grid = document.getElementById('temasLojaGrid');
+  if (!grid) return;
+  const temas = getTemasDisponiveis();
+  if (!temas.length) { grid.innerHTML = '<div class="temas-vazio">Os temas estarão disponíveis em breve.</div>'; return; }
+  grid.innerHTML = temas.map(t => {
+    const imagem = t.foto ? `<img src="${escaparHTMLCatalogo(t.foto)}" alt="Tema ${escaparHTMLCatalogo(t.nome)}" loading="lazy" onerror="this.remove();this.parentElement.textContent='🎨';">` : '🎨';
+    return `<button class="tema-card-loja" type="button" data-tema-loja="${escaparHTMLCatalogo(t.nome)}" aria-label="Ver convites do tema ${escaparHTMLCatalogo(t.nome)}"><span class="tema-card-image">${imagem}</span><strong>${escaparHTMLCatalogo(t.nome)}</strong></button>`;
+  }).join('');
+  grid.querySelectorAll('[data-tema-loja]').forEach(botao => botao.addEventListener('click', () => selecionarTemaLoja(botao.dataset.temaLoja)));
 }
 
 function imagemProdutoParaTema(produto) {
@@ -1456,10 +1510,20 @@ function aplicarBuscaCatalogo() {
   const input = document.getElementById('searchInput');
   termoBusca = normalizarTextoBusca(input?.value || '');
   categoriaAtiva = 'todas';
+  const urlBusca = new URL(window.location.href);
+  if (input?.value.trim()) urlBusca.searchParams.set('busca', input.value.trim());
+  else urlBusca.searchParams.delete('busca');
+  history.replaceState({}, '', urlBusca.href);
   fecharSugestoesBusca();
   if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
   renderCatalogo();
   requestAnimationFrame(() => document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+function selecionarTemaLoja(nomeTema) {
+  const input = document.getElementById('searchInput');
+  if (input) input.value = nomeTema;
+  aplicarBuscaCatalogo();
 }
 
 function fecharSugestoesBusca() {
@@ -1583,14 +1647,18 @@ function renderCatalogo() {
 
 // ── Banner carrossel automático ────────────────────────────────────────────
 let bannerIdx = 0;
+let bannerTimer = null;
 function initBannerCarrossel() {
   const slides = document.querySelectorAll('.banner-slide');
   const dotsEl = document.getElementById('bannerDots');
+  if (!dotsEl || !slides.length) return;
+  if (bannerTimer) clearInterval(bannerTimer);
+  bannerIdx = 0;
   dotsEl.innerHTML = Array.from(slides).map((_, i) =>
     `<div class="banner-dot ${i===0?'active':''}" onclick="irParaBannerSlide(${i})"></div>`
   ).join('');
 
-  setInterval(() => {
+  bannerTimer = setInterval(() => {
     irParaBannerSlide((bannerIdx + 1) % slides.length);
   }, 4500);
 }
@@ -2519,6 +2587,16 @@ document.addEventListener('keydown', (e) => {
     <div class="admin-modal-header"><span id="adminModalTemaTitle">Novo Tema</span><button onclick="adminFecharModal('adminModalTema')">✕</button></div>
     <div class="admin-modal-body">
       <div class="admin-field"><label>Nome do tema</label><input type="text" id="atNome" placeholder="Ex: Bluey"></div>
+      <div class="admin-field"><label>Imagem do tema (opcional)</label>
+        <input type="hidden" id="atFotoUrl">
+        <input type="file" id="atFotoArquivo" accept="image/*" onchange="adminPreviewTemaFoto()">
+        <div id="atFotoPreview" style="margin-top:8px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button type="button" class="admin-btn-ghost" id="btnUploadTemaFoto" onclick="adminEnviarFotoTema()">📤 Enviar imagem</button>
+          <button type="button" class="admin-btn-ghost" onclick="adminRemoverFotoTema()">Remover imagem</button>
+        </div>
+        <div id="atFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;">Sem imagem própria, a loja usa uma imagem dos convites do tema.</div>
+      </div>
       <div class="admin-field">
         <label>Palavras-chave relacionadas</label>
         <input type="text" id="atPalavrasChave" placeholder="Ex: herói, marvel, ação (separe por vírgula)">
@@ -2552,10 +2630,12 @@ document.addEventListener('keydown', (e) => {
           <select id="abTipoDestino" onchange="adminBannerDestinoChange()">
             <option value="categoria">Categoria</option>
             <option value="produto">Produto</option>
+            <option value="pesquisa">Pesquisa</option>
           </select>
         </div>
-        <div class="admin-field"><label id="abDestinoLabel">Categoria</label><select id="abDestino"></select></div>
+        <div class="admin-field" id="abDestinoSelectWrap"><label id="abDestinoLabel">Categoria</label><select id="abDestino"></select></div>
       </div>
+      <div class="admin-field" id="abPesquisaWrap" style="display:none;"><label>Termo da pesquisa</label><input type="text" id="abDestinoPesquisa" placeholder="Ex: cinematográfico"></div>
     </div>
     <div class="admin-modal-footer">
       <button class="admin-btn-ghost" onclick="adminFecharModal('adminModalBanner')">Cancelar</button>
@@ -3540,7 +3620,7 @@ function adminRenderTemas() {
   if (!filtrados.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum tema encontrado.</p>'; return; }
   grid.innerHTML = filtrados.map(({tema:t,idx}) => {
     const produtoComImagem=produtos.find(p=>(p.temaId===t.id||normalizarTextoBusca(p.temaNome)===normalizarTextoBusca(t.nome))&&imagemProdutoParaTema(p));
-    const imagem=produtoComImagem?imagemProdutoParaTema(produtoComImagem):null;
+    const imagem=imagemProdutoParaTema({ foto:t.foto }) || (produtoComImagem?imagemProdutoParaTema(produtoComImagem):null);
     const thumb=imagem?`<img src="${String(imagem).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" alt="" loading="lazy" onerror="this.style.display='none';this.parentElement.textContent='🎨';">`:'🎨';
     return `
     <div class="admin-card-item">
@@ -3562,6 +3642,10 @@ function adminNovoTema() {
   document.getElementById('adminModalTemaTitle').textContent='Novo Tema';
   document.getElementById('atNome').value='';
   document.getElementById('atPalavrasChave').value='';
+  document.getElementById('atFotoUrl').value='';
+  document.getElementById('atFotoArquivo').value='';
+  document.getElementById('atFotoUploadStatus').textContent='Sem imagem própria, a loja usa uma imagem dos convites do tema.';
+  adminPreviewTemaFoto();
   document.getElementById('adminModalTema').classList.add('open');
 }
 function adminEditarTema(idx) {
@@ -3569,23 +3653,57 @@ function adminEditarTema(idx) {
   document.getElementById('adminModalTemaTitle').textContent='Editar Tema';
   document.getElementById('atNome').value = temasSite[idx].nome;
   document.getElementById('atPalavrasChave').value = (temasSite[idx].palavrasChave || []).join(', ');
+  document.getElementById('atFotoUrl').value = temasSite[idx].foto || '';
+  document.getElementById('atFotoArquivo').value = '';
+  document.getElementById('atFotoUploadStatus').textContent = temasSite[idx].foto ? 'Imagem própria cadastrada.' : 'Sem imagem própria, a loja usa uma imagem dos convites do tema.';
+  adminPreviewTemaFoto();
   document.getElementById('adminModalTema').classList.add('open');
+}
+function adminPreviewTemaFoto() {
+  const arquivo = document.getElementById('atFotoArquivo')?.files[0];
+  const url = arquivo ? URL.createObjectURL(arquivo) : document.getElementById('atFotoUrl')?.value.trim();
+  const preview = document.getElementById('atFotoPreview');
+  if (preview) preview.innerHTML = url ? `<img src="${escaparHTMLCatalogo(url)}" alt="Prévia da imagem do tema" style="width:90px;height:90px;object-fit:cover;border-radius:12px;">` : '<span style="font-size:11px;color:#9a8890;">Sem imagem própria (fallback dos convites).</span>';
+}
+function adminRemoverFotoTema() {
+  document.getElementById('atFotoUrl').value = '';
+  document.getElementById('atFotoArquivo').value = '';
+  document.getElementById('atFotoUploadStatus').textContent = 'Imagem própria removida; o fallback dos convites será usado.';
+  adminPreviewTemaFoto();
+}
+async function adminEnviarFotoTema() {
+  const input = document.getElementById('atFotoArquivo');
+  const botao = document.getElementById('btnUploadTemaFoto');
+  const status = document.getElementById('atFotoUploadStatus');
+  if (!input.files[0]) { showToast('Selecione uma imagem para o tema.','error'); return; }
+  botao.disabled = true;
+  try {
+    const url = await adminUploadImagemCloudinary(input.files[0], p => status.textContent = `Enviando imagem do tema... ${p}%`);
+    document.getElementById('atFotoUrl').value = url;
+    input.value = '';
+    status.textContent = 'Imagem enviada ✓';
+    adminPreviewTemaFoto();
+  } catch(e) { status.textContent = `Erro: ${e.message}`; showToast(e.message,'error'); }
+  finally { botao.disabled = false; }
 }
 async function adminSalvarTema() {
   const nome = document.getElementById('atNome').value.trim();
   if (!nome) { showToast('Preencha o nome do tema','error'); return; }
   const palavrasChave = document.getElementById('atPalavrasChave').value
     .split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+  const foto = document.getElementById('atFotoUrl').value.trim() || null;
   const estadoAnterior = JSON.parse(JSON.stringify(temasSite));
   if (_editandoTemaIdx !== null) {
     temasSite[_editandoTemaIdx].nome = nome;
     temasSite[_editandoTemaIdx].palavrasChave = palavrasChave;
+    temasSite[_editandoTemaIdx].foto = foto;
   } else {
-    temasSite.push({ id: 'tema_'+Date.now(), nome, palavrasChave, ativo:true });
+    temasSite.push({ id: 'tema_'+Date.now(), nome, palavrasChave, foto, ativo:true });
   }
   try { await salvarTemasRemote(); }
   catch (e) { temasSite = estadoAnterior; showToast('Não foi possível salvar o tema.', 'error'); return; }
   adminRenderTemas();
+  renderTemasLoja();
   renderCategorias();
   renderCatalogo();
   adminFecharModal('adminModalTema');
@@ -3664,7 +3782,7 @@ function adminRenderBanners() {
       <div class="admin-card-thumb">${b.foto ? `<img src="${b.foto}">` : '📣'}</div>
       <div class="admin-card-info">
         <div class="admin-card-nome">${b.titulo||'(sem título)'}</div>
-        <div class="admin-card-sub">${b.tipoDestino==='produto'?'→ produto':'→ '+ (b.destino||'—')}</div>
+        <div class="admin-card-sub">${b.tipoDestino==='produto'?'→ produto':b.tipoDestino==='pesquisa'?'⌕ '+(b.destino||'pesquisa sem termo'):'→ '+ (b.destino||'—')}</div>
         <div class="admin-card-actions">
           <button onclick="adminEditarBanner(${idx})">Editar</button>
           <button onclick="adminExcluirBanner(${idx})">Excluir</button>
@@ -3676,6 +3794,15 @@ function adminBannerDestinoChange() {
   const tipo = document.getElementById('abTipoDestino').value;
   const sel = document.getElementById('abDestino');
   const label = document.getElementById('abDestinoLabel');
+  const wrapPesquisa = document.getElementById('abPesquisaWrap');
+  const wrapSelect = document.getElementById('abDestinoSelectWrap');
+  wrapPesquisa.style.display = tipo === 'pesquisa' ? '' : 'none';
+  wrapSelect.style.display = tipo === 'pesquisa' ? 'none' : '';
+  if (tipo === 'pesquisa') {
+    label.textContent = 'Pesquisa';
+    sel.innerHTML = '';
+    return;
+  }
   if (tipo === 'categoria') {
     label.textContent = 'Categoria';
     const cats = [...new Set(produtos.map(p=>p.categoria).filter(Boolean))];
@@ -3705,7 +3832,7 @@ async function adminEnviarFotoBanner() {
   } catch(e) { status.textContent = `Erro: ${e.message}`; showToast(e.message,'error'); }
   finally { botao.disabled = false; }
 }
-function adminNovoBanner() { _editandoBannerIdx = null; document.getElementById('adminModalBannerTitle').textContent='Novo Banner'; ['abFotoUrl','abTag','abTitulo','abSubtitulo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('abFotoArquivo').value=''; document.getElementById('abFotoUploadStatus').textContent=''; adminPreviewBannerFoto(); document.getElementById('abTipoDestino').value='categoria'; adminBannerDestinoChange(); document.getElementById('adminModalBanner').classList.add('open'); }
+function adminNovoBanner() { _editandoBannerIdx = null; document.getElementById('adminModalBannerTitle').textContent='Novo Banner'; ['abFotoUrl','abTag','abTitulo','abSubtitulo','abDestinoPesquisa'].forEach(id=>document.getElementById(id).value=''); document.getElementById('abFotoArquivo').value=''; document.getElementById('abFotoUploadStatus').textContent=''; adminPreviewBannerFoto(); document.getElementById('abTipoDestino').value='categoria'; adminBannerDestinoChange(); document.getElementById('adminModalBanner').classList.add('open'); }
 function adminEditarBanner(idx) {
   _editandoBannerIdx = idx;
   const b = bannersSite[idx];
@@ -3718,20 +3845,24 @@ function adminEditarBanner(idx) {
   document.getElementById('abTitulo').value = b.titulo||'';
   document.getElementById('abSubtitulo').value = b.subtitulo||'';
   document.getElementById('abTipoDestino').value = b.tipoDestino||'categoria';
+  document.getElementById('abDestinoPesquisa').value = b.tipoDestino === 'pesquisa' ? (b.destino||'') : '';
   adminBannerDestinoChange();
-  document.getElementById('abDestino').value = b.destino||'';
+  if (b.tipoDestino !== 'pesquisa') document.getElementById('abDestino').value = b.destino||'';
   document.getElementById('adminModalBanner').classList.add('open');
 }
 async function adminSalvarBanner() {
   const titulo = document.getElementById('abTitulo').value.trim();
   if (!titulo) { showToast('Preencha o título','error'); return; }
   const id = _editandoBannerIdx !== null ? bannersSite[_editandoBannerIdx].id : 'bn_'+Date.now();
+  const tipoDestino = document.getElementById('abTipoDestino').value;
+  const destino = tipoDestino === 'pesquisa' ? document.getElementById('abDestinoPesquisa').value.trim() : document.getElementById('abDestino').value;
+  if (tipoDestino === 'pesquisa' && !destino) { showToast('Informe o termo da pesquisa.','error'); return; }
   const data = {
     id, foto: document.getElementById('abFotoUrl').value.trim()||null,
     tag: document.getElementById('abTag').value.trim(),
     titulo, subtitulo: document.getElementById('abSubtitulo').value.trim(),
-    tipoDestino: document.getElementById('abTipoDestino').value,
-    destino: document.getElementById('abDestino').value,
+    tipoDestino,
+    destino,
   };
   if (_editandoBannerIdx !== null) bannersSite[_editandoBannerIdx] = data;
   else bannersSite.push(data);
@@ -3746,6 +3877,45 @@ async function adminExcluirBanner(idx) {
   await salvarBannersRemote();
   adminRenderBanners();
   showToast('Banner excluído','error');
+}
+
+function renderBannersPublicos() {
+  const carrossel = document.getElementById('bannerCarrossel');
+  if (!carrossel || !bannersSite.length) return; // mantém os banners padrão antigos se não houver cadastro
+  carrossel.innerHTML = bannersSite.map((b, idx) => `
+    <div class="banner-slide personalizado ${idx===0?'active':''}" data-banner-index="${idx}" role="button" tabindex="0" aria-label="${escaparHTMLCatalogo(b.titulo || 'Ver oferta')}" ${b.foto ? `style="background-image:url('${escaparHTMLCatalogo(b.foto).replace(/'/g,'%27')}')"` : ''}>
+      <div class="banner-slide-text">
+        ${b.tag ? `<span class="banner-slide-tag">${escaparHTMLCatalogo(b.tag)}</span>` : ''}
+        <h2>${escaparHTMLCatalogo(b.titulo || '')}</h2>
+        ${b.subtitulo ? `<p>${escaparHTMLCatalogo(b.subtitulo)}</p>` : ''}
+      </div>
+      ${b.foto ? '' : '<div class="banner-slide-emoji">🎈</div>'}
+    </div>`).join('') + '<div class="banner-dots" id="bannerDots"></div>';
+  carrossel.querySelectorAll('.banner-slide').forEach(slide => {
+    const ativar = () => abrirDestinoBanner(bannersSite[Number(slide.dataset.bannerIndex)]);
+    slide.addEventListener('click', ativar);
+    slide.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ativar(); } });
+  });
+  initBannerCarrossel();
+}
+
+function abrirDestinoBanner(banner) {
+  if (!banner) return;
+  if (banner.tipoDestino === 'pesquisa') {
+    const input = document.getElementById('searchInput');
+    if (input) input.value = banner.destino || '';
+    aplicarBuscaCatalogo();
+    return;
+  }
+  if (banner.tipoDestino === 'produto') { abrirProduto(banner.destino); return; }
+  if (banner.tipoDestino === 'categoria') {
+    categoriaAtiva = banner.destino || 'todas';
+    renderCategorias();
+    renderCatalogo();
+    document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior:'smooth', block:'start' });
+    return;
+  }
+  if (banner.destino) window.location.href = banner.destino;
 }
 
 checarAcessoAdmin();
