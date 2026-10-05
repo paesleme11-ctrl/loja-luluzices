@@ -562,6 +562,9 @@
   .oferta-global-card .orderbump-thumb { width:64px; height:64px; }
   .adicionais-globais-titulo { font-size:14px; font-weight:700; margin:8px 0 10px; }
   .adicionais-globais-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .adicionais-globais-grid[data-count="1"] { grid-template-columns:minmax(0,min(100%,190px)); justify-content:center; }
+  .adicionais-globais-grid[data-count="2"] { grid-template-columns:repeat(2,minmax(0,1fr)); width:min(100%,390px); margin-inline:auto; }
+  .adicionais-globais-grid:not([data-count="1"]):not([data-count="2"]):not([data-count="3"]) { grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr)); }
   .adicional-global-card { position:relative; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; cursor:pointer; background:#fff; }
   .adicional-global-card.selecionado { border-color:var(--rose); box-shadow:0 0 0 2px var(--rose-light); }
   .adicional-global-card { text-align:left; font:inherit; padding:0; }
@@ -1052,8 +1055,122 @@ function produtoEhAdicional(p) {
   return adicionaisGlobais.includes(p.id) || ofertaCrossSellGlobal.produtoId === p.id;
 }
 
+function textoChaveCatalogo(valor) {
+  return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+const PREFIXOS_MODELOS_CATALOGO = {
+  'interativo-tradicional':['Interativo Tradicional','Convite Interativo Tradicional'],
+  'interativo-animado':['Interativo Animado','Convite Interativo Animado'],
+  'infinito':['Infinito','Convite Infinito'],
+  'cinematografico':['Cinematográfico','Cinematografico','Convite Cinematográfico','Convite Cinematografico'],
+  'em-video':['Em Vídeo','Em Video','Convite em Vídeo','Convite em Video'],
+};
+
+function modeloDoProduto(produto) {
+  if (!produto) return null;
+  const indicado = produto.modeloId || produto.modelo;
+  if (indicado) {
+    const porId = modelosSite.find(m => m.id === indicado);
+    if (porId) return porId;
+    const porNome = modelosSite.find(m => [m.nome, ...(m.aliases || []), ...(PREFIXOS_MODELOS_CATALOGO[m.id] || [])].some(n => textoChaveCatalogo(n) === textoChaveCatalogo(indicado)));
+    if (porNome) return porNome;
+  }
+  const nome = textoChaveCatalogo(produto.nome);
+  return modelosSite.find(m => [m.nome, ...(m.aliases || []), ...(PREFIXOS_MODELOS_CATALOGO[m.id] || [])].some(prefixo => {
+    const modelo = textoChaveCatalogo(prefixo);
+    return nome === modelo || nome.startsWith(modelo + ' -') || nome.startsWith(modelo + ' –') || nome.startsWith(modelo + ' —');
+  })) || null;
+}
+
+function temaDoProduto(produto) {
+  if (!produto) return null;
+  if (produto.temaId) {
+    const porId = temasSite.find(t => t.id === produto.temaId);
+    if (porId) return porId;
+  }
+  const nome = textoChaveCatalogo(produto.temaNome);
+  if (nome) {
+    const encontrados = temasSite.filter(t => textoChaveCatalogo(t.nome) === nome);
+    return encontrados.length === 1 ? encontrados[0] : null;
+  }
+  const modelo = modeloDoProduto(produto);
+  if (modelo) {
+    const nomeProduto = textoChaveCatalogo(produto.nome);
+    const prefixos = [modelo.nome, ...(modelo.aliases || []), ...(PREFIXOS_MODELOS_CATALOGO[modelo.id] || [])]
+      .map(textoChaveCatalogo).flatMap(prefixo => [prefixo, `convite ${prefixo}`]);
+    for (const prefixo of prefixos) {
+      if (!nomeProduto.startsWith(prefixo)) continue;
+      const sufixo = nomeProduto.slice(prefixo.length).match(/^\s*[-–—:]\s*(.+)$/)?.[1]?.trim();
+      if (!sufixo) continue;
+      const encontrados = temasSite.filter(t => textoChaveCatalogo(t.nome) === sufixo);
+      if (encontrados.length === 1) return encontrados[0];
+    }
+  }
+  return null;
+}
+
+function produtoComModelo(produto) {
+  const modelo = modeloDoProduto(produto);
+  if (!modelo) return produto;
+  const tema = temaDoProduto(produto);
+  const precoBase = Number(modelo.preco) || 0;
+  const resolvido = {
+    ...produto,
+    modeloId: modelo.id,
+    modelo: modelo.nome,
+    preco: precoBase,
+    sobConsulta: false,
+    descricao: modelo.descricao || produto.descricao || '',
+  };
+  if (tema) {
+    resolvido.temaId = tema.id;
+    resolvido.temaNome = tema.nome;
+    resolvido.nome = `${modelo.nome} - ${tema.nome}`;
+  } else if (produto.temaNome) {
+    resolvido.nome = `${modelo.nome} - ${produto.temaNome}`;
+  }
+  if (!modelo.promoConflito && modelo.promoConfigurada) {
+    const precoPromocional = Number(modelo.promoPreco) || 0;
+    resolvido.promoAtiva = !!modelo.promoAtiva && precoPromocional > 0 && precoPromocional < precoBase;
+    resolvido.promoTipo = 'fixo';
+    resolvido.promoValor = resolvido.promoAtiva ? Math.max(0, precoBase - precoPromocional) : 0;
+  }
+  return resolvido;
+}
+
+function precoPromocionalProduto(produto) {
+  if (!produto || !produto.promoAtiva || !(Number(produto.promoValor) > 0) || produto.sobConsulta) return Number(produto?.preco) || 0;
+  return produto.promoTipo === 'percentual'
+    ? Math.max(0, Number(produto.preco) * (1 - Number(produto.promoValor) / 100))
+    : Math.max(Number(produto.preco) - Number(produto.promoValor), 0);
+}
+
+function temaAtivoDoProduto(produto) {
+  const tema = temaDoProduto(produto);
+  if (tema) return tema.ativo !== false;
+  let nomeTema = textoChaveCatalogo(produto?.temaNome);
+  if (!nomeTema && produto) {
+    const modelo = modeloDoProduto(produto);
+    const nomeProduto = textoChaveCatalogo(produto.nome);
+    if (modelo) {
+      const prefixos = [modelo.nome, ...(modelo.aliases || []), ...(PREFIXOS_MODELOS_CATALOGO[modelo.id] || [])]
+        .map(textoChaveCatalogo).flatMap(prefixo => [prefixo, `convite ${prefixo}`]);
+      for (const prefixo of prefixos) {
+        if (!nomeProduto.startsWith(prefixo)) continue;
+        nomeTema = nomeProduto.slice(prefixo.length).match(/^\s*[-–—:]\s*(.+)$/)?.[1]?.trim() || '';
+        if (nomeTema) break;
+      }
+    }
+  }
+  const encontrados = nomeTema ? temasSite.filter(t => textoChaveCatalogo(t.nome) === nomeTema) : [];
+  return !encontrados.some(t => t.ativo === false);
+}
+
 function getProdutosCatalogo() {
-  return produtos.filter(p => !produtoEhAdicional(p));
+  return produtos
+    .map(produtoComModelo)
+    .filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco) > 0 || p.sobConsulta) && temaAtivoDoProduto(p));
 }
 
 /** URL pública que abre diretamente os detalhes do produto escolhido. */
@@ -1081,6 +1198,17 @@ let produtoPendenteOfertas = null;
 let adicionaisGlobaisSelecionados = new Set();
 let adicionalGlobalEmDetalhe = null;
 let tipoDetalheOferta = 'extra';
+let temasSite = [];
+let modelosSite = [
+  { id:'interativo-tradicional', nome:'Interativo Tradicional', preco:30, descricao:'Convite digital com as informações do evento e links interativos para os convidados.', promoAtiva:false, promoPreco:0, promoConfigurada:false },
+  { id:'interativo-animado', nome:'Interativo Animado', preco:40, descricao:'Convite digital com elementos animados, informações do evento e links interativos.', promoAtiva:false, promoPreco:0, promoConfigurada:false },
+  { id:'infinito', nome:'Infinito', preco:50, descricao:'Convite digital personalizado com as informações e links do evento.', promoAtiva:false, promoPreco:0, promoConfigurada:false },
+  { id:'cinematografico', nome:'Cinematográfico', preco:70, descricao:'Convite digital em vídeo com composição visual cinematográfica e informações do evento.', promoAtiva:false, promoPreco:0, promoConfigurada:false },
+  { id:'em-video', nome:'Em Vídeo', preco:70, descricao:'Convite digital em vídeo com as informações personalizadas do evento.', promoAtiva:false, promoPreco:0, promoConfigurada:false },
+];
+let modelosSiteSalvos = false;
+let conflitoPromocoesModelos = [];
+let migracaoNormalizacaoAtual = null;
 
 async function salvarProdutosSite() {
   return db.collection('config').doc('produtosSite').set({
@@ -1088,6 +1216,59 @@ async function salvarProdutosSite() {
     crossSellGlobal: ofertaCrossSellGlobal,
     adicionaisGlobais: adicionaisGlobais,
   });
+}
+
+async function carregarTemas() {
+  try {
+    const doc = await db.collection('config').doc('temasSite').get();
+    temasSite = doc.exists ? JSON.parse(doc.data().data || '[]') : [];
+  } catch (e) { temasSite = []; }
+}
+
+async function salvarTemasRemote() {
+  await db.collection('config').doc('temasSite').set({ data: JSON.stringify(temasSite) }, { merge:true });
+}
+
+function inferirPromocaoDosProdutos(lista) {
+  conflitoPromocoesModelos = [];
+  modelosSite = modelosSite.map(modelo => {
+    const vinculados = lista.filter(p => modeloDoProduto(p)?.id === modelo.id);
+    if (!vinculados.length) return { ...modelo, promoConfigurada:true, promoConflito:false };
+    const assinatura = p => `${!!p.promoAtiva}|${p.promoTipo || 'percentual'}|${Number(p.promoValor) || 0}`;
+    const regras = [...new Set(vinculados.map(assinatura))];
+    if (regras.length > 1) {
+      conflitoPromocoesModelos.push({ modelo:modelo.nome, produtos:vinculados.map(p => p.nome) });
+      return { ...modelo, promoConfigurada:false, promoConflito:true };
+    }
+    const exemplo = vinculados[0];
+    const ativa = !!exemplo.promoAtiva && Number(exemplo.promoValor) > 0;
+    const promoPreco = !ativa ? 0 : exemplo.promoTipo === 'percentual'
+      ? Number(modelo.preco) * (1 - Number(exemplo.promoValor) / 100)
+      : Number(modelo.preco) - Number(exemplo.promoValor);
+    if (ativa && (!Number.isFinite(promoPreco) || promoPreco <= 0 || promoPreco >= Number(modelo.preco))) {
+      conflitoPromocoesModelos.push({ modelo:modelo.nome, produtos:vinculados.map(p => p.nome) });
+      return { ...modelo, promoConfigurada:false, promoConflito:true };
+    }
+    return { ...modelo, promoAtiva:ativa, promoPreco:ativa ? Math.round(promoPreco * 100) / 100 : 0, promoConfigurada:true, promoConflito:false };
+  });
+}
+
+async function carregarModelos(lista = produtos) {
+  try {
+    const doc = await db.collection('config').doc('modelosSite').get();
+    if (doc.exists) {
+      const salvos = JSON.parse(doc.data().data || '[]');
+      modelosSite = modelosSite.map(base => ({ ...base, ...(salvos.find(m => m.id === base.id) || {}) }));
+      modelosSiteSalvos = true;
+      conflitoPromocoesModelos = modelosSite.filter(m => m.promoConflito).map(m => ({ modelo:m.nome, produtos:[] }));
+    } else {
+      modelosSiteSalvos = false;
+      inferirPromocaoDosProdutos(lista);
+    }
+  } catch (e) {
+    console.warn('Não foi possível carregar as configurações dos modelos:', e);
+    inferirPromocaoDosProdutos(lista);
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1112,17 +1293,19 @@ function vendasFakePara(id) {
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
 async function carregarProdutos() {
   try {
+    await carregarTemas();
     const doc = await db.collection('config').doc('produtosSite').get();
-    if (!doc.exists) { produtos = []; renderCatalogo(); return; }
+    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderCatalogo(); return; }
     const configProdutos = doc.data() || {};
     const lista = JSON.parse(configProdutos.data || '[]');
     ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
     adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0, 3) : [];
-    // Só produtos ativos e com preço definido (ou sob consulta) aparecem no site público
-    produtos = lista.filter(p => (p.preco > 0 || p.sobConsulta) && p.ativo !== false).map(p => ({
+    // Mantém todos os registros no admin; visibilidade pública é decidida no filtro do catálogo.
+    produtos = lista.map(p => ({
       ...p,
       categoria: p.categoria || inferirCategoria(p.nome),
     }));
+    await carregarModelos(produtos);
     renderCategorias();
     renderCatalogo();
     const produtoDireto = new URLSearchParams(window.location.search).get('produto');
@@ -1535,7 +1718,9 @@ function fecharZoomMidiaProduto() {
 }
 
 function abrirProduto(id) {
-  const p = produtos.find(x => x.id === id);
+  const original = produtos.find(x => x.id === id);
+  if (!original || original.ativo === false || !(Number(original.preco) > 0 || original.sobConsulta) || !temaAtivoDoProduto(original)) return;
+  const p = produtoComModelo(original);
   if (!p) return;
   produtoAtual = p;
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
@@ -1602,7 +1787,7 @@ function abrirProduto(id) {
           return `<div class="crosssell-item" onclick="abrirProduto('${cp.id}')">
             <div class="crosssell-thumb">${cpFoto ? `<img src="${cpFoto}">` : emojiPara(cp.categoria)}</div>
             <div class="crosssell-nome">${cp.nome}</div>
-            <div class="crosssell-preco">${cp.sobConsulta ? 'Sob consulta' : BRL(cp.preco)}</div>
+            <div class="crosssell-preco">${cp.sobConsulta ? 'Sob consulta' : BRL(precoPromocionalProduto(cp))}</div>
           </div>`;
         }).join('')}
       </div>
@@ -1660,9 +1845,10 @@ function configurarGestoVoltarProduto() {
 
 // ── Carrinho ───────────────────────────────────────────────────────────────
 function adicionarAoCarrinho(id) {
-  const p = produtos.find(x => x.id === id);
+  const raw = produtos.find(x => x.id === id);
+  const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
-  carrinho.push({ id: p.id, nome: p.nome, preco: p.preco, categoria: p.categoria, adicionais: [] });
+  carrinho.push({ id: p.id, nome: p.nome, preco: precoPromocionalProduto(p), precoBase:p.preco, categoria: p.categoria, adicionais: [] });
   atualizarCarrinhoUI();
   showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
   abrirOfertasParaItem(carrinho[carrinho.length - 1]);
@@ -1679,7 +1865,7 @@ function toggleAdicional(id, preco, nome) {
 function atualizarPrecoTotalProduto() {
   if (!produtoAtual) return;
   const totalAdicionais = adicionaisSelecionados.reduce((s, a) => s + a.preco, 0);
-  const total = produtoAtual.preco + totalAdicionais;
+  const total = precoPromocionalProduto(produtoAtual) + totalAdicionais;
   const precoEl = document.getElementById('produtoDetalhePrecoTotal');
   const btnEl = document.getElementById('btnAdicionarCarrinho');
   if (precoEl) precoEl.textContent = BRL(total);
@@ -1688,12 +1874,13 @@ function atualizarPrecoTotalProduto() {
 
 /** Adiciona ao carrinho considerando os adicionais marcados na página do produto */
 function adicionarAoCarrinhoComAdicionais(id) {
-  const p = produtos.find(x => x.id === id);
+  const raw = produtos.find(x => x.id === id);
+  const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
   carrinho.push({
     id: p.id,
     nome: p.nome,
-    preco: p.preco,
+    preco: precoPromocionalProduto(p),
     precoBase: p.preco,
     categoria: p.categoria,
     foto: (p.fotos && p.fotos[0]) || p.foto || null,
@@ -1708,7 +1895,8 @@ function adicionarAoCarrinhoComAdicionais(id) {
 function calcularPrecoCrossSellGlobal(p) {
   if (!p) return 0;
   const valor = Number(ofertaCrossSellGlobal.descontoValor) || 0;
-  const final = ofertaCrossSellGlobal.descontoTipo === 'percentual' ? p.preco * (1 - valor / 100) : p.preco - valor;
+  const precoAplicado = precoPromocionalProduto(p);
+  const final = ofertaCrossSellGlobal.descontoTipo === 'percentual' ? precoAplicado * (1 - valor / 100) : precoAplicado - valor;
   return Math.max(0, final);
 }
 
@@ -1722,17 +1910,18 @@ function abrirOfertasParaItem(item) {
 function renderOfertasGlobais() {
   const body = document.getElementById('ofertasBody');
   const idsNoCarrinho = new Set(carrinho.map(i => i.id));
-  const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).slice(0, 3);
+  const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && p.ativo !== false && temaAtivoDoProduto(p) && (Number(p.preco) > 0 || p.sobConsulta) && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).map(produtoComModelo).slice(0, 3);
   let html = '';
   if (extras.length) {
-    html += `<div class="adicionais-globais-titulo">Quer incluir mais algum serviço? <span style="font-weight:400;color:var(--ink-muted)">Escolha até 3</span></div><div class="adicionais-globais-grid">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; const incluido=adicionaisGlobaisSelecionados.has(p.id); return `<button type="button" class="adicional-global-card ${incluido?'selecionado':''}" id="adicionalGlobalCard_${p.id}" onclick="abrirDetalheAdicionalGlobal('${p.id}')"><span class="adicional-global-status">${incluido?'Incluído':'Ver detalhes'}</span><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${BRL(p.preco)}</div></div></button>`; }).join('')}</div>`;
+    html += `<div class="adicionais-globais-titulo">Quer incluir mais algum serviço?</div><div class="adicionais-globais-grid" data-count="${extras.length}">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; const incluido=adicionaisGlobaisSelecionados.has(p.id); const precoAtual=precoPromocionalProduto(p); return `<button type="button" class="adicional-global-card ${incluido?'selecionado':''}" id="adicionalGlobalCard_${p.id}" onclick="abrirDetalheAdicionalGlobal('${p.id}')"><span class="adicional-global-status">${incluido?'Incluído':'Ver detalhes'}</span><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${precoAtual < p.preco ? `<span style="text-decoration:line-through;color:var(--ink-muted);font-weight:400;">${BRL(p.preco)}</span> ` : ''}${BRL(precoAtual)}</div></div></button>`; }).join('')}</div>`;
   }
   if (!html) html = '<p style="text-align:center;color:var(--ink-muted);padding:18px 0">Seu produto já está no carrinho. Você pode continuar.</p>';
   body.innerHTML = html;
 }
 
 function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
-  const p = produtos.find(item => item.id === id);
+  const raw = produtos.find(item => item.id === id);
+  const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
   adicionalGlobalEmDetalhe = p;
   tipoDetalheOferta = tipo;
@@ -1741,7 +1930,7 @@ function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   const jaIncluido = tipo === 'extra' && adicionaisGlobaisSelecionados.has(id);
   const textoRecusar = tipo === 'crossSell' ? 'Voltar ao carrinho' : (jaIncluido ? 'Remover dos extras' : 'Recusar');
   const textoIncluir = tipo === 'crossSell' ? 'Adicionar oferta' : (jaIncluido ? 'Manter no pedido' : 'Incluir no carrinho');
-  const preco = tipo === 'crossSell' ? `<span class="orderbump-preco-antigo" style="font-size:14px;margin-right:6px">${BRL(p.preco)}</span>${BRL(calcularPrecoCrossSellGlobal(p))}` : BRL(p.preco);
+  const preco = tipo === 'crossSell' ? `<span class="orderbump-preco-antigo" style="font-size:14px;margin-right:6px">${BRL(p.preco)}</span>${BRL(calcularPrecoCrossSellGlobal(p))}` : BRL(precoPromocionalProduto(p));
   document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${preco}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${textoRecusar}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${textoIncluir}</button></div></div>`;
   document.getElementById('extraDetalheOverlay').classList.add('open');
 }
@@ -1757,7 +1946,7 @@ function fecharDetalheAdicional(incluir) {
     } else if (adicionaisGlobaisSelecionados.size < 3) {
       adicionaisGlobaisSelecionados.add(id);
     } else {
-      showToast('Você pode escolher até 3 serviços extras.', 'error');
+      showToast('Não foi possível incluir outro serviço adicional.', 'error');
     }
   } else if (tipo === 'extra' && id && adicionaisGlobaisSelecionados.has(id)) {
     adicionaisGlobaisSelecionados.delete(id);
@@ -1771,8 +1960,9 @@ function fecharDetalheAdicional(incluir) {
 function confirmarOfertas() {
   const nomeProdutoAdicionado = produtoPendenteOfertas?.nome || 'Produto';
   for (const id of adicionaisGlobaisSelecionados) {
-    const p = produtos.find(x => x.id === id);
-    if (p && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:p.preco, categoria:p.categoria, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
+    const raw = produtos.find(x => x.id === id);
+    const p = raw ? produtoComModelo(raw) : null;
+    if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
   }
   fecharOfertas();
   atualizarCarrinhoUI();
@@ -1795,8 +1985,9 @@ function removerDoCarrinho(idx) {
 /** Retorna o cross-sell global enquanto o produto ainda não estiver no carrinho. */
 function getOrderBumpDisponivel() {
   if (!carrinho.length || !ofertaCrossSellGlobal.produtoId) return null;
-  const bump = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
-  if (!bump || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
+  const raw = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
+  const bump = raw ? produtoComModelo(raw) : null;
+  if (!bump || bump.ativo === false || !temaAtivoDoProduto(raw) || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
   return { bump };
 }
 
@@ -1826,7 +2017,8 @@ function renderOrderBumpNoCarrinho() {
 
 function aceitarOrderBump(bumpId) {
   const disponivel = getOrderBumpDisponivel();
-  const bump = produtos.find(p => p.id === bumpId);
+  const raw = produtos.find(p => p.id === bumpId);
+  const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || !disponivel) return;
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
   carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, adicionais: [], _viaOrderBump: true });
@@ -2099,7 +2291,6 @@ async function carregarCorPersonalizada() {
 // ── Init ─────────────────────────────────────────────────────────────────────
 carregarCorPersonalizada();
 carregarProdutos();
-carregarTemas(); // necessário para a busca por palavras-chave considerar os temas
 initBannerCarrossel();
 atualizarCarrinhoUI();
 
@@ -2127,6 +2318,7 @@ document.addEventListener('keydown', (e) => {
 
     <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;border-bottom:1.5px solid #ecddd6;">
       <div class="admin-tab active" data-atab="produtos" onclick="adminGoTab('produtos')">🛍️ Produtos</div>
+      <div class="admin-tab" data-atab="modelos" onclick="adminGoTab('modelos')">🎞️ Modelos</div>
       <div class="admin-tab" data-atab="temas" onclick="adminGoTab('temas')">🎨 Temas</div>
       <div class="admin-tab" data-atab="banners" onclick="adminGoTab('banners')">📣 Banners</div>
       <div class="admin-tab" data-atab="cores" onclick="adminGoTab('cores')">🌈 Cores</div>
@@ -2167,6 +2359,23 @@ document.addEventListener('keydown', (e) => {
       <div id="adminProdutosGrid" class="admin-grid"></div>
     </div>
 
+    <div class="admin-subpage" id="atab-modelos">
+      <div style="max-width:760px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;margin-bottom:16px;">
+        <h3 style="font-size:18px;margin-bottom:6px;">Configuração central dos modelos</h3>
+        <p style="font-size:12.5px;color:#9a8890;margin-bottom:16px;">Preço, descrição e promoção definidos aqui são aplicados a todos os produtos vinculados ao modelo. As descrições iniciais são provisórias e editáveis.</p>
+        <div id="adminModelosLista"></div>
+        <button class="admin-btn-primary" onclick="adminSalvarModelos()">Salvar modelos</button>
+        <div id="adminModelosAviso" style="font-size:12px;color:#9a6a00;margin-top:12px;"></div>
+      </div>
+      <div style="max-width:760px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;">
+        <h3 style="font-size:17px;margin-bottom:6px;">Normalização dos produtos existentes</h3>
+        <p style="font-size:12.5px;color:#9a8890;margin-bottom:12px;">A prévia separa produtos identificados com segurança dos que precisam de revisão. A aplicação baixa uma cópia de segurança antes de gravar.</p>
+        <button class="admin-btn-ghost" onclick="adminPreverNormalizacao()">Gerar prévia</button>
+        <button class="admin-btn-primary" id="btnAplicarNormalizacao" onclick="adminAplicarNormalizacao()" disabled>Aplicar itens seguros</button>
+        <div id="adminNormalizacaoResumo" style="font-size:12px;margin-top:12px;white-space:pre-line;"></div>
+      </div>
+    </div>
+
     <div class="admin-subpage" id="atab-ofertas">
       <div style="max-width:680px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;">
         <h3 style="font-size:18px;margin-bottom:6px;">Ofertas exibidas ao adicionar ao carrinho</h3>
@@ -2179,9 +2388,9 @@ document.addEventListener('keydown', (e) => {
           <div class="admin-field"><label>Desconto</label><input type="number" id="aCrossSellGlobalValor" min="0" step="0.01" placeholder="Ex.: 10"></div>
         </div>
         <div class="admin-field"><label>Texto da oferta</label><input type="text" id="aCrossSellGlobalTexto" placeholder="Ex.: Aproveite esta oferta especial"></div>
-        <div class="admin-field"><label>Produtos adicionais (até 3)</label>
+        <div class="admin-field"><label>Produtos adicionais</label>
           <select id="aAdicionaisGlobais" multiple style="min-height:120px;"></select>
-          <small style="color:#9a8890;">Segure Ctrl (ou ⌘ no Mac) para selecionar mais de um. O cliente poderá escolher os produtos que quiser.</small>
+          <small style="color:#9a8890;">Segure Ctrl (ou ⌘ no Mac) para selecionar mais de um. Os itens selecionados serão apresentados ao cliente.</small>
         </div>
         <button class="admin-btn-primary" onclick="adminSalvarOfertasGlobais()">Salvar ofertas globais</button>
       </div>
@@ -2272,14 +2481,15 @@ document.addEventListener('keydown', (e) => {
           </select>
         </div>
       </div>
+      <div class="admin-field"><label>Modelo de convite</label><select id="aModelo" onchange="adminAtualizarCamposModelo()"><option value="">Produto sem modelo central</option></select></div>
       <div class="admin-field"><label>Nome do produto</label><input type="text" id="aNome" placeholder="Ex: Convite Interativo Animado"></div>
 
-      <div class="admin-check-row">
+      <div class="admin-check-row" id="aSobConsultaRow">
         <label><input type="checkbox" id="aSobConsulta" onchange="adminToggleSobConsulta()"> Sem preço fixo (sob consulta via WhatsApp)</label>
       </div>
       <div class="admin-field" id="aPrecoGroup"><label>Preço (R$)</label><input type="number" id="aPreco" step="0.01" min="0"></div>
 
-      <div class="admin-check-row">
+      <div class="admin-check-row" id="aPromoCheckRow">
         <label><input type="checkbox" id="aPromoAtiva" onchange="adminTogglePromo()"> Produto em promoção</label>
       </div>
       <div class="admin-row2" id="aPromoFields" style="display:none;">
@@ -2422,7 +2632,6 @@ document.addEventListener('keydown', (e) => {
 // ============================================================
 const ADMIN_URL_KEY = 'luluzices2026admin';
 
-let temasSite = [];
 let bannersSite = [];
 let _fotosGaleriaAdmin = [];
 let _editandoProdutoIdx = null;
@@ -2480,17 +2689,171 @@ function adminGoTab(tab) {
 function adminFecharModal(id) { document.getElementById(id).classList.remove('open'); }
 
 async function adminCarregarTudo() {
-  await Promise.all([carregarProdutos(), carregarTemas(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
+  await Promise.all([carregarProdutos(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
   adminCarregarOfertasGlobais();
   adminRenderProdutos();
   adminRenderTemas();
+  adminRenderModelos();
   adminRenderBanners();
+}
+
+function escaparHTMLCatalogo(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function adminPopularSelecaoModelo() {
+  const select = document.getElementById('aModelo');
+  if (!select) return;
+  const valorAtual = select.value;
+  select.innerHTML = '<option value="">Produto sem modelo central</option>' + modelosSite.map(m => `<option value="${m.id}">${escaparHTMLCatalogo(m.nome)}</option>`).join('');
+  if (modelosSite.some(m => m.id === valorAtual)) select.value = valorAtual;
+}
+
+function adminRenderModelos() {
+  const root = document.getElementById('adminModelosLista');
+  if (!root) return;
+  root.innerHTML = modelosSite.map(m => `
+    <section style="padding:14px 0;border-top:1px solid #ecddd6;">
+      <div class="admin-field"><label>Nome do modelo</label><input type="text" id="modeloNome_${m.id}" value="${escaparHTMLCatalogo(m.nome)}"></div>
+      <div class="admin-row2">
+        <div class="admin-field"><label>Preço padrão (R$)</label><input type="number" min="0.01" step="0.01" id="modeloPreco_${m.id}" value="${Number(m.preco)||0}"></div>
+        <div class="admin-field"><label>Preço promocional (R$)</label><input type="number" min="0" step="0.01" id="modeloPromoPreco_${m.id}" value="${Number(m.promoPreco)||0}" ${m.promoAtiva?'':'disabled'}></div>
+      </div>
+      <div class="admin-check-row"><label><input type="checkbox" id="modeloPromoAtiva_${m.id}" ${m.promoAtiva?'checked':''} onchange="this.dataset.revisada='true';document.getElementById('modeloPromoPreco_${m.id}').disabled=!this.checked"> Promoção ativa para este modelo</label></div>
+      <div class="admin-field"><label>Descrição padrão</label><textarea rows="3" id="modeloDescricao_${m.id}">${escaparHTMLCatalogo(m.descricao)}</textarea></div>
+      ${m.promoConflito ? '<small style="color:#a36500;">Os produtos existentes deste modelo têm promoções diferentes. A regra antiga será mantida até você salvar uma regra única aqui.</small>' : ''}
+    </section>`).join('');
+  const aviso = document.getElementById('adminModelosAviso');
+  if (aviso) {
+    aviso.textContent = conflitoPromocoesModelos.length
+      ? `Revisão necessária: ${conflitoPromocoesModelos.map(m => `${m.modelo} (${m.produtos.length || 'vários'} produto(s))`).join('; ')} têm regras promocionais divergentes. Configure e salve uma regra única para centralizar.`
+      : 'As descrições provisórias podem ser revisadas nesta tela. Os preços iniciais seguem a tabela definida.';
+  }
+  adminPopularSelecaoModelo();
+}
+
+async function adminSalvarModelos() {
+  const atualizados = modelosSite.map(m => {
+    const nome = document.getElementById(`modeloNome_${m.id}`)?.value.trim() || '';
+    const preco = Number(document.getElementById(`modeloPreco_${m.id}`)?.value);
+    const promoAtiva = !!document.getElementById(`modeloPromoAtiva_${m.id}`)?.checked;
+    const promoPreco = Number(document.getElementById(`modeloPromoPreco_${m.id}`)?.value) || 0;
+    const descricao = document.getElementById(`modeloDescricao_${m.id}`)?.value.trim() || '';
+    const aliases = [...new Set([...(m.aliases || []), m.nome].filter(alias => textoChaveCatalogo(alias) !== textoChaveCatalogo(nome)))];
+    return { ...m, nome, aliases, preco, promoAtiva, promoPreco, descricao, promoConfigurada:true, promoConflito:false };
+  });
+  const nomesUnicos = new Set(atualizados.map(m => textoChaveCatalogo(m.nome)));
+  if (atualizados.some(m => !m.nome) || nomesUnicos.size !== atualizados.length) { showToast('Informe nomes diferentes para todos os modelos.', 'error'); return; }
+  const conflitoNaoRevisado = modelosSite.find(m => m.promoConflito && document.getElementById(`modeloPromoAtiva_${m.id}`)?.dataset.revisada !== 'true');
+  if (conflitoNaoRevisado) { showToast(`Defina explicitamente a regra de promoção de ${conflitoNaoRevisado.nome} antes de salvar.`, 'error'); return; }
+  const invalido = atualizados.find(m => !Number.isFinite(m.preco) || m.preco <= 0 || !m.descricao || (m.promoAtiva && (m.promoPreco <= 0 || m.promoPreco >= m.preco)));
+  if (invalido) { showToast(`Revise preço, descrição e promoção de ${invalido.nome}.`, 'error'); return; }
+  try {
+    await db.collection('config').doc('modelosSite').set({ data:JSON.stringify(atualizados) }, { merge:true });
+    modelosSite = atualizados;
+    modelosSiteSalvos = true;
+    conflitoPromocoesModelos = [];
+    adminRenderModelos();
+    adminRenderProdutos();
+    renderCategorias();
+    renderCatalogo();
+    showToast('Configurações dos modelos salvas ✓', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast('Não foi possível salvar os modelos.', 'error');
+  }
+}
+
+function adminPreverNormalizacao() {
+  const seguros = [];
+  const pendentes = [];
+  produtos.forEach((produto, index) => {
+    const modelo = modeloDoProduto(produto);
+    if (!modelo) { pendentes.push({ produto, motivo:'modelo não identificado pelo nome/cadastro' }); return; }
+    let tema = temaDoProduto(produto);
+    if (!tema) {
+      const nome = String(produto.nome || '').trim();
+      const escapedModel = modelo.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sufixo = nome.replace(new RegExp(`^(?:Convite\\s+)?${escapedModel}\\s*[-–—:]\\s*`, 'i'), '').trim();
+      const matches = temasSite.filter(t => textoChaveCatalogo(t.nome) === textoChaveCatalogo(sufixo || produto.temaNome));
+      if (matches.length === 1) tema = matches[0];
+      else if (matches.length > 1) { pendentes.push({ produto, motivo:'mais de um tema tem o mesmo nome' }); return; }
+    }
+    if (!tema) { pendentes.push({ produto, motivo:'tema não identificado com segurança' }); return; }
+    if (produto.sobConsulta) { pendentes.push({ produto, motivo:'produto está marcado como sob consulta' }); return; }
+    seguros.push({ index, modeloId:modelo.id, temaId:tema.id });
+  });
+  migracaoNormalizacaoAtual = { seguros, pendentes };
+  document.getElementById('btnAplicarNormalizacao').disabled = !seguros.length;
+  const resumo = [
+    `${seguros.length} produto(s) identificados com modelo e tema; podem ser normalizados.`,
+    `${pendentes.length} produto(s) precisam de revisão manual e não serão alterados.`,
+    ...pendentes.slice(0,10).map(item => `• ${item.produto.nome || item.produto.id}: ${item.motivo}`),
+    ...(pendentes.length > 10 ? [`• e mais ${pendentes.length-10} item(ns).`] : []),
+    conflitoPromocoesModelos.length ? `Promoções divergentes: ${conflitoPromocoesModelos.map(m=>m.modelo).join(', ')}. As promoções desses produtos serão preservadas até configuração central.` : 'As promoções iguais foram centralizadas por modelo quando a regra existente era uniforme.',
+  ];
+  document.getElementById('adminNormalizacaoResumo').textContent = resumo.join('\n');
+}
+
+function baixarBackupCatalogo() {
+  const conteudo = JSON.stringify({ exportadoEm:new Date().toISOString(), produtos, temasSite, modelosSite }, null, 2);
+  const url = URL.createObjectURL(new Blob([conteudo], { type:'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `backup-catalogo-${new Date().toISOString().slice(0,10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function adminAplicarNormalizacao() {
+  if (!migracaoNormalizacaoAtual?.seguros?.length) return;
+  const qtdAplicados = migracaoNormalizacaoAtual.seguros.length;
+  if (!confirm(`Normalizar ${migracaoNormalizacaoAtual.seguros.length} produto(s) seguro(s)? Um backup JSON será baixado antes de salvar. Produtos ambíguos ficarão intactos.`)) return;
+  baixarBackupCatalogo();
+  const produtosAtualizados = produtos.map(p => ({ ...p }));
+  migracaoNormalizacaoAtual.seguros.forEach(item => {
+    const produto = produtosAtualizados[item.index];
+    const modelo = modelosSite.find(m => m.id === item.modeloId);
+    const tema = temasSite.find(t => t.id === item.temaId);
+    if (!produto || !modelo || !tema) return;
+    Object.assign(produto, {
+      modeloId:modelo.id,
+      modelo:modelo.nome,
+      temaId:tema.id,
+      temaNome:tema.nome,
+      nome:`${modelo.nome} - ${tema.nome}`,
+      descricao:modelo.descricao,
+      preco:Number(modelo.preco),
+      sobConsulta:false,
+    });
+    if (!modelo.promoConflito && modelo.promoConfigurada) {
+      produto.promoAtiva = !!modelo.promoAtiva;
+      produto.promoTipo = 'fixo';
+      produto.promoValor = produto.promoAtiva ? Math.max(0, Number(modelo.preco) - Number(modelo.promoPreco)) : 0;
+    }
+  });
+  const batch = db.batch();
+  batch.set(db.collection('config').doc('produtosSite'), { data:JSON.stringify(produtosAtualizados) }, { merge:true });
+  batch.set(db.collection('config').doc('modelosSite'), { data:JSON.stringify(modelosSite) }, { merge:true });
+  try {
+    await batch.commit();
+    produtos = produtosAtualizados;
+    modelosSiteSalvos = true;
+    adminRenderProdutos();
+    renderCategorias();
+    renderCatalogo();
+    adminPreverNormalizacao();
+    showToast(`${qtdAplicados} produto(s) normalizado(s) ✓`, 'success');
+  } catch (e) {
+    console.error(e);
+    showToast('Falha ao salvar a normalização. O backup foi baixado; nenhum sucesso foi confirmado.', 'error');
+  }
 }
 
 function adminCarregarOfertasGlobais() {
   const crossSelect = document.getElementById('aCrossSellGlobal');
   const extrasSelect = document.getElementById('aAdicionaisGlobais');
-  const opcoes = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+  const opcoes = produtos.map(produtoComModelo).map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   crossSelect.innerHTML = '<option value="">Nenhum produto selecionado</option>' + opcoes;
   extrasSelect.innerHTML = opcoes;
   crossSelect.value = ofertaCrossSellGlobal.produtoId || '';
@@ -2502,7 +2865,7 @@ function adminCarregarOfertasGlobais() {
 
 async function adminSalvarOfertasGlobais() {
   const extras = Array.from(document.getElementById('aAdicionaisGlobais').selectedOptions).map(o => o.value);
-  if (extras.length > 3) { showToast('Selecione no máximo 3 produtos adicionais.', 'error'); return; }
+  if (extras.length > 3) { showToast('Ajuste os produtos adicionais selecionados antes de salvar.', 'error'); return; }
   ofertaCrossSellGlobal = {
     produtoId: document.getElementById('aCrossSellGlobal').value,
     descontoTipo: document.getElementById('aCrossSellGlobalTipo').value,
@@ -2514,15 +2877,6 @@ async function adminSalvarOfertasGlobais() {
   catch (e) { showToast('Não foi possível salvar as ofertas.', 'error'); }
 }
 
-async function carregarTemas() {
-  try {
-    const doc = await db.collection('config').doc('temasSite').get();
-    temasSite = doc.exists ? JSON.parse(doc.data().data || '[]') : [];
-  } catch(e) { temasSite = []; }
-}
-async function salvarTemasRemote() {
-  try { await db.collection('config').doc('temasSite').set({ data: JSON.stringify(temasSite) }); } catch(e) {}
-}
 async function carregarBannersAdmin() {
   try {
     const doc = await db.collection('config').doc('bannersSite').get();
@@ -2841,7 +3195,7 @@ function adminRenderProdutos() {
   const categoriaFiltro = document.getElementById('adminFiltroCategoria')?.value || '';
   const statusFiltro = document.getElementById('adminFiltroStatus')?.value || '';
 
-  const filtrados = produtos.filter(p => {
+  const filtrados = produtos.map(produtoComModelo).filter(p => {
     if (busca) {
       const alvo = `${p.nome || ''} ${p.temaNome || ''}`.toLowerCase();
       if (!alvo.includes(busca)) return false;
@@ -2908,13 +3262,42 @@ async function adminExcluirProdutoPorId(id) {
 }
 
 function adminToggleSobConsulta() {
-  document.getElementById('aPrecoGroup').style.display = document.getElementById('aSobConsulta').checked ? 'none' : 'block';
+  const comModelo = !!document.getElementById('aModelo')?.value;
+  document.getElementById('aPrecoGroup').style.display = !comModelo && document.getElementById('aSobConsulta').checked ? 'none' : 'block';
 }
 function adminTogglePromo() {
-  document.getElementById('aPromoFields').style.display = document.getElementById('aPromoAtiva').checked ? 'grid' : 'none';
+  const comModelo = !!document.getElementById('aModelo')?.value;
+  document.getElementById('aPromoCheckRow').style.display = comModelo ? 'none' : '';
+  document.getElementById('aPromoFields').style.display = !comModelo && document.getElementById('aPromoAtiva').checked ? 'grid' : 'none';
 }
 function adminTogglePromoTipo() {
   document.getElementById('aPromoValorLabel').textContent = document.getElementById('aPromoTipo').value === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)';
+}
+
+function adminAtualizarCamposModelo() {
+  const modelo = modelosSite.find(m => m.id === document.getElementById('aModelo')?.value);
+  const temaInput = document.getElementById('aTemaInput');
+  const tema = temasSite.find(t => t.id === document.getElementById('aTemaId')?.value && t.nome === temaInput?.value.trim());
+  const temModelo = !!modelo;
+  const nome = document.getElementById('aNome');
+  nome.readOnly = temModelo;
+  if (temModelo) {
+    nome.value = `${modelo.nome}${tema ? ` - ${tema.nome}` : temaInput.value.trim() ? ` - ${temaInput.value.trim()}` : ''}`;
+    document.getElementById('aPreco').value = modelo.preco;
+    document.getElementById('aDescricao').value = modelo.descricao || '';
+    document.getElementById('aSobConsulta').checked = false;
+    document.getElementById('aSobConsulta').disabled = true;
+    document.getElementById('aPreco').disabled = true;
+    document.getElementById('aDescricao').readOnly = true;
+    document.getElementById('aSobConsultaRow').style.display = 'none';
+  } else {
+    document.getElementById('aSobConsulta').disabled = false;
+    document.getElementById('aPreco').disabled = false;
+    document.getElementById('aDescricao').readOnly = false;
+    document.getElementById('aSobConsultaRow').style.display = '';
+  }
+  adminToggleSobConsulta();
+  adminTogglePromo();
 }
 
 /** Detecta se um link de mídia é vídeo pela extensão do arquivo */
@@ -2956,13 +3339,15 @@ function adminOnTemaInput() {
   const termo = document.getElementById('aTemaInput').value.trim().toLowerCase();
   const el = document.getElementById('adminTemaSugestoes');
   const lista = termo ? temasSite.filter(t => t.nome.toLowerCase().includes(termo)) : temasSite;
-  if (!lista.length) { el.innerHTML=''; el.classList.remove('open'); return; }
+  if (!lista.length) { el.innerHTML=''; el.classList.remove('open'); adminAtualizarCamposModelo(); return; }
   el.innerHTML = lista.map(t => `<div onmousedown="adminSelecionarTema('${t.id}','${t.nome.replace(/'/g,"\\'")}')">${t.nome}</div>`).join('');
   el.classList.add('open');
+  adminAtualizarCamposModelo();
 }
 function adminSelecionarTema(id, nome) {
   document.getElementById('aTemaInput').value = nome;
   document.getElementById('aTemaId').value = id;
+  adminAtualizarCamposModelo();
   adminFecharTemaSugestoes();
 }
 function adminFecharTemaSugestoes() {
@@ -2973,7 +3358,7 @@ function adminFecharTemaSugestoes() {
 let _produtosDisponiveisOrderBump = [];
 
 function adminPopularCrossSell(idExcluir) {
-  const outros = produtos.filter(p => p.id !== idExcluir);
+  const outros = produtos.filter(p => p.id !== idExcluir).map(produtoComModelo);
   document.getElementById('aCrossSell').innerHTML = outros.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   _produtosDisponiveisOrderBump = outros;
 }
@@ -3046,20 +3431,23 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
   // No modo duplicado, carrega os dados do produto em idx, mas trata como "novo"
   // (sem editar o original) — _editandoProdutoIdx fica null pra salvar como item novo.
   _editandoProdutoIdx = comoNovoDuplicado ? null : idx;
-  const editando = idx !== null ? produtos[idx] : null;
+  const original = idx !== null ? produtos[idx] : null;
+  const editando = original ? produtoComModelo(original) : null;
+  adminPopularSelecaoModelo();
   _fotosGaleriaAdmin = editando ? [...(editando.fotos || (editando.foto ? [editando.foto] : []))] : [];
   adminRenderFotosGaleria();
 
   if (editando) {
     const p = editando;
     document.getElementById('adminModalProdutoTitle').textContent = comoNovoDuplicado ? 'Duplicar Produto' : 'Editar Produto';
-    document.getElementById('aNome').value = comoNovoDuplicado ? (p.nome ? p.nome + ' (Cópia)' : '') : (p.nome || '');
+    document.getElementById('aNome').value = comoNovoDuplicado && !p.modeloId ? (p.nome ? p.nome + ' (Cópia)' : '') : (p.nome || '');
     document.getElementById('aCategoria').value = p.categoria || 'Aniversário';
     document.getElementById('aPreco').value = p.preco || '';
     document.getElementById('aDescricao').value = p.descricao || '';
     document.getElementById('aSobConsulta').checked = !!p.sobConsulta;
     document.getElementById('aTemaInput').value = p.temaNome || '';
     document.getElementById('aTemaId').value = p.temaId || '';
+    document.getElementById('aModelo').value = p.modeloId || '';
     document.getElementById('aPromoAtiva').checked = !!p.promoAtiva;
     document.getElementById('aPromoTipo').value = p.promoTipo || 'percentual';
     document.getElementById('aPromoValor').value = p.promoValor || '';
@@ -3068,43 +3456,68 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
     ['aNome','aPreco','aDescricao','aTemaInput','aTemaId','aPromoValor'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('aCategoria').value = 'Aniversário';
     document.getElementById('aSobConsulta').checked = false;
+    document.getElementById('aModelo').value = '';
     document.getElementById('aPromoAtiva').checked = false;
     document.getElementById('aPromoTipo').value = 'percentual';
   }
-  adminToggleSobConsulta(); adminTogglePromo(); adminTogglePromoTipo();
+  adminAtualizarCamposModelo(); adminToggleSobConsulta(); adminTogglePromo(); adminTogglePromoTipo();
   document.getElementById('adminModalProduto').classList.add('open');
 }
 
 async function adminSalvarProduto() {
-  const nome = document.getElementById('aNome').value.trim();
-  const sobConsulta = document.getElementById('aSobConsulta').checked;
-  const preco = sobConsulta ? 0 : (parseFloat(document.getElementById('aPreco').value) || 0);
+  const temaId = document.getElementById('aTemaId').value || null;
+  const temaNomeDigitado = document.getElementById('aTemaInput').value.trim();
+  const tema = temasSite.find(t => t.id === temaId && t.nome === temaNomeDigitado);
+  const temaValido = !!tema;
+  const modelo = modelosSite.find(m => m.id === document.getElementById('aModelo').value);
+  if (modelo && !temaValido) { showToast('Selecione um tema cadastrado para gerar o título automaticamente.', 'error'); return; }
+  if (modelo && (modelo.preco <= 0 || !modelo.descricao)) { showToast('Configure preço e descrição do modelo na aba Modelos.', 'error'); return; }
+
+  const sobConsulta = modelo ? false : document.getElementById('aSobConsulta').checked;
+  const preco = modelo ? Number(modelo.preco) : (sobConsulta ? 0 : (parseFloat(document.getElementById('aPreco').value) || 0));
+  const nome = modelo ? `${modelo.nome} - ${tema.nome}` : document.getElementById('aNome').value.trim();
   if (!nome) { showToast('Preencha o nome','error'); return; }
   if (!sobConsulta && preco <= 0) { showToast('Informe um preço válido','error'); return; }
 
-  const temaId = document.getElementById('aTemaId').value || null;
-  const temaNomeDigitado = document.getElementById('aTemaInput').value.trim();
-  const temaValido = temaId && temasSite.some(t => t.id === temaId && t.nome === temaNomeDigitado);
-
   const id = _editandoProdutoIdx !== null ? produtos[_editandoProdutoIdx].id : 'ps_' + Date.now();
+  const anterior = _editandoProdutoIdx !== null ? produtos[_editandoProdutoIdx] : null;
+  const promoIndividualAtiva = modelo
+    ? (modelo.promoConflito ? !!anterior?.promoAtiva : !!modelo.promoAtiva)
+    : document.getElementById('aPromoAtiva').checked;
+  const promoTipo = modelo
+    ? (modelo.promoConflito ? (anterior?.promoTipo || 'fixo') : 'fixo')
+    : document.getElementById('aPromoTipo').value;
+  const promoValor = modelo
+    ? (modelo.promoConflito ? (Number(anterior?.promoValor)||0) : (modelo.promoAtiva ? Math.max(0, Number(modelo.preco)-Number(modelo.promoPreco)) : 0))
+    : (parseFloat(document.getElementById('aPromoValor').value) || 0);
   const produtoData = {
+    ...(anterior || {}),
     id, nome,
     categoria: document.getElementById('aCategoria').value,
     preco, sobConsulta,
-    descricao: document.getElementById('aDescricao').value.trim(),
+    descricao: modelo ? modelo.descricao : document.getElementById('aDescricao').value.trim(),
     fotos: [..._fotosGaleriaAdmin],
     foto: _fotosGaleriaAdmin[0] || null,
-    temaId: temaValido ? temaId : null,
-    temaNome: temaValido ? temaNomeDigitado : null,
-    promoAtiva: document.getElementById('aPromoAtiva').checked,
-    promoTipo: document.getElementById('aPromoTipo').value,
-    promoValor: parseFloat(document.getElementById('aPromoValor').value) || 0,
+    temaId: temaValido ? tema.id : (modelo ? null : null),
+    temaNome: temaValido ? tema.nome : (modelo ? null : null),
+    modeloId: modelo?.id || null,
+    modelo: modelo?.nome || null,
+    promoAtiva: promoIndividualAtiva,
+    promoTipo,
+    promoValor,
   };
 
   if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = produtoData;
   else produtos.push(produtoData);
 
-  try { await salvarProdutosSite(); } catch(e) {}
+  try { await salvarProdutosSite(); }
+  catch(e) {
+    if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = anterior;
+    else produtos.pop();
+    showToast('Não foi possível salvar o produto.', 'error');
+    console.error(e);
+    return;
+  }
   adminRenderProdutos();
   adminFecharModal('adminModalProduto');
   showToast('Produto salvo ✓','success');
@@ -3134,9 +3547,10 @@ function adminRenderTemas() {
       <div class="admin-card-thumb">${thumb}</div>
       <div class="admin-card-info">
         <div class="admin-card-nome">${t.nome}</div>
-        <div class="admin-card-sub">${(t.palavrasChave && t.palavrasChave.length) ? t.palavrasChave.join(', ') : '<em style="color:#c0b0b5;">sem palavras-chave</em>'}</div>
+        <div class="admin-card-sub">${t.ativo === false ? '⏸ Tema pausado · ' : ''}${(t.palavrasChave && t.palavrasChave.length) ? t.palavrasChave.join(', ') : '<em style="color:#c0b0b5;">sem palavras-chave</em>'}</div>
         <div class="admin-card-actions">
           <button onclick="adminEditarTema(${idx})">Editar</button>
+          <button onclick="adminToggleTema('${t.id}')">${t.ativo === false ? '▶ Reativar' : '⏸ Pausar'}</button>
           <button onclick="adminExcluirTema(${idx})">Excluir</button>
         </div>
       </div>
@@ -3162,23 +3576,83 @@ async function adminSalvarTema() {
   if (!nome) { showToast('Preencha o nome do tema','error'); return; }
   const palavrasChave = document.getElementById('atPalavrasChave').value
     .split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+  const estadoAnterior = JSON.parse(JSON.stringify(temasSite));
   if (_editandoTemaIdx !== null) {
     temasSite[_editandoTemaIdx].nome = nome;
     temasSite[_editandoTemaIdx].palavrasChave = palavrasChave;
   } else {
-    temasSite.push({ id: 'tema_'+Date.now(), nome, palavrasChave });
+    temasSite.push({ id: 'tema_'+Date.now(), nome, palavrasChave, ativo:true });
   }
-  await salvarTemasRemote();
+  try { await salvarTemasRemote(); }
+  catch (e) { temasSite = estadoAnterior; showToast('Não foi possível salvar o tema.', 'error'); return; }
   adminRenderTemas();
+  renderCategorias();
+  renderCatalogo();
   adminFecharModal('adminModalTema');
   showToast('Tema salvo ✓','success');
 }
+async function adminToggleTema(id) {
+  const tema = temasSite.find(t => t.id === id);
+  if (!tema) return;
+  tema.ativo = tema.ativo === false;
+  try {
+    await salvarTemasRemote();
+    adminRenderTemas();
+    renderCategorias();
+    renderCatalogo();
+    showToast(tema.ativo ? 'Tema reativado; produtos publicados ✓' : 'Tema pausado; produtos ocultos do catálogo', tema.ativo ? 'success' : '');
+  } catch (e) {
+    tema.ativo = !tema.ativo;
+    showToast('Não foi possível atualizar o tema.', 'error');
+  }
+}
 async function adminExcluirTema(idx) {
-  if (!confirm(`Excluir tema "${temasSite[idx].nome}"?`)) return;
-  temasSite.splice(idx,1);
-  await salvarTemasRemote();
+  const tema = temasSite[idx];
+  if (!tema) return;
+  const nomeNormalizado = textoChaveCatalogo(tema.nome);
+  const temasComMesmoNome = temasSite.filter(t => textoChaveCatalogo(t.nome) === nomeNormalizado);
+  const pertenceAoTema = p => {
+    if (p.temaId === tema.id) return true;
+    if (p.temaId && temasSite.some(t => t.id === p.temaId)) return false;
+    if (textoChaveCatalogo(p.temaNome) === nomeNormalizado) return temasComMesmoNome.length === 1;
+    return temaDoProduto(p)?.id === tema.id;
+  };
+  const vinculados = produtos.filter(pertenceAoTema);
+  const ambiguos = produtos.filter(p => {
+    if (p.temaId && temasSite.some(t => t.id === p.temaId)) return false;
+    return textoChaveCatalogo(p.temaNome) === nomeNormalizado && temasComMesmoNome.length > 1;
+  }).length;
+  const avisoAmbiguos = ambiguos ? ` ${ambiguos} produto(s) com vínculo ambíguo serão preservados para revisão.` : '';
+  if (!confirm(`Excluir o tema "${tema.nome}" e também ${vinculados.length} produto(s) vinculado(s)?${avisoAmbiguos} Essa ação não pode ser desfeita.`)) return;
+  const temasAtualizados = temasSite.filter(t => t.id !== tema.id);
+  const produtosAtualizados = produtos.filter(p => !pertenceAoTema(p));
+  const idsRestantes = new Set(produtosAtualizados.map(p => p.id));
+  const adicionaisAtualizados = adicionaisGlobais.filter(id => idsRestantes.has(id));
+  const crossSellAtualizado = { ...ofertaCrossSellGlobal };
+  if (crossSellAtualizado.produtoId && !idsRestantes.has(crossSellAtualizado.produtoId)) crossSellAtualizado.produtoId = '';
+  const batch = db.batch();
+  batch.set(db.collection('config').doc('temasSite'), { data:JSON.stringify(temasAtualizados) }, { merge:true });
+  batch.set(db.collection('config').doc('produtosSite'), {
+    data:JSON.stringify(produtosAtualizados),
+    adicionaisGlobais:adicionaisAtualizados,
+    crossSellGlobal:crossSellAtualizado,
+  }, { merge:true });
+  try {
+    await batch.commit();
+    temasSite = temasAtualizados;
+    produtos = produtosAtualizados;
+    adicionaisGlobais = adicionaisAtualizados;
+    ofertaCrossSellGlobal = crossSellAtualizado;
+  } catch (e) {
+    showToast('Não foi possível excluir o tema e seus produtos.', 'error');
+    return;
+  }
   adminRenderTemas();
-  showToast('Tema excluído','error');
+  adminRenderProdutos();
+  adminCarregarOfertasGlobais();
+  renderCategorias();
+  renderCatalogo();
+  showToast(`Tema e ${vinculados.length} produto(s) excluído(s)`, 'success');
 }
 
 // ── BANNERS ──────────────────────────────────────────────────────────────────
@@ -3208,7 +3682,7 @@ function adminBannerDestinoChange() {
     sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
   } else {
     label.textContent = 'Produto';
-    sel.innerHTML = produtos.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+    sel.innerHTML = produtos.map(produtoComModelo).map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   }
 }
 function adminPreviewBannerFoto() {
