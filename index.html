@@ -62,6 +62,7 @@
     display: flex; align-items: center; gap: 5px;
     flex-shrink: 0;
   }
+  .logo img { display:block; height:38px; max-width:min(28vw,160px); object-fit:contain; }
   .search-bar {
     flex: 1; position: relative; min-width: 180px;
   }
@@ -103,12 +104,9 @@
   .temas-section-heading { display:flex; align-items:end; justify-content:space-between; gap:12px; margin:0 0 12px; }
   .temas-section-heading h2 { font:600 16px 'DM Sans',sans-serif; margin:0; }
   .temas-section-heading span { font-size:11px; opacity:.8; }
-  .temas-carousel { display:flex; align-items:center; gap:8px; }
+  .temas-carousel { display:block; }
   .temas-grid { display:flex; flex:1; min-width:0; gap:12px; overflow-x:auto; overflow-y:hidden; padding:4px 2px 8px; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:none; }
   .temas-grid::-webkit-scrollbar { display:none; }
-  .temas-carousel-btn { width:34px; height:34px; flex:0 0 34px; border:1px solid rgba(255,255,255,.55); border-radius:50%; background:rgba(255,255,255,.14); color:#fff; font-size:21px; line-height:1; display:grid; place-items:center; }
-  .temas-carousel-btn:hover { background:rgba(255,255,255,.28); }
-  .temas-carousel-btn:disabled { opacity:.35; cursor:default; }
   .tema-card-loja { flex:0 0 clamp(78px,9vw,104px); border:0; padding:0; background:transparent; color:#fff; text-align:center; min-width:0; scroll-snap-align:start; }
   .tema-card-loja .tema-card-image { width:clamp(68px,9vw,94px); aspect-ratio:1; margin:auto auto 7px; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.18); border:2px solid rgba(255,255,255,.68); box-shadow:0 3px 12px rgba(70,15,33,.16); display:grid; place-items:center; font-size:25px; }
   .tema-card-loja img { width:100%; height:100%; object-fit:cover; }
@@ -782,9 +780,7 @@
     .header-top .header-actions { order:1; margin-left:auto; }
     .header-top .search-bar { order:2; flex-basis:100%; }
     .search-bar input { font-size:15px; padding:13px 44px 13px 17px; }
-    .temas-carousel { gap:5px; }
     .temas-grid { gap:8px; }
-    .temas-carousel-btn { width:28px; height:28px; flex-basis:28px; font-size:18px; }
     .tema-card-loja { flex-basis:76px; }
     .tema-card-loja .tema-card-image { width:66px; }
     .hero { padding: 44px 16px 32px; }
@@ -851,9 +847,7 @@
     <div class="temas-section-inner">
       <div class="temas-section-heading"><h2>Encontre por tema</h2><span>Deslize para ver mais</span></div>
       <div class="temas-carousel">
-        <button type="button" class="temas-carousel-btn" id="temasAnterior" onclick="rolarTemasLoja(-1)" aria-label="Ver temas anteriores">‹</button>
         <div class="temas-grid" id="temasLojaGrid"><div class="temas-vazio">Carregando temas…</div></div>
-        <button type="button" class="temas-carousel-btn" id="temasProximo" onclick="rolarTemasLoja(1)" aria-label="Ver mais temas">›</button>
       </div>
     </div>
   </section>
@@ -1478,32 +1472,12 @@ function renderTemasLoja() {
   const grid = document.getElementById('temasLojaGrid');
   if (!grid) return;
   const temas = getTemasDisponiveis();
-  if (!temas.length) { grid.innerHTML = '<div class="temas-vazio">Os temas estarão disponíveis em breve.</div>'; atualizarControlesTemaLoja(); return; }
+  if (!temas.length) { grid.innerHTML = '<div class="temas-vazio">Os temas estarão disponíveis em breve.</div>'; return; }
   grid.innerHTML = temas.map(t => {
     const imagem = t.foto ? `<img src="${escaparHTMLCatalogo(t.foto)}" alt="Tema ${escaparHTMLCatalogo(t.nome)}" loading="lazy" onerror="this.remove();this.parentElement.textContent='🎨';">` : '🎨';
     return `<button class="tema-card-loja" type="button" data-tema-loja="${escaparHTMLCatalogo(t.nome)}" aria-label="Ver convites do tema ${escaparHTMLCatalogo(t.nome)}"><span class="tema-card-image">${imagem}</span><strong>${escaparHTMLCatalogo(t.nome)}</strong></button>`;
   }).join('');
   grid.querySelectorAll('[data-tema-loja]').forEach(botao => botao.addEventListener('click', () => selecionarTemaLoja(botao.dataset.temaLoja)));
-  grid.onscroll = atualizarControlesTemaLoja;
-  requestAnimationFrame(atualizarControlesTemaLoja);
-}
-
-function rolarTemasLoja(direcao) {
-  const grid = document.getElementById('temasLojaGrid');
-  if (!grid) return;
-  grid.scrollBy({ left:direcao * Math.max(grid.clientWidth * .75, 220), behavior:'smooth' });
-}
-
-function atualizarControlesTemaLoja() {
-  const grid = document.getElementById('temasLojaGrid');
-  const anterior = document.getElementById('temasAnterior');
-  const proximo = document.getElementById('temasProximo');
-  if (!grid || !anterior || !proximo) return;
-  const temOverflow = grid.scrollWidth > grid.clientWidth + 2;
-  anterior.style.visibility = temOverflow ? 'visible' : 'hidden';
-  proximo.style.visibility = temOverflow ? 'visible' : 'hidden';
-  anterior.disabled = !temOverflow || grid.scrollLeft <= 2;
-  proximo.disabled = !temOverflow || grid.scrollLeft + grid.clientWidth >= grid.scrollWidth - 2;
 }
 
 function imagemProdutoParaTema(produto) {
@@ -2509,7 +2483,7 @@ document.addEventListener('keydown', (e) => {
     <!-- BANNERS -->
     <div class="admin-subpage" id="atab-banners">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-        <p style="font-size:12.5px;color:#9a8890;">Slides do carrossel — cada um pode levar a uma categoria ou produto.</p>
+        <p style="font-size:12.5px;color:#9a8890;">Slides do carrossel — textos opcionais; escolha uma ação e destino.</p>
         <button class="admin-btn-primary" onclick="adminNovoBanner()">+ Novo Banner</button>
       </div>
       <div id="adminBannersGrid" class="admin-grid"></div>
@@ -2654,9 +2628,9 @@ document.addEventListener('keydown', (e) => {
         <button type="button" class="admin-btn-ghost" id="btnUploadBannerFoto" onclick="adminEnviarFotoBanner()" style="margin-top:8px;">📤 Enviar imagem do banner</button>
         <div id="abFotoUploadStatus" style="font-size:11px;color:#9a8890;margin-top:5px;"></div>
       </div>
-      <div class="admin-field"><label>Tag</label><input type="text" id="abTag" placeholder="Ex: Novidade"></div>
-      <div class="admin-field"><label>Título</label><input type="text" id="abTitulo"></div>
-      <div class="admin-field"><label>Subtítulo</label><input type="text" id="abSubtitulo"></div>
+      <div class="admin-field"><label>Tag (opcional)</label><input type="text" id="abTag" placeholder="Ex: Novidade"></div>
+      <div class="admin-field"><label>Título (opcional)</label><input type="text" id="abTitulo"></div>
+      <div class="admin-field"><label>Subtítulo (opcional)</label><input type="text" id="abSubtitulo"></div>
       <div class="admin-row2">
         <div class="admin-field"><label>Destino</label>
           <select id="abTipoDestino" onchange="adminBannerDestinoChange()">
@@ -3094,11 +3068,25 @@ async function adminEnviarFotoProduto() {
 async function carregarLogoAdmin() {
   try {
     const doc = await db.collection('config').doc('logoSite').get();
-    if (doc.exists && doc.data().url) {
-      document.getElementById('alogoUrl').value = doc.data().url;
-      adminPreviewLogo();
-    }
+    const url = doc.exists ? (doc.data().url || '') : '';
+    const campo = document.getElementById('alogoUrl');
+    if (campo) campo.value = url;
+    if (document.getElementById('adminLogoPreview')) adminPreviewLogo();
+    aplicarLogoSite(url);
   } catch(e) {}
+}
+function aplicarLogoSite(url) {
+  const marca = document.querySelector('.header-top .logo');
+  if (!marca) return;
+  if (url) {
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Luluzices';
+    img.onerror = () => { marca.textContent = '🎈 Lulu'; };
+    marca.replaceChildren(img);
+  } else {
+    marca.textContent = '🎈 Lulu';
+  }
 }
 function adminPreviewLogo() {
   const arquivo = document.getElementById('alogoArquivo')?.files[0];
@@ -3123,7 +3111,11 @@ async function adminEnviarLogo() {
 }
 async function adminSalvarLogo() {
   const url = document.getElementById('alogoUrl').value.trim() || null;
-  try { await db.collection('config').doc('logoSite').set({ url }); showToast('Logo salva ✓','success'); } catch(e) { showToast('Erro ao salvar logo: '+e.message,'error'); }
+  try {
+    await db.collection('config').doc('logoSite').set({ url });
+    aplicarLogoSite(url);
+    showToast('Logo salva e aplicada na loja ✓','success');
+  } catch(e) { showToast('Erro ao salvar logo: '+e.message,'error'); }
 }
 
 // ── PRODUTOS ──────────────────────────────────────────────────────────────────
@@ -3884,7 +3876,6 @@ function adminEditarBanner(idx) {
 }
 async function adminSalvarBanner() {
   const titulo = document.getElementById('abTitulo').value.trim();
-  if (!titulo) { showToast('Preencha o título','error'); return; }
   const id = _editandoBannerIdx !== null ? bannersSite[_editandoBannerIdx].id : 'bn_'+Date.now();
   const tipoDestino = document.getElementById('abTipoDestino').value;
   const destino = tipoDestino === 'pesquisa' ? document.getElementById('abDestinoPesquisa').value.trim() : document.getElementById('abDestino').value;
@@ -3918,7 +3909,7 @@ function renderBannersPublicos() {
     <div class="banner-slide personalizado ${idx===0?'active':''}" data-banner-index="${idx}" role="button" tabindex="0" aria-label="${escaparHTMLCatalogo(b.titulo || 'Ver oferta')}" ${b.foto ? `style="background-image:url('${escaparHTMLCatalogo(b.foto).replace(/'/g,'%27')}')"` : ''}>
       <div class="banner-slide-text">
         ${b.tag ? `<span class="banner-slide-tag">${escaparHTMLCatalogo(b.tag)}</span>` : ''}
-        <h2>${escaparHTMLCatalogo(b.titulo || '')}</h2>
+        ${b.titulo ? `<h2>${escaparHTMLCatalogo(b.titulo)}</h2>` : ''}
         ${b.subtitulo ? `<p>${escaparHTMLCatalogo(b.subtitulo)}</p>` : ''}
       </div>
       ${b.foto ? '' : '<div class="banner-slide-emoji">🎈</div>'}
@@ -3951,6 +3942,7 @@ function abrirDestinoBanner(banner) {
 }
 
 checarAcessoAdmin();
+carregarLogoAdmin();
 configurarGestoVoltarProduto();
 document.addEventListener('keydown', evento => { if (evento.key === 'Escape') fecharZoomMidiaProduto(); });
 </script>
