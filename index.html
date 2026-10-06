@@ -862,6 +862,7 @@
         <p>Carregando produtos...</p>
       </div>
     </div>
+    <div id="catalogoPaginacao" style="min-height:36px;text-align:center;color:#9a8890;font-size:13px;padding:12px 0" aria-live="polite"></div>
   </div>
 </div>
 
@@ -1249,11 +1250,38 @@ let conflitoPromocoesModelos = [];
 let migracaoNormalizacaoAtual = null;
 
 async function salvarProdutosSite() {
-  return db.collection('config').doc('produtosSite').set({
+  await db.collection('config').doc('produtosSite').set({
     data: JSON.stringify(produtos),
     crossSellGlobal: ofertaCrossSellGlobal,
     adicionaisGlobais: adicionaisGlobais,
   });
+  await sincronizarProdutosPaginadosSite(produtos);
+}
+
+// Espelho individual para consultas paginadas públicas; o documento legado
+// continua sendo a fonte do painel e das buscas completas.
+async function sincronizarProdutosPaginadosSite(lista) {
+  const col = db.collection('siteCatalogProducts');
+  const existentes = await col.get();
+  const contagensExistentes = new Map(existentes.docs.map(d => [d.id, Number(d.data().salesCount)||0]));
+  const publico = lista.filter(p => {
+    const resolvido = produtoComModelo(p);
+    return p?.id && !produtoEhAdicional(resolvido) && resolvido.ativo !== false &&
+      (Number(resolvido.preco)>0 || resolvido.sobConsulta) && temaAtivoDoProduto(resolvido);
+  });
+  const ids = new Set(publico.map(p => String(p.id)));
+  let batch = db.batch(), operacoes = 0;
+  const commit = async () => { if (operacoes) { await batch.commit(); batch = db.batch(); operacoes = 0; } };
+  for (const p of publico) {
+    batch.set(col.doc(String(p.id)), { ...p, modelo:produtoComModelo(p).modelo || p.modelo || null, salesCount:contagensExistentes.get(String(p.id)) ?? Number(p.salesCount) ?? 0 }, { merge:true });
+    if (++operacoes >= 450) await commit();
+  }
+  for (const doc of existentes.docs) {
+    if (ids.has(doc.id)) continue;
+    batch.delete(doc.ref);
+    if (++operacoes >= 450) await commit();
+  }
+  await commit();
 }
 
 async function carregarTemas() {
@@ -1321,11 +1349,55 @@ function showToast(msg, type = '') {
   setTimeout(() => { t.className = 'toast'; }, 2800);
 }
 
-/** Gera uma contagem de "vendas" pseudo-aleatória mas estável por produto (mesmo produto sempre mostra o mesmo número) */
-function vendasFakePara(id) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return 10 + (hash % 180);
+function vendasProduto(p) { return Math.max(0, Number(p?.salesCount) || 0); }
+let produtosHome = [], cursorProdutosHome = null, carregandoProdutosHome = false, fimProdutosHome = false;
+let observerProdutosHome = null, catalogoCompletoCarregado = false;
+let catalogoCompletoPromise = null;
+const TAMANHO_LOTE_HOME = 10;
+
+function atualizarIndicadorPaginacaoHome(texto = '') {
+  const el = document.getElementById('catalogoPaginacao'); if (el) el.textContent = texto;
+}
+function observarFimCatalogoHome() {
+  observerProdutosHome?.disconnect();
+  if (termoBusca || categoriaAtiva !== 'todas') return;
+  const alvo = document.getElementById('catalogoPaginacao');
+  if (!alvo || !('IntersectionObserver' in window) || fimProdutosHome) return;
+  observerProdutosHome = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) carregarProximoLoteHome(); }, { rootMargin:'500px 0px' });
+  observerProdutosHome.observe(alvo);
+}
+async function carregarProximoLoteHome() {
+  if (carregandoProdutosHome || fimProdutosHome) return;
+  carregandoProdutosHome = true; atualizarIndicadorPaginacaoHome('Carregando mais convites…');
+  try {
+    let consulta = db.collection('siteCatalogProducts').orderBy('salesCount','desc').limit(TAMANHO_LOTE_HOME);
+    if (cursorProdutosHome) consulta = consulta.startAfter(cursorProdutosHome);
+    const snap = await consulta.get();
+    if (snap.empty) { fimProdutosHome = true; atualizarIndicadorPaginacaoHome(''); observerProdutosHome?.disconnect(); renderCatalogo(); return; }
+    cursorProdutosHome = snap.docs[snap.docs.length - 1];
+    const vistos = new Set(produtosHome.map(p => String(p.id)));
+    produtosHome.push(...snap.docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
+    if (snap.size < TAMANHO_LOTE_HOME) fimProdutosHome = true;
+    renderCategorias(); renderTemasLoja(); renderCatalogo();
+    atualizarIndicadorPaginacaoHome(fimProdutosHome ? '' : 'Role para ver mais convites');
+    if (fimProdutosHome) observerProdutosHome?.disconnect(); else observarFimCatalogoHome();
+  } catch (e) { console.error('Erro ao carregar mais convites:',e); atualizarIndicadorPaginacaoHome('Não foi possível carregar mais. Tente rolar novamente.'); }
+  finally { carregandoProdutosHome = false; }
+}
+
+async function carregarCatalogoCompleto() {
+  if (catalogoCompletoCarregado) return;
+  if (!catalogoCompletoPromise) catalogoCompletoPromise = (async () => {
+    const doc = await db.collection('config').doc('produtosSite').get();
+    const dados = doc.exists ? doc.data() || {} : {};
+    const lista = JSON.parse(dados.data || '[]');
+    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(dados.crossSellGlobal || {}) };
+    adicionaisGlobais = Array.isArray(dados.adicionaisGlobais) ? dados.adicionaisGlobais.slice(0,3) : [];
+    produtos = lista.map(p => ({ ...p, categoria:p.categoria || inferirCategoria(p.nome) }));
+    catalogoCompletoCarregado = true;
+    await carregarModelos(produtos);
+  })();
+  try { await catalogoCompletoPromise; } finally { catalogoCompletoPromise = null; }
 }
 
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
@@ -1333,18 +1405,7 @@ async function carregarProdutos() {
   try {
     await carregarTemas();
     await carregarBannersAdmin();
-    const doc = await db.collection('config').doc('produtosSite').get();
-    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderTemasLoja(); renderBannersPublicos(); renderCatalogo(); return; }
-    const configProdutos = doc.data() || {};
-    const lista = JSON.parse(configProdutos.data || '[]');
-    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
-    adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0, 3) : [];
-    // Mantém todos os registros no admin; visibilidade pública é decidida no filtro do catálogo.
-    produtos = lista.map(p => ({
-      ...p,
-      categoria: p.categoria || inferirCategoria(p.nome),
-    }));
-    await carregarModelos(produtos);
+    await carregarModelos([]);
     renderCategorias();
     renderTemasLoja();
     renderBannersPublicos();
@@ -1354,7 +1415,9 @@ async function carregarProdutos() {
       if (inputBusca) inputBusca.value = buscaInicial;
       termoBusca = normalizarTextoBusca(buscaInicial);
     }
-    renderCatalogo();
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('busca') || params.has('produto')) { await carregarCatalogoCompleto(); renderCatalogo(); }
+    else { await carregarProximoLoteHome(); observarFimCatalogoHome(); }
     const produtoDireto = new URLSearchParams(window.location.search).get('produto');
     if (produtoDireto) abrirProduto(produtoDireto);
   } catch (e) {
@@ -1374,7 +1437,8 @@ const ICONE_CATEGORIA_NAV = {
 };
 
 function renderCategorias() {
-  const categorias = ['todas', ...new Set(getProdutosCatalogo().map(p => p.categoria))];
+  const fonte = catalogoCompletoCarregado ? produtos : produtosHome;
+  const categorias = ['todas', ...new Set(fonte.map(p => p.categoria || inferirCategoria(p.nome)))];
   const el = document.getElementById('categoriasScroll');
   if (!el) return;
   el.innerHTML = categorias.map(cat => {
@@ -1387,7 +1451,8 @@ function renderCategorias() {
   }).join('');
 }
 
-function filtrarCategoria(cat) {
+async function filtrarCategoria(cat) {
+  if (!catalogoCompletoCarregado) await carregarCatalogoCompleto();
   categoriaAtiva = cat;
   renderCategorias();
   renderCatalogo();
@@ -1449,13 +1514,15 @@ function pontuarTextoBusca(consulta, texto) {
 function onSearchInput() {
   termoBusca = normalizarTextoBusca(document.getElementById('searchInput').value);
   renderSugestoesBusca();
-  renderCatalogo();
+  carregarCatalogoCompleto().then(() => { renderCategorias(); renderSugestoesBusca(); renderCatalogo(); }).catch(e => console.error('Erro ao carregar catálogo para busca:',e));
 }
 
 /** Lista de temas únicos existentes no catálogo, com contagem de produtos e uma foto de exemplo */
 function getTemasDisponiveis() {
   const mapa = {};
-  getProdutosCatalogo().forEach(p => {
+  const produtosTemaFonte = (catalogoCompletoCarregado ? produtos : produtosHome).map(produtoComModelo)
+    .filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco)>0 || p.sobConsulta) && temaAtivoDoProduto(p));
+  produtosTemaFonte.forEach(p => {
     const cadastrado = temaDoProduto(p);
     const nomeTema = cadastrado?.nome || p.temaNome;
     if (!nomeTema) return;
@@ -1465,10 +1532,14 @@ function getTemasDisponiveis() {
     mapa[nomeTema].count++;
     if (!mapa[nomeTema].imagemFallback) mapa[nomeTema].imagemFallback = imagemProdutoParaTema(p);
   });
-  return Object.values(mapa).map(t => {
+  const encontrados = Object.values(mapa).map(t => {
     const tema = temasSite.find(x => x.id && x.id === t.id) || temasSite.find(x => textoChaveCatalogo(x.nome) === textoChaveCatalogo(t.nome));
     return { ...t, foto:imagemProdutoParaTema({ foto:tema?.foto }) || t.imagemFallback };
-  }).sort((a,b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
+  });
+  if (!catalogoCompletoCarregado) temasSite.filter(t => t.ativo !== false).forEach(t => {
+    if (!encontrados.some(x => textoChaveCatalogo(x.nome) === textoChaveCatalogo(t.nome))) encontrados.push({ id:t.id, nome:t.nome, count:0, foto:imagemProdutoParaTema({foto:t.foto}), palavrasChave:t.palavrasChave||[], ordem:temasSite.indexOf(t) });
+  });
+  return encontrados.sort((a,b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 function renderTemasLoja() {
@@ -1515,7 +1586,7 @@ function selecionarSugestaoBusca(nomeTema) {
   aplicarBuscaCatalogo();
 }
 
-function aplicarBuscaCatalogo() {
+async function aplicarBuscaCatalogo() {
   const input = document.getElementById('searchInput');
   termoBusca = normalizarTextoBusca(input?.value || '');
   categoriaAtiva = 'todas';
@@ -1525,6 +1596,9 @@ function aplicarBuscaCatalogo() {
   history.replaceState({}, '', urlBusca.href);
   fecharSugestoesBusca();
   if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
+  await carregarCatalogoCompleto();
+  renderCategorias();
+  renderSugestoesBusca();
   renderCatalogo();
   requestAnimationFrame(() => document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
@@ -1599,7 +1673,8 @@ function produtoPontuacaoBusca(p, termo) {
 
 function renderCatalogo() {
   const grid = document.getElementById('catalogoGrid');
-  const produtosVisiveis = getProdutosCatalogo();
+  const fonteProdutos = (termoBusca || categoriaAtiva !== 'todas') ? produtos : produtosHome;
+  const produtosVisiveis = fonteProdutos.map(produtoComModelo).filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco)>0 || p.sobConsulta) && temaAtivoDoProduto(p));
   let lista = categoriaAtiva === 'todas' ? produtosVisiveis : produtosVisiveis.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
     lista = lista.map((produto,ordem)=>({produto,ordem,pontuacao:produtoPontuacaoBusca(produto,termoBusca)}))
@@ -1627,16 +1702,17 @@ function renderCatalogo() {
   }
 
   grid.innerHTML = lista.map(p => {
-    const vendas = vendasFakePara(p.id);
-    const badge = vendas > 100 ? '🔥 Mais vendido' : (p.adicionais && p.adicionais.length > 0 ? 'Personalizável' : '');
+    const vendas = vendasProduto(p);
+    const badge = vendas >= 10 ? '🔥 Mais vendido' : (p.adicionais && p.adicionais.length > 0 ? 'Personalizável' : '');
     const emPromocao = p.promoAtiva && p.promoValor > 0 && !p.sobConsulta;
     const precoPromocional = !emPromocao ? p.preco : (p.promoTipo === 'percentual'
       ? p.preco * (1 - p.promoValor / 100)
       : Math.max(p.preco - p.promoValor, 0));
     const seloPromocao = !emPromocao ? '' : (p.promoTipo === 'percentual' ? `${p.promoValor}% OFF` : `-${BRL(p.promoValor)}`);
+    const rotuloVendas = vendas > 0 ? `<span class="produto-vendas">${vendas} vendido${vendas === 1 ? '' : 's'}</span>` : '';
     const precoCatalogoHtml = emPromocao
-      ? `<span class="preco-original-catalogo">${BRL(p.preco)}</span><span class="preco-promocional-catalogo">${BRL(precoPromocional)}</span><span class="badge-promocional-catalogo">${seloPromocao}</span><span class="produto-vendas">${vendas}+ vendidos</span>`
-      : `${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}<span class="produto-vendas">${vendas}+ vendidos</span>`;
+      ? `<span class="preco-original-catalogo">${BRL(p.preco)}</span><span class="preco-promocional-catalogo">${BRL(precoPromocional)}</span><span class="badge-promocional-catalogo">${seloPromocao}</span>${rotuloVendas}`
+      : `${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}${rotuloVendas}`;
     // A capa (p.foto) pode ser um vídeo — <img> não reproduz vídeo, então nesse caso
     // usa a primeira foto de verdade da galeria, ou o emoji da categoria como fallback
     const capaFoto = (p.foto && !ehVideo(p.foto)) ? p.foto : (p.fotos || []).find(f => !ehVideo(f));
@@ -1652,6 +1728,7 @@ function renderCatalogo() {
       </div>
     </div>`;
   }).join('');
+  observarFimCatalogoHome();
 }
 
 // ── Banner carrossel automático ────────────────────────────────────────────
@@ -1795,7 +1872,7 @@ function fecharZoomMidiaProduto() {
 }
 
 function abrirProduto(id) {
-  const original = produtos.find(x => x.id === id);
+  const original = produtos.find(x => x.id === id) || produtosHome.find(x => x.id === id);
   if (!original || original.ativo === false || !(Number(original.preco) > 0 || original.sobConsulta) || !temaAtivoDoProduto(original)) return;
   const p = produtoComModelo(original);
   if (!p) return;
@@ -2830,7 +2907,8 @@ function adminGoTab(tab) {
 function adminFecharModal(id) { document.getElementById(id).classList.remove('open'); }
 
 async function adminCarregarTudo() {
-  await Promise.all([carregarProdutos(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
+  await Promise.all([carregarTemas(), carregarCatalogoCompleto(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
+  try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.error('Erro ao sincronizar catálogo paginado:',e); }
   adminCarregarOfertasGlobais();
   adminRenderProdutos();
   adminRenderTemas();
@@ -2978,6 +3056,7 @@ async function adminAplicarNormalizacao() {
   batch.set(db.collection('config').doc('modelosSite'), { data:JSON.stringify(modelosSite) }, { merge:true });
   try {
     await batch.commit();
+    await sincronizarProdutosPaginadosSite(produtosAtualizados);
     produtos = produtosAtualizados;
     modelosSiteSalvos = true;
     adminRenderProdutos();
@@ -3865,6 +3944,7 @@ async function adminSalvarTema() {
   }
   try { await salvarTemasRemote(); }
   catch (e) { temasSite = estadoAnterior; showToast('Não foi possível salvar o tema.', 'error'); return; }
+  try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.warn('Falha ao atualizar catálogo paginado após editar tema:',e); }
   adminRenderTemas();
   renderTemasLoja();
   renderCategorias();
@@ -3878,6 +3958,7 @@ async function adminToggleTema(id) {
   tema.ativo = tema.ativo === false;
   try {
     await salvarTemasRemote();
+    try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.warn('Falha ao atualizar catálogo paginado após alterar tema:',e); }
     adminRenderTemas();
     renderCategorias();
     renderCatalogo();
@@ -3920,6 +4001,7 @@ async function adminExcluirTema(idx) {
   }, { merge:true });
   try {
     await batch.commit();
+    await sincronizarProdutosPaginadosSite(produtosAtualizados);
     temasSite = temasAtualizados;
     produtos = produtosAtualizados;
     adicionaisGlobais = adicionaisAtualizados;
