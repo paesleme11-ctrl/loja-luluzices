@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#e8546a">
 <title>Luluzices — Convites Digitais</title>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://res.cloudinary.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <!-- Firebase (apenas leitura de produtos + chamada das Cloud Functions) -->
@@ -306,6 +309,11 @@
   }
 
   /* ── LOADING ─────────────────────────────────────────────────────────────── */
+  .produto-card.skeleton { aspect-ratio: 3/4; cursor: default; border: 0;
+    background: linear-gradient(90deg,#f1e6df 25%,#f9f1ec 50%,#f1e6df 75%);
+    background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .produto-card { content-visibility: auto; contain-intrinsic-size: 260px; }
   .loading-produtos {
     grid-column: 1 / -1;
     text-align: center;
@@ -857,10 +865,8 @@
     </div>
 
     <div class="catalogo" id="catalogoGrid">
-      <div class="loading-produtos">
-        <div class="spinner"></div>
-        <p>Carregando produtos...</p>
-      </div>
+      <div class="produto-card skeleton"></div><div class="produto-card skeleton"></div>
+      <div class="produto-card skeleton"></div><div class="produto-card skeleton"></div>
     </div>
   </div>
 </div>
@@ -1329,41 +1335,96 @@ function vendasFakePara(id) {
 }
 
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
-async function carregarProdutos() {
-  try {
-    await carregarTemas();
-    await carregarBannersAdmin();
-    const doc = await db.collection('config').doc('produtosSite').get();
-    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderTemasLoja(); renderBannersPublicos(); renderCatalogo(); return; }
-    const configProdutos = doc.data() || {};
-    const lista = JSON.parse(configProdutos.data || '[]');
-    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
-    adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0, 3) : [];
-    // Mantém todos os registros no admin; visibilidade pública é decidida no filtro do catálogo.
-    produtos = lista.map(p => ({
-      ...p,
-      categoria: p.categoria || inferirCategoria(p.nome),
-    }));
-    await carregarModelos(produtos);
-    renderCategorias();
-    renderTemasLoja();
-    renderBannersPublicos();
-    const buscaInicial = new URLSearchParams(window.location.search).get('busca');
+const CACHE_KEY = 'lulu_loja_v1';
+let ultimoRawLoja = '';
+let primeiraAplicacao = true;
+
+/** Otimiza imagens do Cloudinary (formato/qualidade automáticos + largura certa). Vídeos ficam intactos. */
+function otimizarImg(url, w = 500) {
+  if (!url || typeof url !== 'string' || !url.includes('res.cloudinary.com') || !url.includes('/image/upload/') || url.includes('/image/upload/f_auto')) return url;
+  return url.replace('/image/upload/', `/image/upload/f_auto,q_auto,w_${w}/`);
+}
+
+function aplicarDadosLoja(r) {
+  temasSite   = JSON.parse(r.temas || '[]');
+  bannersSite = JSON.parse(r.banners || '[]');
+  const lista = JSON.parse(r.produtos || '[]');
+  ofertaCrossSellGlobal = { produtoId:'', descontoTipo:'fixo', descontoValor:0, texto:'', ...(r.cross || {}) };
+  adicionaisGlobais = Array.isArray(r.adicionais) ? r.adicionais.slice(0, 3) : [];
+  produtos = lista.map(p => ({ ...p, categoria: p.categoria || inferirCategoria(p.nome) }));
+
+  if (r.modelos) {
+    const salvos = JSON.parse(r.modelos);
+    modelosSite = modelosSite.map(base => ({ ...base, ...(salvos.find(m => m.id === base.id) || {}) }));
+    modelosSiteSalvos = true;
+    conflitoPromocoesModelos = modelosSite.filter(m => m.promoConflito).map(m => ({ modelo:m.nome, produtos:[] }));
+  } else {
+    modelosSiteSalvos = false;
+    inferirPromocaoDosProdutos(produtos);
+  }
+
+  renderCategorias();
+  renderTemasLoja();
+  renderBannersPublicos();
+
+  if (primeiraAplicacao) {
+    primeiraAplicacao = false;
+    const params = new URLSearchParams(window.location.search);
+    const buscaInicial = params.get('busca');
     if (buscaInicial) {
       const inputBusca = document.getElementById('searchInput');
       if (inputBusca) inputBusca.value = buscaInicial;
       termoBusca = normalizarTextoBusca(buscaInicial);
     }
     renderCatalogo();
-    const produtoDireto = new URLSearchParams(window.location.search).get('produto');
+    const produtoDireto = params.get('produto');
     if (produtoDireto) abrirProduto(produtoDireto);
+  } else {
+    renderCatalogo();
+  }
+}
+
+async function carregarProdutos() {
+  // 1) Pinta na hora com o que o cliente viu da última vez
+  let temCache = false;
+  try {
+    const cache = localStorage.getItem(CACHE_KEY);
+    if (cache) { aplicarDadosLoja(JSON.parse(cache)); ultimoRawLoja = cache; temCache = true; }
+  } catch (e) { try { localStorage.removeItem(CACHE_KEY); } catch {} }
+
+  // 2) Busca os dados novos, todas as leituras ao mesmo tempo
+  try {
+    const cfg = db.collection('config');
+    const [t, b, p, m] = await Promise.all([
+      cfg.doc('temasSite').get(),
+      cfg.doc('bannersSite').get(),
+      cfg.doc('produtosSite').get(),
+      cfg.doc('modelosSite').get(),
+    ]);
+    const pd = p.exists ? (p.data() || {}) : {};
+    const raw = {
+      temas:    t.exists ? (t.data().data || '[]') : '[]',
+      banners:  b.exists ? (b.data().data || '[]') : '[]',
+      produtos: pd.data || '[]',
+      cross:    pd.crossSellGlobal || null,
+      adicionais: pd.adicionaisGlobais || [],
+      modelos:  m.exists ? (m.data().data || null) : null,
+    };
+    const novo = JSON.stringify(raw);
+    if (novo !== ultimoRawLoja || primeiraAplicacao) {   // só re-renderiza se algo mudou
+      aplicarDadosLoja(raw);
+      ultimoRawLoja = novo;
+      try { localStorage.setItem(CACHE_KEY, novo); } catch {}
+    }
   } catch (e) {
     console.error('Erro ao carregar produtos:', e);
-    document.getElementById('catalogoGrid').innerHTML = `
-      <div class="empty-state">
-        <div class="icon">😕</div>
-        <p>Não foi possível carregar o catálogo agora.<br>Tente novamente em instantes.</p>
-      </div>`;
+    if (!temCache) {
+      document.getElementById('catalogoGrid').innerHTML = `
+        <div class="empty-state">
+          <div class="icon">😕</div>
+          <p>Não foi possível carregar o catálogo agora.<br>Tente novamente em instantes.</p>
+        </div>`;
+    }
   }
 }
 
@@ -1477,7 +1538,7 @@ function renderTemasLoja() {
   const temas = getTemasDisponiveis();
   if (!temas.length) { grid.innerHTML = '<div class="temas-vazio">Os temas estarão disponíveis em breve.</div>'; return; }
   grid.innerHTML = temas.map(t => {
-    const imagem = t.foto ? `<img src="${escaparHTMLCatalogo(t.foto)}" alt="Tema ${escaparHTMLCatalogo(t.nome)}" loading="lazy" onerror="this.remove();this.parentElement.textContent='🎨';">` : '🎨';
+    const imagem = t.foto ? `<img src="${escaparHTMLCatalogo(otimizarImg(t.foto, 200))}" alt="Tema ${escaparHTMLCatalogo(t.nome)}" loading="lazy" decoding="async" onerror="this.remove();this.parentElement.textContent='🎨';">` : '🎨';
     return `<button class="tema-card-loja" type="button" data-tema-loja="${escaparHTMLCatalogo(t.nome)}" aria-label="Ver convites do tema ${escaparHTMLCatalogo(t.nome)}"><span class="tema-card-image">${imagem}</span><strong>${escaparHTMLCatalogo(t.nome)}</strong></button>`;
   }).join('');
   grid.querySelectorAll('[data-tema-loja]').forEach(botao => botao.addEventListener('click', () => selecionarTemaLoja(botao.dataset.temaLoja)));
@@ -1644,7 +1705,7 @@ function renderCatalogo() {
     <div class="produto-card" onclick="abrirProduto('${p.id}')">
       ${badge ? `<div class="produto-badge">${badge}</div>` : ''}
       ${emPromocao ? `<div class="produto-badge-oferta">OFERTA</div>` : ''}
-      <div class="produto-thumb">${capaFoto ? `<img src="${capaFoto}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
+      <div class="produto-thumb">${capaFoto ? `<img src="${otimizarImg(capaFoto, 400)}" alt="${p.nome}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
       <div class="produto-info">
         <div class="produto-categoria">${p.categoria}</div>
         <h3 class="produto-nome">${p.nome}</h3>
@@ -1811,7 +1872,7 @@ function abrirProduto(id) {
     ? fotos.map((url, indice) => {
         const conteudo = ehVideo(url)
           ? `<video src="${url}" autoplay muted loop playsinline preload="metadata" onclick="abrirZoomMidiaProduto(${indice})" aria-label="Ampliar vídeo"></video>`
-          : `<img src="${url}" alt="${p.nome}" onclick="abrirZoomMidiaProduto(${indice})" aria-label="Ampliar imagem do produto" style="cursor:zoom-in;">`;
+          : `<img src="${otimizarImg(url, 900)}" alt="${p.nome}" onclick="abrirZoomMidiaProduto(${indice})" aria-label="Ampliar imagem do produto" style="cursor:zoom-in;">`;
         return `<div class="produto-midia-slide">${conteudo}</div>`;
       }).join('')
     : `<div class="produto-midia-slide"><span class="emoji-fallback">${emojiPara(p.categoria)}</span></div>`;
@@ -1862,7 +1923,7 @@ function abrirProduto(id) {
         ${crossProdutos.map(cp => {
           const cpFoto = (cp.fotos && cp.fotos[0]) || cp.foto;
           return `<div class="crosssell-item" onclick="abrirProduto('${cp.id}')">
-            <div class="crosssell-thumb">${cpFoto ? `<img src="${cpFoto}">` : emojiPara(cp.categoria)}</div>
+            <div class="crosssell-thumb">${cpFoto ? `<img src="${otimizarImg(cpFoto, 260)}" loading="lazy" decoding="async">` : emojiPara(cp.categoria)}</div>
             <div class="crosssell-nome">${cp.nome}</div>
             <div class="crosssell-preco">${cp.sobConsulta ? 'Sob consulta' : BRL(precoPromocionalProduto(cp))}</div>
           </div>`;
