@@ -142,6 +142,9 @@
     overflow: hidden;
     aspect-ratio: 16/7.5;
     background: linear-gradient(120deg, var(--rose-dark), var(--rose));
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
   }
   .banner-slide {
     position: absolute; inset: 0;
@@ -1746,19 +1749,55 @@ function renderCatalogo() {
 // ── Banner carrossel automático ────────────────────────────────────────────
 let bannerIdx = 0;
 let bannerTimer = null;
+let bannerIgnorarCliqueAte = 0;
+
+function reiniciarTimerBanner(total) {
+  if (bannerTimer) clearInterval(bannerTimer);
+  if (total > 1) bannerTimer = setInterval(() => irParaBannerSlide((bannerIdx + 1) % total), 4500);
+}
+
+function configurarDeslizeBanner(carrossel) {
+  if (!carrossel || carrossel.dataset.swipeConfigured === 'true') return;
+  carrossel.dataset.swipeConfigured = 'true';
+  let inicioX = 0, inicioY = 0;
+  carrossel.addEventListener('touchstart', event => {
+    const toque = event.touches[0];
+    if (!toque) return;
+    inicioX = toque.clientX;
+    inicioY = toque.clientY;
+    if (bannerTimer) clearInterval(bannerTimer);
+  }, { passive:true });
+  carrossel.addEventListener('touchend', event => {
+    const toque = event.changedTouches[0];
+    if (!toque) return;
+    const dx = toque.clientX - inicioX;
+    const dy = toque.clientY - inicioY;
+    const total = carrossel.querySelectorAll('.banner-slide').length;
+    if (total > 1 && Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      bannerIgnorarCliqueAte = Date.now() + 500;
+      irParaBannerSlide((bannerIdx + (dx < 0 ? 1 : -1) + total) % total);
+    }
+    reiniciarTimerBanner(total);
+  }, { passive:true });
+  carrossel.addEventListener('click', event => {
+    if (Date.now() < bannerIgnorarCliqueAte) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+}
+
 function initBannerCarrossel() {
   const slides = document.querySelectorAll('.banner-slide');
   const dotsEl = document.getElementById('bannerDots');
   if (!dotsEl || !slides.length) return;
-  if (bannerTimer) clearInterval(bannerTimer);
+  configurarDeslizeBanner(document.getElementById('bannerCarrossel'));
   bannerIdx = 0;
   dotsEl.innerHTML = Array.from(slides).map((_, i) =>
     `<div class="banner-dot ${i===0?'active':''}" onclick="irParaBannerSlide(${i})"></div>`
   ).join('');
 
-  bannerTimer = setInterval(() => {
-    irParaBannerSlide((bannerIdx + 1) % slides.length);
-  }, 4500);
+  reiniciarTimerBanner(slides.length);
 }
 
 function irParaBannerSlide(idx) {
