@@ -6,10 +6,12 @@
 <meta name="theme-color" content="#e8546a">
 <title>Luluzices — Convites Digitais</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
 <!-- Firebase (apenas leitura de produtos + chamada das Cloud Functions) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
 <style>
   /* ============================================================
      LULUZICES — SITE DE VENDAS
@@ -26,6 +28,7 @@
     --shadow-lg: 0 12px 40px rgba(26,18,20,0.14);
     --radius: 18px; --radius-sm: 10px;
   }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body {
@@ -40,7 +43,9 @@
   button { font-family: inherit; cursor: pointer; }
   img { max-width: 100%; display: block; }
   video { max-width: 100%; display: block; }
+
   h1, h2, h3 { font-family: 'DM Serif Display', serif; font-weight: 400; }
+
   /* ── HEADER ──────────────────────────────────────────────────────────────── */
   header {
     position: sticky; top: 0; z-index: 100;
@@ -125,20 +130,12 @@
     position: absolute; top: -4px; right: -4px;
     border: 1.5px solid var(--rose);
   }
+
   /* ── BANNER CARROSSEL ────────────────────────────────────────────────────── */
   .banner-wrap {
     padding: 12px 16px 0;
     background: var(--rose);
   }
-  .banner-carrossel {
-    position: relative;
-    border-radius: 14px;
-    overflow: hidden;
-    aspect-ratio: 16/7.5;
-    background: linear-gradient(120deg, var(--rose-dark), var(--rose));
-    touch-action: pan-y;
-    user-select: none;
-    -webkit-user-select: none;
   .banner-carrossel {
     position: relative;
     border-radius: 14px;
@@ -183,6 +180,7 @@
     transition: background 0.2s, width 0.2s;
   }
   .banner-dot.active { background: #fff; width: 18px; border-radius: 4px; }
+
   /* ── CATEGORIAS (ícones circulares) ──────────────────────────────────────── */
   .categorias-section {
     background: var(--rose);
@@ -213,8 +211,10 @@
     font-size: 10.5px; font-weight: 600; color: #fff;
     text-align: center; line-height: 1.2;
   }
+
   /* Corpo da página tem fundo creme, some do laço do header/banner/categorias */
   .home-body { background: var(--cream); }
+
   /* ── SEÇÃO / GRID DE PRODUTOS ────────────────────────────────────────────── */
   .secao-titulo {
     display: flex; align-items: center; justify-content: space-between;
@@ -222,6 +222,7 @@
   }
   .secao-titulo h2 { font-size: 17px; }
   .secao-titulo .ver-todos { font-size: 12px; color: var(--rose); font-weight: 700; }
+
   .catalogo {
     max-width: 1200px; margin: 0 auto;
     padding: 0 12px 60px;
@@ -235,6 +236,7 @@
   @media (min-width: 960px) {
     .catalogo { grid-template-columns: repeat(4, 1fr); }
   }
+
   .produto-card {
     background: #fff; border-radius: 10px;
     border: 1px solid var(--border);
@@ -242,6 +244,7 @@
     cursor: pointer;
     position: relative;
   }
+
   .produto-badge {
     position: absolute; top: 8px; left: 8px;
     background: var(--rose); color: #fff;
@@ -249,6 +252,7 @@
     padding: 3px 8px; border-radius: 5px;
     z-index: 2; text-transform: uppercase; letter-spacing: 0.3px;
   }
+
   .produto-thumb {
     aspect-ratio: 1/1;
     background: linear-gradient(135deg, var(--rose-light), var(--warm));
@@ -285,6 +289,7 @@
   .produto-preco .preco-promocional-catalogo { color:#c23650; }
   .produto-preco .badge-promocional-catalogo { display:inline-block; margin-left:5px; padding:2px 5px; border-radius:4px; background:#e84040; color:#fff; font-size:9px; font-weight:700; vertical-align:2px; }
   .produto-badge-oferta { position:absolute; top:8px; right:8px; z-index:3; background:#e84040; color:#fff; font-size:9px; font-weight:800; padding:4px 7px; border-radius:5px; box-shadow:0 2px 6px rgba(0,0,0,.18); }
+
   .empty-state {
     grid-column: 1 / -1;
     text-align: center;
@@ -299,6 +304,7 @@
     padding: 12px 22px; border-radius: 100px; font-size: 13.5px; font-weight: 700;
     margin-top: 18px; text-decoration: none;
   }
+
   /* ── LOADING ─────────────────────────────────────────────────────────────── */
   .loading-produtos {
     grid-column: 1 / -1;
@@ -306,21 +312,6 @@
     padding: 60px 24px;
     color: var(--ink-muted);
   }
-  .loading-produtos {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 60px 24px;
-    color: var(--ink-muted);
-  }
-  .site-loading-overlay {
-    position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center;
-    background:var(--cream); opacity:1; visibility:visible; transition:opacity .22s ease,visibility .22s ease;
-  }
-  .site-loading-overlay.oculto { opacity:0; visibility:hidden; pointer-events:none; }
-  .site-loading-conteudo { display:flex; flex-direction:column; align-items:center; gap:16px; }
-  .site-loading-logo { min-height:42px; display:flex; align-items:center; justify-content:center; color:var(--rose-dark); font-family:'DM Serif Display',serif; font-size:28px; }
-  .site-loading-logo img { max-width:min(56vw,220px); max-height:64px; object-fit:contain; }
-  .site-loading-spinner { width:24px; height:24px; border:2px solid rgba(232,84,106,.18); border-top-color:var(--rose); border-radius:50%; animation:spin .9s linear infinite; }
   .spinner {
     width: 32px; height: 32px; margin: 0 auto 14px;
     border: 3px solid var(--border); border-top-color: var(--rose);
@@ -328,6 +319,7 @@
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ── BOTTOM NAV (mobile, estilo app) ─────────────────────────────────────── */
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -350,9 +342,11 @@
     font-size: 9px; font-weight: 700;
   }
   body { padding-bottom: 58px; } /* espaço pra bottom nav não cobrir conteúdo */
+
   /* ── PÁGINA DE PRODUTO (view) ────────────────────────────────────────────── */
   .view { display: none; }
   .view.active { display: block; }
+
   .produto-page {
     max-width: 1000px; margin: 0 auto;
     padding: 20px 16px 80px;
@@ -370,6 +364,7 @@
   .produto-voltar-icone { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; background:var(--rose-light); color:var(--rose-dark); border-radius:50%; font-size:20px; line-height:1; }
   .produto-voltar-dica { display:none; color:var(--ink-muted); font-size:11px; }
   @media (max-width: 768px) { .produto-voltar-dica { display:inline; } }
+
   .produto-detalhe {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -380,6 +375,7 @@
   @media (max-width: 768px) {
     .produto-detalhe { grid-template-columns: 1fr; gap: 20px; }
   }
+
   /* Carrossel de mídia (foto/vídeo) por arraste — substitui a antiga miniatura fixa */
   .produto-midia-carrossel {
     position: relative;
@@ -444,6 +440,7 @@
   .produto-zoom-conteudo img { cursor:zoom-in; transition:transform .2s ease; }
   .produto-zoom-conteudo img.ampliada { transform:scale(1.7); cursor:zoom-out; }
   .produto-zoom-fechar { position:absolute; top:14px; right:14px; z-index:2; width:42px; height:42px; border:0; border-radius:50%; color:#fff; background:rgba(255,255,255,.16); font-size:26px; line-height:1; }
+
   .produto-detalhe-info .produto-categoria { font-size: 12px; }
   .produto-detalhe-info h1 { font-size: 28px; margin: 8px 0 14px; word-break: break-word; }
   .produto-detalhe-preco {
@@ -460,6 +457,7 @@
   }
   .produto-descricao ul { margin: 10px 0 0 18px; }
   .produto-descricao li { margin-bottom: 4px; }
+
   .produto-adicionais { margin-bottom: 24px; }
   .produto-preco-original { font-size: 15px; color: var(--ink-muted); text-decoration: line-through; font-weight: 500; margin-left: 8px; }
   .produto-preco-badge-promo { display: inline-block; background: var(--red, #e84040); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; margin-left: 6px; vertical-align: middle; }
@@ -485,6 +483,7 @@
   }
   .adicional-nome-check { flex: 1; }
   .adicional-preco-check { color: var(--rose); font-weight: 600; font-size: 13px; }
+
   .btn-comprar {
     width: 100%;
     background: var(--rose); color: #fff;
@@ -493,12 +492,14 @@
     transition: background 0.15s;
   }
   .btn-comprar:hover { background: var(--rose-dark); }
+
   /* ── DRAWER DO CARRINHO ──────────────────────────────────────────────────── */
   .cart-overlay {
     position: fixed; inset: 0; background: rgba(26,18,20,0.4);
     z-index: 998; display: none;
   }
   .cart-overlay.open { display: block; }
+
   .cart-drawer {
     position: fixed; top: 0; right: 0; height: 100vh;
     width: 380px; max-width: 92vw;
@@ -510,12 +511,14 @@
     display: flex; flex-direction: column;
   }
   .cart-drawer.open { transform: translateX(0); }
+
   .cart-header {
     padding: 20px 24px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .cart-header h2 { font-size: 20px; }
   .cart-close { background: none; border: none; font-size: 22px; color: var(--ink-muted); }
+
   .cart-items { flex: 1; overflow-y: auto; padding: 16px 24px; }
   .cart-item {
     display: flex; gap: 12px; padding: 14px 0;
@@ -536,10 +539,12 @@
     font-size: 18px; align-self: flex-start;
   }
   .cart-item-remove:hover { color: var(--red, #e84040); }
+
   .cart-item-selo-oferta {
     display: inline-block; font-size: 10px; font-weight: 700; color: var(--green);
     background: rgba(61,171,122,0.12); padding: 2px 7px; border-radius: 100px; margin: 3px 0;
   }
+
   .orderbump-card {
     display: flex; align-items: center; gap: 10px;
     background: linear-gradient(135deg, var(--rose-light), #fff);
@@ -563,6 +568,7 @@
     background: var(--rose); color: #fff; border: none; border-radius: 100px;
     padding: 7px 12px; font-size: 11px; font-weight: 700; flex-shrink: 0; pointer-events: none;
   }
+
   .ofertas-overlay { position:fixed; inset:0; z-index:1001; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(26,18,20,.58); }
   .ofertas-overlay.open { display:flex; }
   .ofertas-modal { width:560px; max-width:100%; max-height:92vh; overflow:auto; background:#fff; border-radius:20px; box-shadow:var(--shadow-lg); }
@@ -604,11 +610,14 @@
   .extra-detalhe-acoes .recusar { padding:12px; border-radius:10px; background:#fff; border:1px solid var(--border); color:var(--ink-light); font-weight:700; }
   .extra-detalhe-acoes .incluir { padding:12px; border-radius:10px; background:var(--rose); border:0; color:#fff; font-weight:700; }
   @media(max-width:420px) { .ofertas-body,.ofertas-header,.ofertas-footer { padding-left:15px; padding-right:15px; } .adicionais-globais-grid { gap:7px; } .adicional-global-info { padding:6px; } }
+
   .cart-empty { text-align: center; padding: 60px 20px; color: var(--ink-muted); }
   .cart-empty .icon { font-size: 36px; margin-bottom: 10px; }
+
   .cart-footer { padding: 20px 24px; border-top: 1px solid var(--border); }
   .cart-total { display: flex; justify-content: space-between; margin-bottom: 16px; font-size: 15px; font-weight: 600; }
   .cart-total span:last-child { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--rose); }
+
   /* ── MODAL DE CHECKOUT ───────────────────────────────────────────────────── */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(26,18,20,0.5);
@@ -630,6 +639,7 @@
   .checkout-header h2 { font-size: 20px; }
   .checkout-close { background: none; border: none; font-size: 20px; color: var(--ink-muted); }
   .checkout-body { padding: 22px 26px; }
+
   .checkout-resumo {
     background: var(--cream); border-radius: var(--radius-sm);
     padding: 14px 16px; margin-bottom: 20px;
@@ -641,6 +651,7 @@
     padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--border);
     font-weight: 700; font-size: 15px;
   }
+
   .form-group { margin-bottom: 14px; }
   .form-group label {
     display: block; font-size: 12px; font-weight: 700;
@@ -656,6 +667,7 @@
   }
   input:focus, textarea:focus { border-color: var(--rose); }
   textarea { min-height: 70px; resize: vertical; }
+
   .btn-finalizar {
     width: 100%; background: var(--rose); color: #fff;
     border: none; border-radius: var(--radius-sm);
@@ -665,19 +677,23 @@
   }
   .btn-finalizar:hover { background: var(--rose-dark); }
   .btn-finalizar:disabled { background: var(--ink-muted); cursor: not-allowed; }
+
   .checkout-selo {
     display: flex; align-items: center; gap: 8px;
     justify-content: center; margin-top: 14px;
     font-size: 11.5px; color: var(--ink-muted);
   }
+
   /* ── ETAPAS DO CHECKOUT (multi-step) ────────────────────────────────────── */
   .checkout-etapa { display: none; }
   .checkout-etapa.active { display: block; }
+
   .voltar-etapa {
     text-align: center; margin-top: 14px; font-size: 12.5px; font-weight: 600;
     color: var(--ink-muted); cursor: pointer;
   }
   .voltar-etapa:hover { color: var(--rose); }
+
   /* Como funciona */
   .como-funciona-texto {
     font-size: 14px; color: var(--ink); line-height: 1.6; margin-bottom: 20px;
@@ -694,6 +710,7 @@
   .como-funciona-importante li {
     font-size: 12.5px; color: var(--ink-light); margin-bottom: 6px; line-height: 1.5;
   }
+
   /* Forma de pagamento */
   .pagamento-titulo {
     font-size: 15px; font-weight: 700; text-align: center; margin-bottom: 16px; color: var(--ink);
@@ -709,6 +726,7 @@
   .btn-pagamento-texto { display: flex; flex-direction: column; font-size: 13px; }
   .btn-pagamento-texto strong { font-size: 15px; color: var(--ink); margin-bottom: 2px; }
   .btn-pagamento-texto span { color: var(--ink-muted); font-size: 12px; }
+
   /* Pix */
   .pix-box, .cartao-box { text-align: center; margin-bottom: 18px; }
   .pix-icon, .cartao-icon { font-size: 44px; margin-bottom: 10px; }
@@ -728,6 +746,7 @@
   }
   .btn-whats-confirmar { background: var(--green); }
   .btn-whats-confirmar:hover { background: #2f8d64; }
+
   /* ── TOAST ───────────────────────────────────────────────────────────────── */
   .toast {
     position: fixed; bottom: 24px; left: 50%;
@@ -743,12 +762,14 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.success { background: var(--green); }
   .toast.error { background: #e84040; }
+
   /* ── FOOTER ──────────────────────────────────────────────────────────────── */
   footer {
     text-align: center; padding: 32px 24px;
     color: var(--ink-muted); font-size: 12.5px;
     border-top: 1px solid var(--border);
   }
+
   /* ── MOBILE ──────────────────────────────────────────────────────────────── */
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
@@ -768,14 +789,7 @@
 </style>
 </head>
 <body>
-<header>
-<body>
-<div class="site-loading-overlay" id="siteLoadingOverlay" aria-label="Carregando a loja" role="status">
-  <div class="site-loading-conteudo">
-    <div class="site-loading-logo" id="siteLoadingLogo">🎈 Lulu</div>
-    <div class="site-loading-spinner" aria-hidden="true"></div>
-  </div>
-</div>
+
 <header>
   <div class="header-top">
     <div class="logo">🎈 Lulu</div>
@@ -794,8 +808,10 @@
     </div>
   </div>
 </header>
+
 <!-- ═══════════════════ VIEW: CATÁLOGO ═══════════════════ -->
 <div class="view active" id="view-catalogo">
+
   <div class="banner-wrap">
     <div class="banner-carrossel" id="bannerCarrossel">
       <div class="banner-slide active">
@@ -825,6 +841,7 @@
       <div class="banner-dots" id="bannerDots"></div>
     </div>
   </div>
+
   <section class="temas-section" aria-label="Temas de convites">
     <div class="temas-section-inner">
       <div class="temas-section-heading"><h2>Encontre por tema</h2><span>Deslize para ver mais</span></div>
@@ -833,20 +850,21 @@
       </div>
     </div>
   </section>
+
   <div class="home-body">
     <div class="secao-titulo">
-      <h2>✨ Novidades</h2>
       <h2>🔥 Todos os convites</h2>
     </div>
+
     <div class="catalogo" id="catalogoGrid">
       <div class="loading-produtos">
         <div class="spinner"></div>
         <p>Carregando produtos...</p>
       </div>
     </div>
-    <div id="catalogoPaginacao" style="min-height:36px;text-align:center;color:#9a8890;font-size:13px;padding:12px 0" aria-live="polite"></div>
   </div>
 </div>
+
 <!-- ═══════════════════ VIEW: PRODUTO ═══════════════════ -->
 <div class="view" id="view-produto">
   <div class="produto-page">
@@ -859,10 +877,12 @@
     <div class="produto-detalhe" id="produtoDetalheContainer"></div>
   </div>
 </div>
+
 <div id="produtoZoomOverlay" class="produto-zoom-overlay" role="dialog" aria-modal="true" aria-label="Mídia ampliada do produto" onclick="if(event.target===this)fecharZoomMidiaProduto()">
   <button type="button" class="produto-zoom-fechar" onclick="fecharZoomMidiaProduto()" aria-label="Fechar mídia ampliada">×</button>
   <div id="produtoZoomConteudo" class="produto-zoom-conteudo"></div>
 </div>
+
 <!-- ═══════════════════ BOTTOM NAV ═══════════════════ -->
 <div class="bottom-nav">
   <div class="bottom-nav-item active" onclick="voltarCatalogo()">
@@ -879,6 +899,8 @@
     <span class="bn-icon">💬</span> Ajuda
   </div>
 </div>
+
+
 <!-- ═══════════════════ CARRINHO (drawer) ═══════════════════ -->
 <div class="cart-overlay" id="cartOverlay" onclick="fecharCarrinho()"></div>
 <div class="cart-drawer" id="cartDrawer">
@@ -893,6 +915,7 @@
     <button class="btn-finalizar" onclick="abrirCheckout()">Finalizar Pedido</button>
   </div>
 </div>
+
 <div class="ofertas-overlay" id="ofertasOverlay" role="dialog" aria-modal="true" aria-labelledby="ofertasTitulo">
   <div class="ofertas-modal">
     <div class="ofertas-header"><div><h2 id="ofertasTitulo">Complete seu pedido</h2><p>Confira as ofertas especiais para o seu carrinho.</p></div><button class="ofertas-close" onclick="fecharOfertas()" aria-label="Fechar">✕</button></div>
@@ -903,6 +926,7 @@
 <div class="extra-detalhe-overlay" id="extraDetalheOverlay" role="dialog" aria-modal="true" aria-labelledby="extraDetalheTitulo" onclick="if(event.target===this) fecharDetalheAdicional(false)">
   <div class="extra-detalhe-modal" id="extraDetalheConteudo"></div>
 </div>
+
 <!-- ═══════════════════ MODAL DE CHECKOUT ═══════════════════ -->
 <div class="modal-overlay" id="checkoutOverlay">
   <div class="checkout-modal">
@@ -911,9 +935,11 @@
       <button class="checkout-close" onclick="fecharCheckout()">✕</button>
     </div>
     <div class="checkout-body">
+
       <!-- ETAPA 1: DADOS DO CLIENTE -->
       <div class="checkout-etapa active" id="checkout-etapa-dados">
         <div class="checkout-resumo" id="checkoutResumo"></div>
+
         <form id="checkoutForm" onsubmit="event.preventDefault(); irParaComoFunciona();">
           <div class="form-group">
             <label>Seu nome</label>
@@ -923,15 +949,18 @@
             <label>Seu WhatsApp</label>
             <input type="tel" id="ckWhatsapp" placeholder="(11) 99999-9999" required>
           </div>
+
           <button type="submit" class="btn-finalizar" id="btnFinalizarPedido">
             Continuar →
           </button>
         </form>
       </div>
+
       <!-- ETAPA 2: COMO FUNCIONA -->
       <div class="checkout-etapa" id="checkout-etapa-como-funciona">
         <div class="como-funciona-texto">
           <p>✨ Após a confirmação do pagamento, em <strong>1 dia útil</strong> você recebe o convite para aprovação (nome, data, hora, endereço, etc.). Após sua aprovação, finalizamos o convite.</p>
+
           <div class="como-funciona-importante">
             <div class="como-funciona-importante-titulo">📌 Importante:</div>
             <ul>
@@ -942,13 +971,17 @@
             </ul>
           </div>
         </div>
+
         <button class="btn-finalizar" onclick="irParaPagamento()">Entendi, continuar →</button>
         <div class="voltar-etapa" onclick="voltarParaDados()">← Voltar</div>
       </div>
+
       <!-- ETAPA 3: FORMA DE PAGAMENTO -->
       <div class="checkout-etapa" id="checkout-etapa-pagamento">
         <div class="checkout-resumo" id="checkoutResumoPagamento"></div>
+
         <p class="pagamento-titulo">Como você prefere pagar?</p>
+
         <button class="btn-pagamento btn-pagamento-pix" onclick="selecionarPagamento('pix')">
           <span class="btn-pagamento-icon">💠</span>
           <span class="btn-pagamento-texto">
@@ -956,6 +989,7 @@
             <span>Pagamento instantâneo</span>
           </span>
         </button>
+
         <button class="btn-pagamento btn-pagamento-cartao" onclick="selecionarPagamento('cartao')">
           <span class="btn-pagamento-icon">💳</span>
           <span class="btn-pagamento-texto">
@@ -963,8 +997,10 @@
             <span>Combinamos direto no WhatsApp</span>
           </span>
         </button>
+
         <div class="voltar-etapa" onclick="voltarParaComoFunciona()">← Voltar</div>
       </div>
+
       <!-- ETAPA 4a: PIX -->
       <div class="checkout-etapa" id="checkout-etapa-pix">
         <div class="pix-box">
@@ -976,30 +1012,37 @@
           </div>
           <div class="pix-valor" id="pixValorTexto"></div>
         </div>
+
         <button class="btn-finalizar btn-whats-confirmar" onclick="finalizarPedido('pix')">
           ✓ Já paguei — Enviar comprovante
         </button>
         <div class="voltar-etapa" onclick="voltarParaPagamento()">← Voltar</div>
       </div>
+
       <!-- ETAPA 4b: CARTÃO -->
       <div class="checkout-etapa" id="checkout-etapa-cartao">
         <div class="cartao-box">
           <div class="cartao-icon">💳</div>
           <p class="pix-instrucao">Vamos combinar o pagamento no cartão direto pelo WhatsApp — é rapidinho!</p>
         </div>
+
         <button class="btn-finalizar btn-whats-confirmar" onclick="finalizarPedido('cartao')">
           💬 Continuar no WhatsApp
         </button>
         <div class="voltar-etapa" onclick="voltarParaPagamento()">← Voltar</div>
       </div>
+
     </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
 // ============================================================
 // LULUZICES — SITE DE VENDAS
 // ============================================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",
   authDomain: "luluzices-4254e.firebaseapp.com",
@@ -1008,9 +1051,11 @@ const firebaseConfig = {
   messagingSenderId: "328419813225",
   appId: "1:328419813225:web:6f168623f3edd148ee7ff8"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+
 // ── Emojis por categoria (usado como "thumbnail" visual dos produtos) ────────
 const EMOJI_CATEGORIA = {
   'aniversario': '🎂', 'aniversário': '🎂',
@@ -1021,6 +1066,7 @@ const EMOJI_CATEGORIA = {
   'formatura': '🎓',
   'default': '🎉',
 };
+
 // Mapeia palavras-chave do nome do produto para uma categoria (já que o
 // catálogo do sistema de gestão não tem campo de categoria hoje — usamos
 // o próprio nome pra inferir, mantendo compatibilidade total)
@@ -1032,19 +1078,23 @@ function inferirCategoria(nomeProduto) {
   if (n.includes('mascotinho') || n.includes('infantil')) return 'Infantil';
   return 'Aniversário';
 }
+
 function emojiPara(categoria) {
   const key = categoria.toLowerCase();
   return EMOJI_CATEGORIA[key] || EMOJI_CATEGORIA['default'];
 }
+
 /** Produtos reservados para ofertas aparecem nas ofertas do carrinho, não no catálogo. */
 function produtoEhAdicional(p) {
   // Produtos usados somente como adicionais ficam fora do catálogo; o item do cross-sell
   // continua visível para também receber a promoção quando o cliente o escolhe diretamente.
   return adicionaisGlobais.includes(p.id) && ofertaCrossSellGlobal.produtoId !== p.id;
 }
+
 function textoChaveCatalogo(valor) {
   return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 }
+
 const PREFIXOS_MODELOS_CATALOGO = {
   'interativo-tradicional':['Interativo Tradicional','Convite Interativo Tradicional'],
   'interativo-animado':['Interativo Animado','Convite Interativo Animado'],
@@ -1052,6 +1102,7 @@ const PREFIXOS_MODELOS_CATALOGO = {
   'cinematografico':['Cinematográfico','Cinematografico','Convite Cinematográfico','Convite Cinematografico'],
   'em-video':['Em Vídeo','Em Video','Convite em Vídeo','Convite em Video'],
 };
+
 function modeloDoProduto(produto) {
   if (!produto) return null;
   const indicado = produto.modeloId || produto.modelo;
@@ -1067,6 +1118,7 @@ function modeloDoProduto(produto) {
     return nome === modelo || nome.startsWith(modelo + ' -') || nome.startsWith(modelo + ' –') || nome.startsWith(modelo + ' —');
   })) || null;
 }
+
 function temaDoProduto(produto) {
   if (!produto) return null;
   if (produto.temaId) {
@@ -1093,6 +1145,7 @@ function temaDoProduto(produto) {
   }
   return null;
 }
+
 function produtoComModelo(produto) {
   const modelo = modeloDoProduto(produto);
   if (!modelo) return produto;
@@ -1121,12 +1174,14 @@ function produtoComModelo(produto) {
   }
   return resolvido;
 }
+
 function precoPromocionalProduto(produto) {
   if (!produto || !produto.promoAtiva || !(Number(produto.promoValor) > 0) || produto.sobConsulta) return Number(produto?.preco) || 0;
   return produto.promoTipo === 'percentual'
     ? Math.max(0, Number(produto.preco) * (1 - Number(produto.promoValor) / 100))
     : Math.max(Number(produto.preco) - Number(produto.promoValor), 0);
 }
+
 function temaAtivoDoProduto(produto) {
   const tema = temaDoProduto(produto);
   if (tema) return tema.ativo !== false;
@@ -1147,11 +1202,13 @@ function temaAtivoDoProduto(produto) {
   const encontrados = nomeTema ? temasSite.filter(t => textoChaveCatalogo(t.nome) === nomeTema) : [];
   return !encontrados.some(t => t.ativo === false);
 }
+
 function getProdutosCatalogo() {
   return produtos
     .map(produtoComModelo)
     .filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco) > 0 || p.sobConsulta) && temaAtivoDoProduto(p));
 }
+
 /** URL pública que abre diretamente os detalhes do produto escolhido. */
 function linkProdutoDireto(produtoId) {
   const url = new URL(window.location.href);
@@ -1160,15 +1217,9 @@ function linkProdutoDireto(produtoId) {
   url.searchParams.set('produto', produtoId);
   return url.href;
 }
+
 // ── Estado global ──────────────────────────────────────────────────────────
 let produtos = [];       // catálogo carregado do Firestore
-let produtos = [];       // catálogo completo carregado em segundo plano
-let produtosHome = [];   // quatro convites selecionados para a primeira tela
-let homeProdutoIds = [];
-let homeCardsInicialCarregados = false;
-let catalogoCompletoCarregado = false;
-let catalogoCompletoPromise = null;
-const LIMITE_CONVITES_HOME = 4;
 let categoriaAtiva = 'todas';
 let termoBusca = '';
 let carrinho = [];        // [{ id, nome, preco, categoria }]
@@ -1196,148 +1247,26 @@ let modelosSite = [
 let modelosSiteSalvos = false;
 let conflitoPromocoesModelos = [];
 let migracaoNormalizacaoAtual = null;
+
 async function salvarProdutosSite() {
-  await db.collection('config').doc('produtosSite').set({
+  return db.collection('config').doc('produtosSite').set({
     data: JSON.stringify(produtos),
     crossSellGlobal: ofertaCrossSellGlobal,
     adicionaisGlobais: adicionaisGlobais,
   });
-  await sincronizarProdutosPaginadosSite(produtos);
 }
-// Espelho individual para consultas paginadas públicas; o documento legado
-// continua sendo a fonte do painel e das buscas completas.
-async function sincronizarProdutosPaginadosSite(lista) {
-  const col = db.collection('siteCatalogProducts');
-  const existentes = await col.get();
-  const dadosExistentes = new Map(existentes.docs.map(d => [d.id, d.data()]));
-  const publico = lista.filter(p => {
-    const resolvido = produtoComModelo(p);
-    return p?.id && !produtoEhAdicional(resolvido) && resolvido.ativo !== false &&
-      (Number(resolvido.preco)>0 || resolvido.sobConsulta) && temaAtivoDoProduto(resolvido);
-  });
-  const ids = new Set(publico.map(p => String(p.id)));
-  let batch = db.batch(), operacoes = 0;
-  const commit = async () => { if (operacoes) { await batch.commit(); batch = db.batch(); operacoes = 0; } };
-  for (const p of publico) {
-    const existente = dadosExistentes.get(String(p.id)) || {};
-    batch.set(col.doc(String(p.id)), {
-      ...p,
-      modelo:produtoComModelo(p).modelo || p.modelo || null,
-      createdAtMs:Number(existente.createdAtMs) || dataAdicaoProdutoMs(p),
-      salesCount:Number(existente.salesCount) || Number(p.salesCount) || 0,
-  await db.collection('config').doc('produtosSite').set({
-    data: JSON.stringify(produtos),
-    crossSellGlobal: ofertaCrossSellGlobal,
-    adicionaisGlobais: adicionaisGlobais,
-  });
-  try { await atualizarSnapshotsHomeSelecionados(); }
-  catch (e) { console.error('Catálogo salvo, mas não foi possível atualizar os quatro convites da HOME:',e); }
-}
-function produtoCardHome(produto) {
-  const foto = (produto.foto && !ehVideo(produto.foto)) ? produto.foto : (produto.fotos || []).find(f => !ehVideo(f)) || '';
-  return {
-    id:String(produto.id), nome:produto.nome || '', categoria:produto.categoria || inferirCategoria(produto.nome),
-    temaId:produto.temaId || '', temaNome:produto.temaNome || '', ativo:produto.ativo !== false,
-    modeloId:produto.modeloId || '', modelo:produto.modelo || '',
-    foto, preco:Number(produto.preco) || 0, sobConsulta:!!produto.sobConsulta,
-    promoAtiva:!!produto.promoAtiva, promoTipo:produto.promoTipo || 'percentual',
-    promoValor:Number(produto.promoValor) || 0, temAdicionais:Array.isArray(produto.adicionais) && produto.adicionais.length > 0,
-  };
-}
-function produtoSeguroParaFirestore(produto) {
-  return JSON.parse(JSON.stringify(produto));
-}
-async function carregarSelecaoHome() {
-  const doc = await db.collection('config').doc('siteHome').get();
-  const dados = doc.exists ? doc.data() || {} : {};
-  homeProdutoIds = Array.isArray(dados.productIds) ? [...new Set(dados.productIds.map(String))].slice(0,LIMITE_CONVITES_HOME) : [];
-  produtosHome = Array.isArray(dados.cards) ? dados.cards.slice(0,LIMITE_CONVITES_HOME) : [];
-  homeCardsInicialCarregados = produtosHome.length > 0;
-  return dados;
-}
-async function atualizarSnapshotsHomeSelecionados() {
-  if (!homeProdutoIds.length) return;
-  const elegiveis = getProdutosCatalogo();
-  const selecionados = homeProdutoIds.map(id => elegiveis.find(p => String(p.id) === String(id))).filter(Boolean);
-  if (!selecionados.length) return;
-  const batch = db.batch();
-  selecionados.forEach(produto => batch.set(db.collection('siteHomeProducts').doc(String(produto.id)), produtoSeguroParaFirestore(produto)));
-  await batch.commit();
-  produtosHome = selecionados.map(produtoCardHome);
-  homeCardsInicialCarregados = produtosHome.length > 0;
-  await db.collection('config').doc('siteHome').set({
-    productIds:selecionados.map(p => String(p.id)), cards:produtosHome, updatedAtMs:Date.now()
-  }, { merge:true });
-}
-async function adminSalvarSelecaoHome() {
-  if (homeProdutoIds.length !== LIMITE_CONVITES_HOME) {
-    showToast('Selecione exatamente 4 convites para a HOME.','error');
-    return;
-  }
-  const elegiveis = new Map(getProdutosCatalogo().map(p => [String(p.id),p]));
-  const selecionados = homeProdutoIds.map(id => elegiveis.get(String(id))).filter(Boolean);
-  if (selecionados.length !== LIMITE_CONVITES_HOME) {
-    showToast('Um ou mais convites selecionados não estão disponíveis.','error');
-    return;
-  }
-  try {
-    const batch = db.batch();
-    selecionados.forEach(produto => batch.set(db.collection('siteHomeProducts').doc(String(produto.id)), produtoSeguroParaFirestore(produto)));
-    await batch.commit();
-    produtosHome = selecionados.map(produtoCardHome);
-    await db.collection('config').doc('siteHome').set({
-      productIds:selecionados.map(p => String(p.id)), cards:produtosHome, updatedAtMs:Date.now()
-    }, { merge:true });
-    if (++operacoes >= 450) await commit();
-  }
-  for (const doc of existentes.docs) {
-    if (ids.has(doc.id)) continue;
-    batch.delete(doc.ref);
-    if (++operacoes >= 450) await commit();
-  }
-  await commit();
-}
-    renderCatalogo();
-    homeCardsInicialCarregados = true;
-    adminRenderSelecaoHome();
-    showToast('Os 4 convites da HOME foram salvos.','success');
-  } catch (e) {
-    console.error('Erro ao salvar seleção da HOME:',e);
-    showToast('Não foi possível salvar a seleção da HOME.','error');
-  }
-}
-function adminRenderSelecaoHome() {
-  const raiz = document.getElementById('adminHomeSelecaoLista');
-  if (!raiz) return;
-  const termo = normalizarTextoBusca(document.getElementById('adminHomeBusca')?.value || '');
-  const elegiveis = getProdutosCatalogo();
-  raiz.innerHTML = elegiveis.filter(p => !termo || normalizarTextoBusca(`${p.nome} ${p.temaNome || ''}`).includes(termo)).map(p => `
-    <label style="display:flex;align-items:center;gap:9px;padding:8px;border-bottom:1px solid #f4ece8;font-size:12.5px;cursor:pointer;">
-      <input type="checkbox" data-home-id="${escaparHTMLCatalogo(p.id)}" ${homeProdutoIds.includes(String(p.id))?'checked':''}>
-      <span>${escaparHTMLCatalogo(p.nome)}</span>
-    </label>`).join('') || '<p style="padding:10px;color:#9a8890;font-size:12px;">Nenhum convite encontrado.</p>';
-  raiz.querySelectorAll('[data-home-id]').forEach(campo => campo.addEventListener('change', () => {
-    const id = String(campo.dataset.homeId);
-    if (campo.checked) {
-      if (homeProdutoIds.length >= LIMITE_CONVITES_HOME) { campo.checked = false; showToast('A HOME aceita exatamente 4 convites.','error'); return; }
-      if (!homeProdutoIds.includes(id)) homeProdutoIds.push(id);
-    } else homeProdutoIds = homeProdutoIds.filter(item => item !== id);
-    const status = document.getElementById('adminHomeSelecaoStatus');
-    if (status) status.textContent = `${homeProdutoIds.length} de 4 selecionados`;
-    adminRenderSelecaoHome();
-  }));
-  const status = document.getElementById('adminHomeSelecaoStatus');
-  if (status) status.textContent = `${homeProdutoIds.length} de 4 selecionados`;
-}
+
 async function carregarTemas() {
   try {
     const doc = await db.collection('config').doc('temasSite').get();
     temasSite = doc.exists ? JSON.parse(doc.data().data || '[]') : [];
   } catch (e) { temasSite = []; }
 }
+
 async function salvarTemasRemote() {
   await db.collection('config').doc('temasSite').set({ data: JSON.stringify(temasSite) }, { merge:true });
 }
+
 function inferirPromocaoDosProdutos(lista) {
   conflitoPromocoesModelos = [];
   modelosSite = modelosSite.map(modelo => {
@@ -1361,6 +1290,7 @@ function inferirPromocaoDosProdutos(lista) {
     return { ...modelo, promoAtiva:ativa, promoPreco:ativa ? Math.round(promoPreco * 100) / 100 : 0, promoConfigurada:true, promoConflito:false };
   });
 }
+
 async function carregarModelos(lista = produtos) {
   try {
     const doc = await db.collection('config').doc('modelosSite').get();
@@ -1378,135 +1308,43 @@ async function carregarModelos(lista = produtos) {
     inferirPromocaoDosProdutos(lista);
   }
 }
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function BRL(v) {
   return 'R$ ' + Number(v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+
 function showToast(msg, type = '') {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show ' + type;
   setTimeout(() => { t.className = 'toast'; }, 2800);
 }
-function vendasProduto(p) { return Math.max(0, Number(p?.salesCount) || 0); }
-let produtosHome = [], cursorProdutosHome = null, carregandoProdutosHome = false, fimProdutosHome = false;
-let observerProdutosHome = null, catalogoCompletoCarregado = false;
-let catalogoCompletoPromise = null;
-const TAMANHO_LOTE_HOME = 10;
-function atualizarIndicadorPaginacaoHome(texto = '') {
-  const el = document.getElementById('catalogoPaginacao'); if (el) el.textContent = texto;
+
 /** Gera uma contagem de "vendas" pseudo-aleatória mas estável por produto (mesmo produto sempre mostra o mesmo número) */
 function vendasFakePara(id) {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return 10 + (hash % 180);
 }
-function observarFimCatalogoHome() {
-  observerProdutosHome?.disconnect();
-  if (termoBusca || categoriaAtiva !== 'todas') return;
-  const alvo = document.getElementById('catalogoPaginacao');
-  if (!alvo || !('IntersectionObserver' in window) || fimProdutosHome) return;
-  observerProdutosHome = new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) carregarProximoLoteHome(); }, { rootMargin:'500px 0px' });
-  observerProdutosHome.observe(alvo);
-}
-async function carregarProximoLoteHome() {
-  if (carregandoProdutosHome || fimProdutosHome) return;
-  carregandoProdutosHome = true; atualizarIndicadorPaginacaoHome('Carregando mais convites…');
-  try {
-    const consulta = db.collection('siteCatalogProducts').orderBy('createdAtMs','desc').limit(TAMANHO_LOTE_HOME);
-    const snap = await consulta.get();
-    if (snap.empty) {
-      fimProdutosHome = true;
-      atualizarIndicadorPaginacaoHome('');
-      observerProdutosHome?.disconnect();
-      if (!produtosHome.length) {
-        document.getElementById('catalogoGrid').innerHTML = '<div class="empty-state"><div class="icon">🎈</div><p>Os convites estão sendo atualizados. Tente novamente em instantes.</p></div>';
-      }
-      return;
-    }
-    cursorProdutosHome = snap.docs[snap.docs.length - 1];
-    const vistos = new Set(produtosHome.map(p => String(p.id)));
-    produtosHome.push(...snap.docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
-    fimProdutosHome = true; // HOME exibe somente as 10 novidades mais recentes.
-    renderCategorias(); renderTemasLoja(); renderCatalogo();
-    atualizarIndicadorPaginacaoHome('');
-    observerProdutosHome?.disconnect();
-  } catch (e) {
-    console.error('Erro ao carregar mais convites:',e);
-    if (!produtosHome.length) document.getElementById('catalogoGrid').innerHTML = '<div class="empty-state"><div class="icon">😕</div><p>Não foi possível carregar os convites agora. Tente novamente em instantes.</p></div>';
-    atualizarIndicadorPaginacaoHome('Não foi possível carregar mais. Tente rolar novamente.');
-  }
-  finally { carregandoProdutosHome = false; }
-}
-async function carregarCatalogoCompleto() {
-  if (catalogoCompletoCarregado) return;
-  if (!catalogoCompletoPromise) catalogoCompletoPromise = (async () => {
-    const doc = await db.collection('config').doc('produtosSite').get();
-    const dados = doc.exists ? doc.data() || {} : {};
-    const lista = JSON.parse(dados.data || '[]');
-    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(dados.crossSellGlobal || {}) };
-    adicionaisGlobais = Array.isArray(dados.adicionaisGlobais) ? dados.adicionaisGlobais.slice(0,3) : [];
-    produtos = lista.map(p => ({ ...p, categoria:p.categoria || inferirCategoria(p.nome) }));
-    catalogoCompletoCarregado = true;
-    await carregarModelos(produtos);
-  })();
-  try { await catalogoCompletoPromise; } finally { catalogoCompletoPromise = null; }
-}
+
 // ── Carregar produtos do Firestore ────────────────────────────────────────────
 async function carregarProdutos() {
   try {
     await carregarTemas();
     await carregarBannersAdmin();
-    await carregarModelos([]);
-    renderCategorias();
-    renderTemasLoja();
-    renderBannersPublicos();
-    const buscaInicial = new URLSearchParams(window.location.search).get('busca');
-    if (buscaInicial) {
-      const inputBusca = document.getElementById('searchInput');
-      if (inputBusca) inputBusca.value = buscaInicial;
-      termoBusca = normalizarTextoBusca(buscaInicial);
-    }
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('busca') || params.has('produto')) { await carregarCatalogoCompleto(); renderCatalogo(); }
-    else { await carregarProximoLoteHome(); observarFimCatalogoHome(); }
-    const produtoDireto = new URLSearchParams(window.location.search).get('produto');
-    if (produtoDireto) abrirProduto(produtoDireto);
-  } catch (e) {
-    console.error('Erro ao carregar produtos:', e);
-    document.getElementById('catalogoGrid').innerHTML = `
-      <div class="empty-state">
-        <div class="icon">😕</div>
-        <p>Não foi possível carregar o catálogo agora.<br>Tente novamente em instantes.</p>
-      </div>`;
-  }
-}
-async function carregarCatalogoCompleto() {
-  if (catalogoCompletoCarregado) return produtos;
-  if (!catalogoCompletoPromise) catalogoCompletoPromise = (async () => {
     const doc = await db.collection('config').doc('produtosSite').get();
-    const configProdutos = doc.exists ? doc.data() || {} : {};
+    if (!doc.exists) { produtos = []; await carregarModelos(produtos); renderCategorias(); renderTemasLoja(); renderBannersPublicos(); renderCatalogo(); return; }
+    const configProdutos = doc.data() || {};
     const lista = JSON.parse(configProdutos.data || '[]');
     ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(configProdutos.crossSellGlobal || {}) };
-    adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0,3) : [];
-    produtos = lista.map(p => ({ ...p, categoria:p.categoria || inferirCategoria(p.nome) }));
+    adicionaisGlobais = Array.isArray(configProdutos.adicionaisGlobais) ? configProdutos.adicionaisGlobais.slice(0, 3) : [];
+    // Mantém todos os registros no admin; visibilidade pública é decidida no filtro do catálogo.
+    produtos = lista.map(p => ({
+      ...p,
+      categoria: p.categoria || inferirCategoria(p.nome),
+    }));
     await carregarModelos(produtos);
-    catalogoCompletoCarregado = true;
-    if (!homeProdutoIds.length && !produtosHome.length) produtosHome = getProdutosCatalogo().slice(0,LIMITE_CONVITES_HOME).map(produtoCardHome);
-    else if (homeProdutoIds.length) {
-      produtosHome = homeProdutoIds.map(id => produtos.find(p => String(p.id) === String(id))).filter(Boolean).map(produtoCardHome);
-    }
-    renderCategorias();
-    if (termoBusca || categoriaAtiva !== 'todas') renderCatalogo();
-    return produtos;
-  })();
-  try { return await catalogoCompletoPromise; }
-  finally { catalogoCompletoPromise = null; }
-}
-async function carregarProdutos() {
-  try {
-    await Promise.all([carregarTemas(), carregarBannersAdmin()]);
-    await carregarCatalogoCompleto();
     renderCategorias();
     renderTemasLoja();
     renderBannersPublicos();
@@ -1518,7 +1356,7 @@ async function carregarProdutos() {
     }
     renderCatalogo();
     const produtoDireto = new URLSearchParams(window.location.search).get('produto');
-    if (produtoDireto) await abrirProduto(produtoDireto);
+    if (produtoDireto) abrirProduto(produtoDireto);
   } catch (e) {
     console.error('Erro ao carregar produtos:', e);
     document.getElementById('catalogoGrid').innerHTML = `
@@ -1528,59 +1366,15 @@ async function carregarProdutos() {
       </div>`;
   }
 }
-function esconderCarregamentoInicial() {
-  document.getElementById('siteLoadingOverlay')?.classList.add('oculto');
-}
-async function iniciarHomePublica() {
-  const params = new URLSearchParams(window.location.search);
-  const buscaInicial = params.get('busca');
-  if (buscaInicial) {
-    const inputBusca = document.getElementById('searchInput');
-    if (inputBusca) inputBusca.value = buscaInicial;
-    termoBusca = normalizarTextoBusca(buscaInicial);
-  }
-  try {
-    await Promise.all([
-      carregarTemas(), carregarBannersAdmin(), carregarModelos([]), carregarSelecaoHome(),
-      carregarLogoAdmin(), carregarCorPersonalizada()
-    ]);
-    renderCategorias();
-    renderTemasLoja();
-    renderBannersPublicos();
-    if (params.has('busca') && !params.has('produto')) document.getElementById('catalogoGrid').innerHTML = '<div class="loading-produtos"><div class="spinner"></div><p>Carregando resultados…</p></div>';
-    else if (produtosHome.length) renderCatalogo();
-    else if (params.has('produto')) document.getElementById('catalogoGrid').innerHTML = '<div class="loading-produtos"><div class="spinner"></div><p>Carregando convite…</p></div>';
-    esconderCarregamentoInicial();
-  } catch (e) {
-    console.error('Erro ao preparar a página inicial:',e);
-    renderCategorias(); renderTemasLoja(); renderBannersPublicos();
-    esconderCarregamentoInicial();
-  }
-  const iniciarCatalogo = () => carregarCatalogoCompleto().then(() => {
-    if (!homeCardsInicialCarregados || termoBusca || categoriaAtiva !== 'todas') renderCatalogo();
-  }).catch(e => {
-    console.error('Erro ao carregar o catálogo em segundo plano:',e);
-    if (!produtosHome.length) document.getElementById('catalogoGrid').innerHTML = '<div class="empty-state"><div class="icon">😕</div><p>Não foi possível carregar os convites agora. Tente novamente em instantes.</p></div>';
-  });
-  if (params.has('busca') && !params.has('produto')) {
-    try { await carregarCatalogoCompleto(); renderCatalogo(); }
-    catch (e) { console.error('Erro ao carregar resultados da busca:',e); }
-  } else if (window.requestIdleCallback) window.requestIdleCallback(iniciarCatalogo,{timeout:1800});
-  else setTimeout(iniciarCatalogo,650);
-  const produtoDireto = params.get('produto');
-  if (produtoDireto) await abrirProduto(produtoDireto);
-}
+
 // ── Categorias (ícones circulares, estilo marketplace) ────────────────────────
 const ICONE_CATEGORIA_NAV = {
   'todas': '✨', 'aniversário': '🎂', 'casamento': '💍', 'debutante': '👑',
   'infantil': '🧸', 'personalizado': '🎨',
 };
+
 function renderCategorias() {
-  const fonte = catalogoCompletoCarregado ? produtos : produtosHome;
-  const categorias = ['todas', ...new Set(fonte.map(p => p.categoria || inferirCategoria(p.nome)))];
-function renderCategorias() {
-  const fonte = catalogoCompletoCarregado ? getProdutosCatalogo() : (produtosHome.length ? produtosHome : getProdutosCatalogo());
-  const categorias = ['todas', ...new Set(fonte.map(p => p.categoria || inferirCategoria(p.nome)))];
+  const categorias = ['todas', ...new Set(getProdutosCatalogo().map(p => p.categoria))];
   const el = document.getElementById('categoriasScroll');
   if (!el) return;
   el.innerHTML = categorias.map(cat => {
@@ -1592,27 +1386,21 @@ function renderCategorias() {
     </div>`;
   }).join('');
 }
-async function filtrarCategoria(cat) {
-  if (!catalogoCompletoCarregado) await carregarCatalogoCompleto();
-  categoriaAtiva = cat;
-  renderCategorias();
-  renderCatalogo();
+
 function filtrarCategoria(cat) {
   categoriaAtiva = cat;
   renderCategorias();
-  if (!catalogoCompletoCarregado) {
-    document.getElementById('catalogoGrid').innerHTML = '<div class="loading-produtos"><div class="spinner"></div><p>Carregando produtos da categoria…</p></div>';
-    carregarCatalogoCompleto().then(renderCatalogo).catch(e => console.error('Erro ao carregar categoria:',e));
-    return;
-  }
   renderCatalogo();
 }
+
 let sugestaoBuscaIndex = -1;
+
 function normalizarTextoBusca(valor) {
   return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/([a-z])([0-9])/g, '$1 $2').replace(/([0-9])([a-z])/g, '$1 $2')
     .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
 }
+
 function distanciaEdicaoBusca(a, b, limite = 2) {
   if (Math.abs(a.length - b.length) > limite) return limite + 1;
   let anterior = Array.from({length:b.length + 1}, (_, i) => i);
@@ -1627,6 +1415,7 @@ function distanciaEdicaoBusca(a, b, limite = 2) {
   }
   return anterior[b.length];
 }
+
 /** Pontua correspondências exatas, parciais e aproximadas sem chamar o servidor. */
 function pontuarTextoBusca(consulta, texto) {
   const q = normalizarTextoBusca(consulta), alvo = normalizarTextoBusca(texto);
@@ -1656,18 +1445,16 @@ function pontuarTextoBusca(consulta, texto) {
   }
   return 700 + soma / termos.length;
 }
+
 function onSearchInput() {
   termoBusca = normalizarTextoBusca(document.getElementById('searchInput').value);
   renderSugestoesBusca();
-  carregarCatalogoCompleto().then(() => { renderCategorias(); renderSugestoesBusca(); renderCatalogo(); }).catch(e => console.error('Erro ao carregar catálogo para busca:',e));
   renderCatalogo();
 }
+
 /** Lista de temas únicos existentes no catálogo, com contagem de produtos e uma foto de exemplo */
 function getTemasDisponiveis() {
   const mapa = {};
-  const produtosTemaFonte = (catalogoCompletoCarregado ? produtos : produtosHome).map(produtoComModelo)
-    .filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco)>0 || p.sobConsulta) && temaAtivoDoProduto(p));
-  produtosTemaFonte.forEach(p => {
   getProdutosCatalogo().forEach(p => {
     const cadastrado = temaDoProduto(p);
     const nomeTema = cadastrado?.nome || p.temaNome;
@@ -1678,17 +1465,12 @@ function getTemasDisponiveis() {
     mapa[nomeTema].count++;
     if (!mapa[nomeTema].imagemFallback) mapa[nomeTema].imagemFallback = imagemProdutoParaTema(p);
   });
-  const encontrados = Object.values(mapa).map(t => {
   return Object.values(mapa).map(t => {
     const tema = temasSite.find(x => x.id && x.id === t.id) || temasSite.find(x => textoChaveCatalogo(x.nome) === textoChaveCatalogo(t.nome));
     return { ...t, foto:imagemProdutoParaTema({ foto:tema?.foto }) || t.imagemFallback };
-  });
-  if (!catalogoCompletoCarregado) temasSite.filter(t => t.ativo !== false).forEach(t => {
-    if (!encontrados.some(x => textoChaveCatalogo(x.nome) === textoChaveCatalogo(t.nome))) encontrados.push({ id:t.id, nome:t.nome, count:0, foto:imagemProdutoParaTema({foto:t.foto}), palavrasChave:t.palavrasChave||[], ordem:temasSite.indexOf(t) });
-  });
-  return encontrados.sort((a,b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
   }).sort((a,b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
 }
+
 function renderTemasLoja() {
   const grid = document.getElementById('temasLojaGrid');
   if (!grid) return;
@@ -1700,6 +1482,7 @@ function renderTemasLoja() {
   }).join('');
   grid.querySelectorAll('[data-tema-loja]').forEach(botao => botao.addEventListener('click', () => selecionarTemaLoja(botao.dataset.temaLoja)));
 }
+
 function imagemProdutoParaTema(produto) {
   const urls=[...(Array.isArray(produto.fotos)?produto.fotos:[]),produto.foto];
   for(const valor of urls){
@@ -1708,13 +1491,16 @@ function imagemProdutoParaTema(produto) {
   }
   return null;
 }
+
 function renderSugestoesBusca() {
   const el = document.getElementById('buscaSugestoes');
   sugestaoBuscaIndex = -1;
   if (!termoBusca) { el.innerHTML = ''; el.classList.remove('open'); return; }
+
   const temas = getTemasDisponiveis().map(t=>({tema:t,score:Math.max(pontuarTextoBusca(termoBusca,t.nome),...(t.palavrasChave||[]).map(pc=>pontuarTextoBusca(termoBusca,pc)))}))
     .filter(x=>x.score>=700).sort((a,b)=>b.score-a.score).map(x=>x.tema);
   if (!temas.length) { el.innerHTML = ''; el.classList.remove('open'); return; }
+
   el.innerHTML = temas.slice(0, 8).map(t => `
     <div class="busca-sugestao-item" onmousedown="selecionarSugestaoBusca('${t.nome.replace(/'/g,"\\'")}')">
       <div class="busca-sugestao-thumb">${t.foto ? `<img src="${t.foto}">` : '🎨'}</div>
@@ -1723,12 +1509,13 @@ function renderSugestoesBusca() {
     </div>`).join('');
   el.classList.add('open');
 }
+
 function selecionarSugestaoBusca(nomeTema) {
   document.getElementById('searchInput').value = nomeTema;
   aplicarBuscaCatalogo();
 }
-async function aplicarBuscaCatalogo() {
-async function aplicarBuscaCatalogo() {
+
+function aplicarBuscaCatalogo() {
   const input = document.getElementById('searchInput');
   termoBusca = normalizarTextoBusca(input?.value || '');
   categoriaAtiva = 'todas';
@@ -1738,28 +1525,21 @@ async function aplicarBuscaCatalogo() {
   history.replaceState({}, '', urlBusca.href);
   fecharSugestoesBusca();
   if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
-  await carregarCatalogoCompleto();
-  renderCategorias();
-  renderSugestoesBusca();
-  renderCatalogo();
-  fecharSugestoesBusca();
-  if (document.getElementById('view-produto')?.classList.contains('active')) voltarCatalogo();
-  if ((termoBusca || categoriaAtiva !== 'todas') && !catalogoCompletoCarregado) {
-    document.getElementById('catalogoGrid').innerHTML = '<div class="loading-produtos"><div class="spinner"></div><p>Carregando produtos para sua busca…</p></div>';
-    try { await carregarCatalogoCompleto(); } catch (e) { console.error('Erro ao carregar produtos para busca:',e); }
-  }
   renderCatalogo();
   requestAnimationFrame(() => document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
+
 function selecionarTemaLoja(nomeTema) {
   const input = document.getElementById('searchInput');
   if (input) input.value = nomeTema;
   aplicarBuscaCatalogo();
 }
+
 function fecharSugestoesBusca() {
   const el = document.getElementById('buscaSugestoes');
   if (el) { el.innerHTML = ''; el.classList.remove('open'); }
 }
+
 function onSearchKeydown(event) {
   const el = document.getElementById('buscaSugestoes');
   const itens = el.querySelectorAll('.busca-sugestao-item');
@@ -1770,6 +1550,7 @@ function onSearchKeydown(event) {
     return;
   }
   if (!itens.length) return;
+
   if (event.key === 'ArrowDown') {
     event.preventDefault();
     sugestaoBuscaIndex = Math.min(sugestaoBuscaIndex + 1, itens.length - 1);
@@ -1782,21 +1563,25 @@ function onSearchKeydown(event) {
     fecharSugestoesBusca();
   }
 }
+
 function scrollParaCategorias() {
   voltarCatalogo();
   document.querySelector('.categorias-section')?.scrollIntoView({ behavior: 'smooth' });
 }
+
 /** Monta o link do WhatsApp para pedir um tema personalizado que não foi encontrado na busca */
 function linkWhatsAppTemaPersonalizado(termo) {
   const numeroLuluzices = '5521981357208';
   const msg = `Olá! Procurei o tema "${termo}" no site mas não encontrei. Vocês fazem convite personalizado nesse tema?`;
   return `https://wa.me/${numeroLuluzices}?text=${encodeURIComponent(msg)}`;
 }
+
 /** Verifica se um produto bate com o termo de busca — considera nome, categoria,
  * nome do tema e também as palavras-chave cadastradas no tema (busca tipo "SEO" interno) */
 function produtoBateComBusca(p, termo) {
   return produtoPontuacaoBusca(p, termo) > 0;
 }
+
 function produtoPontuacaoBusca(p, termo) {
   const nome=p.nome||'', categoria=p.categoria||'', tema=p.temaNome||'';
   const nomeScore=pontuarTextoBusca(termo,nome);
@@ -1811,21 +1596,16 @@ function produtoPontuacaoBusca(p, termo) {
   }
   return score;
 }
+
 function renderCatalogo() {
   const grid = document.getElementById('catalogoGrid');
-  const fonteProdutos = (termoBusca || categoriaAtiva !== 'todas') ? produtos : produtosHome;
-  const produtosVisiveis = fonteProdutos.map(produtoComModelo).filter(p => !produtoEhAdicional(p) && p.ativo !== false && (Number(p.preco)>0 || p.sobConsulta) && temaAtivoDoProduto(p));
-function renderCatalogo() {
-  const grid = document.getElementById('catalogoGrid');
-  const fonte = (termoBusca || categoriaAtiva !== 'todas') && catalogoCompletoCarregado
-    ? getProdutosCatalogo()
-    : produtosHome.map(produtoComModelo).filter(p => p.ativo !== false && (Number(p.preco) > 0 || p.sobConsulta) && temaAtivoDoProduto(p));
-  const produtosVisiveis = fonte;
+  const produtosVisiveis = getProdutosCatalogo();
   let lista = categoriaAtiva === 'todas' ? produtosVisiveis : produtosVisiveis.filter(p => p.categoria === categoriaAtiva);
   if (termoBusca) {
     lista = lista.map((produto,ordem)=>({produto,ordem,pontuacao:produtoPontuacaoBusca(produto,termoBusca)}))
       .filter(item=>item.pontuacao>0).sort((a,b)=>b.pontuacao-a.pontuacao||a.ordem-b.ordem).map(item=>item.produto);
   }
+
   if (lista.length === 0) {
     if (termoBusca) {
       grid.innerHTML = `
@@ -1845,21 +1625,16 @@ function renderCatalogo() {
     }
     return;
   }
-  grid.innerHTML = lista.map(p => {
-    const vendas = vendasProduto(p);
-    const badge = vendas >= 10 ? '🔥 Mais vendido' : (p.adicionais && p.adicionais.length > 0 ? 'Personalizável' : '');
+
   grid.innerHTML = lista.map(p => {
     const vendas = vendasFakePara(p.id);
-    const badge = vendas > 100 ? '🔥 Mais vendido' : (p.temAdicionais || (Array.isArray(p.adicionais) && p.adicionais.length > 0) ? 'Personalizável' : '');
+    const badge = vendas > 100 ? '🔥 Mais vendido' : (p.adicionais && p.adicionais.length > 0 ? 'Personalizável' : '');
     const emPromocao = p.promoAtiva && p.promoValor > 0 && !p.sobConsulta;
     const precoPromocional = !emPromocao ? p.preco : (p.promoTipo === 'percentual'
       ? p.preco * (1 - p.promoValor / 100)
       : Math.max(p.preco - p.promoValor, 0));
     const seloPromocao = !emPromocao ? '' : (p.promoTipo === 'percentual' ? `${p.promoValor}% OFF` : `-${BRL(p.promoValor)}`);
-    const rotuloVendas = vendas > 0 ? `<span class="produto-vendas">${vendas} vendido${vendas === 1 ? '' : 's'}</span>` : '';
     const precoCatalogoHtml = emPromocao
-      ? `<span class="preco-original-catalogo">${BRL(p.preco)}</span><span class="preco-promocional-catalogo">${BRL(precoPromocional)}</span><span class="badge-promocional-catalogo">${seloPromocao}</span>${rotuloVendas}`
-      : `${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}${rotuloVendas}`;
       ? `<span class="preco-original-catalogo">${BRL(p.preco)}</span><span class="preco-promocional-catalogo">${BRL(precoPromocional)}</span><span class="badge-promocional-catalogo">${seloPromocao}</span><span class="produto-vendas">${vendas}+ vendidos</span>`
       : `${p.sobConsulta ? 'Sob consulta' : BRL(p.preco)}<span class="produto-vendas">${vendas}+ vendidos</span>`;
     // A capa (p.foto) pode ser um vídeo — <img> não reproduz vídeo, então nesse caso
@@ -1877,74 +1652,26 @@ function renderCatalogo() {
       </div>
     </div>`;
   }).join('');
-  observarFimCatalogoHome();
 }
+
 // ── Banner carrossel automático ────────────────────────────────────────────
-let bannerIdx = 0;
-let bannerTimer = null;
-let bannerIgnorarCliqueAte = 0;
-function reiniciarTimerBanner(total) {
-  if (bannerTimer) clearInterval(bannerTimer);
-  if (total > 1) bannerTimer = setInterval(() => irParaBannerSlide((bannerIdx + 1) % total), 4500);
-}
-function dataAdicaoProdutoMs(produto) {
-  const explicita = Number(produto?.createdAtMs);
-  if (Number.isFinite(explicita) && explicita > 0) return explicita;
-  const data = produto?.createdAt;
-  if (data && typeof data.toMillis === 'function') return data.toMillis();
-  if (data) { const convertida = new Date(data).getTime(); if (Number.isFinite(convertida) && convertida > 0) return convertida; }
-  const timestampNoId = String(produto?.id || '').match(/(?:^|_)(\d{13})(?:_|$)/);
-  return timestampNoId ? Number(timestampNoId[1]) : 0;
-}
-function configurarDeslizeBanner(carrossel) {
-  if (!carrossel || carrossel.dataset.swipeConfigured === 'true') return;
-  carrossel.dataset.swipeConfigured = 'true';
-  let inicioX = 0, inicioY = 0;
-  carrossel.addEventListener('touchstart', event => {
-    const toque = event.touches[0];
-    if (!toque) return;
-    inicioX = toque.clientX;
-    inicioY = toque.clientY;
-    if (bannerTimer) clearInterval(bannerTimer);
-  }, { passive:true });
-  carrossel.addEventListener('touchend', event => {
-    const toque = event.changedTouches[0];
-    if (!toque) return;
-    const dx = toque.clientX - inicioX;
-    const dy = toque.clientY - inicioY;
-    const total = carrossel.querySelectorAll('.banner-slide').length;
-    if (total > 1 && Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-      bannerIgnorarCliqueAte = Date.now() + 500;
-      irParaBannerSlide((bannerIdx + (dx < 0 ? 1 : -1) + total) % total);
-    }
-    reiniciarTimerBanner(total);
-  }, { passive:true });
-  carrossel.addEventListener('click', event => {
-    if (Date.now() < bannerIgnorarCliqueAte) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-  }, true);
-}
-function initBannerCarrossel() {
 let bannerIdx = 0;
 let bannerTimer = null;
 function initBannerCarrossel() {
   const slides = document.querySelectorAll('.banner-slide');
   const dotsEl = document.getElementById('bannerDots');
   if (!dotsEl || !slides.length) return;
-  configurarDeslizeBanner(document.getElementById('bannerCarrossel'));
   if (bannerTimer) clearInterval(bannerTimer);
   bannerIdx = 0;
   dotsEl.innerHTML = Array.from(slides).map((_, i) =>
     `<div class="banner-dot ${i===0?'active':''}" onclick="irParaBannerSlide(${i})"></div>`
   ).join('');
+
   bannerTimer = setInterval(() => {
     irParaBannerSlide((bannerIdx + 1) % slides.length);
-  reiniciarTimerBanner(slides.length);
-}
   }, 4500);
 }
+
 function irParaBannerSlide(idx) {
   const slides = document.querySelectorAll('.banner-slide');
   const dots = document.querySelectorAll('.banner-dot');
@@ -1952,6 +1679,7 @@ function irParaBannerSlide(idx) {
   dots.forEach((d, i) => d.classList.toggle('active', i === idx));
   bannerIdx = idx;
 }
+
 // ── Página de produto ──────────────────────────────────────────────────────
 /** Mantém o carrossel, a paginação e a reprodução de vídeo sincronizados. */
 function onProdutoMidiaScroll() {
@@ -1972,11 +1700,13 @@ function onProdutoMidiaScroll() {
     sincronizarVideosProduto(indiceAtual);
   }
 }
+
 function navegarMidiaProduto(indice) {
   const track = document.getElementById('produtoMidiaTrack');
   if (!track || !track.children[indice]) return;
   track.children[indice].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
 }
+
 function atualizarBotaoSomProduto() {
   const botao = document.getElementById('produtoMidiaSomBtn');
   if (!botao) return;
@@ -1987,6 +1717,7 @@ function atualizarBotaoSomProduto() {
   botao.setAttribute('aria-pressed', String(produtoMidiaSomAtivo));
   botao.setAttribute('aria-label', produtoMidiaSomAtivo ? 'Desativar áudio dos vídeos' : 'Ativar áudio dos vídeos');
 }
+
 function sincronizarVideosProduto(indiceAtivo) {
   const track = document.getElementById('produtoMidiaTrack');
   if (!track) return;
@@ -2010,6 +1741,7 @@ function sincronizarVideosProduto(indiceAtivo) {
   });
   atualizarBotaoSomProduto();
 }
+
 function toggleSomProduto() {
   produtoMidiaSomAtivo = !produtoMidiaSomAtivo;
   const track = document.getElementById('produtoMidiaTrack');
@@ -2030,6 +1762,7 @@ function toggleSomProduto() {
   }
   atualizarBotaoSomProduto();
 }
+
 function abrirZoomMidiaProduto(indice) {
   if (!produtoAtual) return;
   const fotos = (produtoAtual.fotos && produtoAtual.fotos.length) ? produtoAtual.fotos : (produtoAtual.foto ? [produtoAtual.foto] : []);
@@ -2049,6 +1782,7 @@ function abrirZoomMidiaProduto(indice) {
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
+
 function fecharZoomMidiaProduto() {
   const overlay = document.getElementById('produtoZoomOverlay');
   if (!overlay?.classList.contains('open')) return;
@@ -2059,24 +1793,9 @@ function fecharZoomMidiaProduto() {
   document.body.style.overflow = '';
   sincronizarVideosProduto(produtoSlideAtivo);
 }
+
 function abrirProduto(id) {
-  const original = produtos.find(x => x.id === id) || produtosHome.find(x => x.id === id);
-  if (!original || original.ativo === false || !(Number(original.preco) > 0 || original.sobConsulta) || !temaAtivoDoProduto(original)) return;
-async function abrirProduto(id) {
-  let original = produtos.find(x => String(x.id) === String(id));
-  if (!original) {
-    try {
-      const snap = await db.collection('siteHomeProducts').doc(String(id)).get();
-      if (snap.exists) {
-        original = { ...snap.data(), id:snap.id, categoria:snap.data().categoria || inferirCategoria(snap.data().nome) };
-        produtos.push(original);
-      }
-    } catch (e) { console.warn('Não foi possível carregar o convite selecionado:',e); }
-  }
-  if (!original && !catalogoCompletoCarregado) {
-    try { await carregarCatalogoCompleto(); original = produtos.find(x => String(x.id) === String(id)); }
-    catch (e) { console.error('Não foi possível carregar o convite:',e); }
-  }
+  const original = produtos.find(x => x.id === id);
   if (!original || original.ativo === false || !(Number(original.preco) > 0 || original.sobConsulta) || !temaAtivoDoProduto(original)) return;
   const p = produtoComModelo(original);
   if (!p) return;
@@ -2084,8 +1803,10 @@ async function abrirProduto(id) {
   adicionaisSelecionados = []; // reseta seleção ao entrar em outro produto
   produtoMidiaSomAtivo = false;
   produtoSlideAtivo = 0;
+
   const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
   const temMidia = fotos.length > 0;
+
   const slidesHtml = temMidia
     ? fotos.map((url, indice) => {
         const conteudo = ehVideo(url)
@@ -2094,11 +1815,13 @@ async function abrirProduto(id) {
         return `<div class="produto-midia-slide">${conteudo}</div>`;
       }).join('')
     : `<div class="produto-midia-slide"><span class="emoji-fallback">${emojiPara(p.categoria)}</span></div>`;
+
   const dotsHtml = fotos.length > 1
     ? `<div class="produto-midia-dots" id="produtoMidiaDots" aria-label="Navegação da galeria">${fotos.map((_,i) => `<button type="button" class="produto-midia-dot ${i===0?'ativa':''}" onclick="navegarMidiaProduto(${i})" aria-label="Ver mídia ${i + 1} de ${fotos.length}" aria-current="${i===0?'true':'false'}"></button>`).join('')}</div><div class="produto-midia-swipe-hint">← Deslize para ver mais →</div>`
     : '';
   const temVideo = fotos.some(ehVideo);
   const botaoSomHtml = temVideo ? `<button type="button" class="produto-midia-som" id="produtoMidiaSomBtn" onclick="toggleSomProduto()" aria-pressed="false">🔇 Ativar áudio</button>` : '';
+
   const thumbHtml = `
     <div class="produto-midia-carrossel" aria-label="Galeria do produto. Deslize para os lados para ver as mídias.">
       <div class="produto-midia-track" id="produtoMidiaTrack" onscroll="onProdutoMidiaScroll()">
@@ -2108,6 +1831,7 @@ async function abrirProduto(id) {
       ${botaoSomHtml}
     </div>`;
   const galeriaHtml = ''; // as miniaturas antigas foram substituídas pelo carrossel de arraste acima
+
   const precoOriginal = p.preco;
   let precoFinal = p.preco;
   let promoHtml = '';
@@ -2117,16 +1841,20 @@ async function abrirProduto(id) {
       : Math.max(p.preco - p.promoValor, 0);
     promoHtml = `<span class="produto-preco-original">${BRL(precoOriginal)}</span> <span class="produto-preco-badge-promo">${p.promoTipo === 'percentual' ? p.promoValor + '% OFF' : 'Desconto ' + BRL(p.promoValor)}</span>`;
   }
+
   const descricaoHtml = p.descricao
     ? p.descricao.replace(/\n/g, '<br>')
     : `Convite digital personalizado, entregue em alta qualidade para compartilhar
        no WhatsApp e redes sociais. Personalização com nome, data, hora e local do evento.
        Entrega em até 3 dias úteis após confirmação dos dados.`;
+
   const adicionaisHtml = '';
+
   // Sugestões de convites do mesmo tema na tela de detalhes do produto.
   const crossProdutos = p.temaId
     ? getProdutosCatalogo().filter(x => x.id !== p.id && x.temaId === p.temaId && !x.sobConsulta).slice(0, 8)
     : [];
+
   const crossSellHtml = crossProdutos.length ? `
     <div class="produto-crosssell">
       <div class="crosssell-titulo">${p.temaId ? `Mais produtos do tema "${p.temaNome}"` : 'Você também pode gostar'}</div>
@@ -2142,6 +1870,7 @@ async function abrirProduto(id) {
       </div>
     </div>
   ` : '';
+
   document.getElementById('produtoDetalheContainer').innerHTML = `
     ${thumbHtml}
     ${galeriaHtml}
@@ -2157,15 +1886,19 @@ async function abrirProduto(id) {
     </div>
     ${crossSellHtml}
   `;
+
   sincronizarVideosProduto(0);
+
   document.getElementById('view-catalogo').classList.remove('active');
   document.getElementById('view-produto').classList.add('active');
   window.scrollTo(0, 0);
 }
+
 function voltarCatalogo() {
   document.getElementById('view-produto').classList.remove('active');
   document.getElementById('view-catalogo').classList.add('active');
 }
+
 function configurarGestoVoltarProduto() {
   const view = document.getElementById('view-produto');
   if (!view) return;
@@ -2186,6 +1919,7 @@ function configurarGestoVoltarProduto() {
   }, { passive: true });
   view.addEventListener('touchcancel', () => { gestoValido = false; }, { passive: true });
 }
+
 // ── Carrinho ───────────────────────────────────────────────────────────────
 function adicionarAoCarrinho(id) {
   const raw = produtos.find(x => x.id === id);
@@ -2196,6 +1930,7 @@ function adicionarAoCarrinho(id) {
   showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
   abrirOfertasParaItem(carrinho[carrinho.length - 1]);
 }
+
 /** Marca/desmarca um adicional na página de produto, recalculando o preço total exibido */
 function toggleAdicional(id, preco, nome) {
   const idx = adicionaisSelecionados.findIndex(a => a.id === id);
@@ -2203,6 +1938,7 @@ function toggleAdicional(id, preco, nome) {
   else adicionaisSelecionados.push({ id, preco, nome });
   atualizarPrecoTotalProduto();
 }
+
 function atualizarPrecoTotalProduto() {
   if (!produtoAtual) return;
   const totalAdicionais = adicionaisSelecionados.reduce((s, a) => s + a.preco, 0);
@@ -2212,6 +1948,7 @@ function atualizarPrecoTotalProduto() {
   if (precoEl) precoEl.textContent = BRL(total);
   if (btnEl) btnEl.textContent = `Adicionar ao carrinho — ${BRL(total)}`;
 }
+
 /** Adiciona ao carrinho considerando os adicionais marcados na página do produto */
 function adicionarAoCarrinhoComAdicionais(id) {
   const raw = produtos.find(x => x.id === id);
@@ -2232,6 +1969,7 @@ function adicionarAoCarrinhoComAdicionais(id) {
   fecharCarrinho();
   abrirOfertasParaItem(carrinho[carrinho.length - 1]);
 }
+
 function calcularPrecoCrossSellGlobal(p) {
   if (!p) return 0;
   const valor = Number(ofertaCrossSellGlobal.descontoValor) || 0;
@@ -2239,6 +1977,7 @@ function calcularPrecoCrossSellGlobal(p) {
   const final = ofertaCrossSellGlobal.descontoTipo === 'percentual' ? precoAplicado * (1 - valor / 100) : precoAplicado - valor;
   return Math.max(0, final);
 }
+
 function carrinhoTemModeloAceitoCrossSell() {
   const aceitos = ofertaCrossSellGlobal.modelosAceitos;
   return carrinho.some(item => {
@@ -2250,6 +1989,7 @@ function carrinhoTemModeloAceitoCrossSell() {
     return !!modeloId && aceitos.includes(modeloId);
   });
 }
+
 function precoItemCarrinho(item) {
   const raw = produtos.find(p => p.id === item.id);
   const produto = raw ? produtoComModelo(raw) : null;
@@ -2259,12 +1999,14 @@ function precoItemCarrinho(item) {
   }
   return precoNormal;
 }
+
 function abrirOfertasParaItem(item) {
   produtoPendenteOfertas = item;
   adicionaisGlobaisSelecionados = new Set();
   renderOfertasGlobais();
   document.getElementById('ofertasOverlay').classList.add('open');
 }
+
 function renderOfertasGlobais() {
   const body = document.getElementById('ofertasBody');
   const idsNoCarrinho = new Set(carrinho.map(i => i.id));
@@ -2276,6 +2018,7 @@ function renderOfertasGlobais() {
   if (!html) html = '<p style="text-align:center;color:var(--ink-muted);padding:18px 0">Seu produto já está no carrinho. Você pode continuar.</p>';
   body.innerHTML = html;
 }
+
 function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   const raw = produtos.find(item => item.id === id);
   const p = raw ? produtoComModelo(raw) : null;
@@ -2292,6 +2035,7 @@ function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   document.getElementById('extraDetalheConteudo').innerHTML = `<div class="extra-detalhe-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="extra-detalhe-conteudo"><h3 id="extraDetalheTitulo">${p.nome}</h3><div class="extra-detalhe-descricao">${descricao}</div><div class="extra-detalhe-preco">${preco}</div><div class="extra-detalhe-acoes"><button class="recusar" type="button" onclick="fecharDetalheAdicional(false)">${textoRecusar}</button><button class="incluir" type="button" onclick="fecharDetalheAdicional(true)">${textoIncluir}</button></div></div>`;
   document.getElementById('extraDetalheOverlay').classList.add('open');
 }
+
 function fecharDetalheAdicional(incluir) {
   const id = adicionalGlobalEmDetalhe?.id;
   const tipo = tipoDetalheOferta;
@@ -2313,6 +2057,7 @@ function fecharDetalheAdicional(incluir) {
   tipoDetalheOferta = 'extra';
   if (tipo === 'extra') renderOfertasGlobais();
 }
+
 function confirmarOfertas() {
   const nomeProdutoAdicionado = produtoPendenteOfertas?.nome || 'Produto';
   for (const id of adicionaisGlobaisSelecionados) {
@@ -2325,16 +2070,19 @@ function confirmarOfertas() {
   showToast(`${nomeProdutoAdicionado} adicionado ao carrinho ✓`, 'success');
   abrirCarrinho();
 }
+
 function fecharOfertas() {
   document.getElementById('ofertasOverlay').classList.remove('open');
   produtoPendenteOfertas = null;
   adicionaisGlobaisSelecionados = new Set();
   abrirCarrinho();
 }
+
 function removerDoCarrinho(idx) {
   carrinho.splice(idx, 1);
   atualizarCarrinhoUI();
 }
+
 /** Retorna o cross-sell global enquanto o produto ainda não estiver no carrinho. */
 function getOrderBumpDisponivel() {
   if (!carrinho.length || !ofertaCrossSellGlobal.produtoId || !carrinhoTemModeloAceitoCrossSell()) return null;
@@ -2343,14 +2091,17 @@ function getOrderBumpDisponivel() {
   if (!bump || bump.ativo === false || !temaAtivoDoProduto(raw) || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
   return { bump };
 }
+
 function renderOrderBumpNoCarrinho() {
   const container = document.getElementById('cartOrderBumpContainer');
   if (!container) return '';
   const disponivel = getOrderBumpDisponivel();
   if (!disponivel || orderBumpAceito) { container.innerHTML = ''; return; }
+
   const { bump } = disponivel;
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
   const textoOferta = ofertaCrossSellGlobal.texto?.trim() || `Leve também ${bump.nome} com desconto especial!`;
+
   const precoNormal = precoPromocionalProduto(bump);
   container.innerHTML = `
     <div class="orderbump-card" onclick="abrirDetalheAdicionalGlobal('${bump.id}', 'crossSell')">
@@ -2365,6 +2116,7 @@ function renderOrderBumpNoCarrinho() {
       <button class="orderbump-btn-add">Ver detalhes</button>
     </div>`;
 }
+
 function aceitarOrderBump(bumpId) {
   const disponivel = getOrderBumpDisponivel();
   const raw = produtos.find(p => p.id === bumpId);
@@ -2376,11 +2128,13 @@ function aceitarOrderBump(bumpId) {
   atualizarCarrinhoUI();
   showToast(`${bump.nome} adicionado com desconto ✓`, 'success');
 }
+
 function atualizarCarrinhoUI() {
   const badge = document.getElementById('cartBadge');
   const badgeNav = document.getElementById('cartBadgeNav');
   const itemsContainer = document.getElementById('cartItemsContainer');
   const footer = document.getElementById('cartFooter');
+
   if (carrinho.length === 0) {
     const offerContainer = document.getElementById('cartOrderBumpContainer');
     if (offerContainer) offerContainer.innerHTML = '';
@@ -2394,10 +2148,12 @@ function atualizarCarrinhoUI() {
       </div>`;
     return;
   }
+
   badge.style.display = 'flex';
   badge.textContent = carrinho.length;
   if (badgeNav) { badgeNav.style.display = 'flex'; badgeNav.textContent = carrinho.length; }
   footer.style.display = 'block';
+
   carrinho.forEach(item => { item.preco = precoItemCarrinho(item); });
   itemsContainer.innerHTML = carrinho.map((item, idx) => {
     const adicionaisTexto = (item.adicionais && item.adicionais.length > 0)
@@ -2421,14 +2177,17 @@ function atualizarCarrinhoUI() {
     </div>
   `;
   }).join('');
+
   // Se o item do order bump foi removido do carrinho, libera a oferta pra aparecer de novo
   if (orderBumpAceito && (!carrinho.some(c => c.id === orderBumpAceito) || !carrinhoTemModeloAceitoCrossSell())) {
     orderBumpAceito = null;
   }
   renderOrderBumpNoCarrinho();
+
   const total = carrinho.reduce((s, i) => s + i.preco, 0);
   document.getElementById('cartTotalValor').textContent = BRL(total);
 }
+
 function abrirCarrinho() {
   document.getElementById('cartDrawer').classList.add('open');
   document.getElementById('cartOverlay').classList.add('open');
@@ -2437,12 +2196,15 @@ function fecharCarrinho() {
   document.getElementById('cartDrawer').classList.remove('open');
   document.getElementById('cartOverlay').classList.remove('open');
 }
+
 // ── Checkout ───────────────────────────────────────────────────────────────
 const CHAVE_PIX = 'luuluzices@gmail.com';
 let pagamentoEscolhido = null;
+
 function abrirCheckout() {
   if (carrinho.length === 0) return;
   fecharCarrinho();
+
   const total = carrinho.reduce((s, i) => s + i.preco, 0);
   const resumoHtml = `
     ${carrinho.map(item => `
@@ -2458,16 +2220,20 @@ function abrirCheckout() {
   `;
   document.getElementById('checkoutResumo').innerHTML = resumoHtml;
   document.getElementById('checkoutResumoPagamento').innerHTML = resumoHtml;
+
   irParaEtapa('dados');
   document.getElementById('checkoutOverlay').classList.add('open');
 }
+
 function fecharCheckout() {
   document.getElementById('checkoutOverlay').classList.remove('open');
 }
+
 /** Troca a etapa visível do modal de checkout, sem perder os dados já preenchidos */
 function irParaEtapa(nome) {
   document.querySelectorAll('.checkout-etapa').forEach(el => el.classList.remove('active'));
   document.getElementById('checkout-etapa-' + nome).classList.add('active');
+
   const titulos = {
     dados: 'Finalizar Pedido',
     'como-funciona': 'Como funciona seu pedido',
@@ -2477,6 +2243,7 @@ function irParaEtapa(nome) {
   };
   document.getElementById('checkoutHeaderTitulo').textContent = titulos[nome] || 'Finalizar Pedido';
 }
+
 function irParaComoFunciona() {
   const nomeComprador = document.getElementById('ckNomeComprador').value.trim();
   const whatsapp = document.getElementById('ckWhatsapp').value.trim();
@@ -2486,9 +2253,13 @@ function irParaComoFunciona() {
   }
   irParaEtapa('como-funciona');
 }
+
 function voltarParaDados() { irParaEtapa('dados'); }
+
 function irParaPagamento() { irParaEtapa('pagamento'); }
+
 function voltarParaComoFunciona() { irParaEtapa('como-funciona'); }
+
 function selecionarPagamento(tipo) {
   pagamentoEscolhido = tipo;
   if (tipo === 'pix') {
@@ -2500,7 +2271,9 @@ function selecionarPagamento(tipo) {
     irParaEtapa('cartao');
   }
 }
+
 function voltarParaPagamento() { irParaEtapa('pagamento'); }
+
 function copiarChavePix() {
   navigator.clipboard.writeText(CHAVE_PIX).then(() => {
     showToast('Chave Pix copiada ✓', 'success');
@@ -2508,6 +2281,7 @@ function copiarChavePix() {
     showToast('Não foi possível copiar automaticamente', 'error');
   });
 }
+
 /** Monta o texto de observações no formato reconhecido pelo parser do sistema de gestão */
 function montarObsEstruturada(dados) {
   const linhas = [];
@@ -2520,15 +2294,18 @@ function montarObsEstruturada(dados) {
   if (dados.obsExtra)            linhas.push(`* Observações adicionais - ${dados.obsExtra}`);
   return linhas.join('\n');
 }
+
 async function finalizarPedido(meioPagamento) {
   const btnId = meioPagamento === 'pix' ? null : null; // botões já identificados via onclick, sem precisar de id fixo
   const nomeComprador = document.getElementById('ckNomeComprador').value.trim();
   const whatsapp = document.getElementById('ckWhatsapp').value.trim();
+
   if (!nomeComprador || !whatsapp) {
     showToast('Preencha os campos obrigatórios', 'error');
     irParaEtapa('dados');
     return;
   }
+
   // Monta o resumo do pedido (produtos + adicionais + total)
   const produtoStr = carrinho.map(i => {
     const adicionaisTxt = (i.adicionais && i.adicionais.length > 0)
@@ -2537,7 +2314,9 @@ async function finalizarPedido(meioPagamento) {
     return `• ${i.nome}${adicionaisTxt} — ${BRL(i.preco)}\n  Modelo escolhido: ${linkProdutoDireto(i.id)}`;
   }).join('\n');
   const valorTotal = carrinho.reduce((s, i) => s + i.preco, 0);
+
   const meioPagamentoTexto = meioPagamento === 'pix' ? 'Pix' : 'Cartão';
+
   // Grava o pedido como pendente no Firestore — o sistema de gestão vai mostrar
   // isso nas Tarefas do Dia pra confirmação manual. NUNCA grava direto em `vendas`.
   try {
@@ -2557,6 +2336,7 @@ async function finalizarPedido(meioPagamento) {
     console.warn('Não foi possível registrar o pedido no sistema (site segue funcionando):', e);
     // Não bloqueia o fluxo — o WhatsApp continua sendo a fonte de verdade do pedido
   }
+
   // Monta a mensagem completa pro WhatsApp — detalhes do evento ficam pra combinar na conversa
   const mensagemLinhas = [
     `Olá! Gostaria de fazer um pedido:`,
@@ -2570,10 +2350,13 @@ async function finalizarPedido(meioPagamento) {
     mensagemLinhas.push(`✅ Já realizei o pagamento via Pix e vou enviar o comprovante.`);
   }
   mensagemLinhas.push(``, `Comprador: ${nomeComprador} (${whatsapp})`);
+
   const mensagem = mensagemLinhas.join('\n');
+
   // Número de WhatsApp da Luluzices que recebe os pedidos
   const numeroLuluzices = '5521981357208';
   const linkWhats = `https://wa.me/${numeroLuluzices}?text=${encodeURIComponent(mensagem)}`;
+
   showToast('Redirecionando para o WhatsApp...', 'success');
   setTimeout(() => {
     window.location.href = linkWhats;
@@ -2586,6 +2369,7 @@ async function finalizarPedido(meioPagamento) {
     }, 800);
   }, 600);
 }
+
 /** Carrega a cor personalizada definida no painel admin e aplica ao site */
 function ajustarCor(hex, pct) {
   const h = hex.replace('#','');
@@ -2596,6 +2380,7 @@ function ajustarCor(hex, pct) {
   };
   return `#${ajustar(r)}${ajustar(g)}${ajustar(b)}`;
 }
+
 async function carregarCorPersonalizada() {
   try {
     const doc = await db.collection('config').doc('siteConfig').get();
@@ -2609,12 +2394,13 @@ async function carregarCorPersonalizada() {
     console.warn('Não foi possível carregar cor personalizada:', e);
   }
 }
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 carregarCorPersonalizada();
 carregarProdutos();
 initBannerCarrossel();
-initBannerCarrossel();
 atualizarCarrinhoUI();
+
 // Fecha modais com ESC
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { fecharCarrinho(); fecharCheckout(); }
@@ -2630,11 +2416,13 @@ document.addEventListener('keydown', (e) => {
     <button onclick="verificarSenhaAdmin()" style="width:100%;padding:12px;background:#e8546a;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;">Entrar</button>
     <p id="adminSenhaErro" style="display:none;color:#e84040;font-size:12px;margin-top:10px;">E-mail ou senha incorretos.</p>
   </div>
+
   <div id="adminPainel" style="display:none;max-width:960px;margin:0 auto;padding:24px 16px 60px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
       <h1 style="font-family:'DM Serif Display',serif;font-size:22px;">🎀 Painel Admin — Luluzices</h1>
       <button onclick="fecharAdmin()" style="background:#1a1214;color:#fff;border:none;padding:9px 16px;border-radius:100px;font-size:12.5px;font-weight:600;cursor:pointer;">✕ Fechar</button>
     </div>
+
     <div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;border-bottom:1.5px solid #ecddd6;">
       <div class="admin-tab active" data-atab="produtos" onclick="adminGoTab('produtos')">🛍️ Produtos</div>
       <div class="admin-tab" data-atab="modelos" onclick="adminGoTab('modelos')">🎞️ Modelos</div>
@@ -2644,6 +2432,7 @@ document.addEventListener('keydown', (e) => {
       <div class="admin-tab" data-atab="logo" onclick="adminGoTab('logo')">🖼️ Logo</div>
       <div class="admin-tab" data-atab="ofertas" onclick="adminGoTab('ofertas')">🎁 Ofertas globais</div>
     </div>
+
     <!-- PRODUTOS -->
     <div class="admin-subpage active" id="atab-produtos">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
@@ -2656,18 +2445,6 @@ document.addEventListener('keydown', (e) => {
         </div>
       </div>
       <div id="adminCsvStatus" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:9px;font-size:12.5px;"></div>
-      </div>
-      <div id="adminCsvStatus" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:9px;font-size:12.5px;"></div>
-      <section style="max-width:760px;background:#fff;padding:16px;border:1px solid #ecddd6;border-radius:12px;margin-bottom:16px;">
-        <h3 style="font-size:17px;margin-bottom:5px;">Convites exibidos na Home</h3>
-        <p style="font-size:12.5px;color:#9a8890;margin:0 0 10px;">Selecione exatamente 4 convites. Eles aparecem primeiro enquanto o restante do catálogo carrega em segundo plano.</p>
-        <input id="adminHomeBusca" type="search" placeholder="Buscar convite para selecionar" oninput="adminRenderSelecaoHome()" style="width:100%;padding:9px 12px;border:1.5px solid #ecddd6;border-radius:9px;margin-bottom:8px;">
-        <div id="adminHomeSelecaoLista" style="max-height:250px;overflow:auto;border:1px solid #f0e5df;border-radius:9px;padding:6px;"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap;">
-          <span id="adminHomeSelecaoStatus" style="font-size:12px;color:#9a8890;"></span>
-          <button class="admin-btn-primary" type="button" onclick="adminSalvarSelecaoHome()">Salvar 4 convites</button>
-        </div>
-      </section>
       <div id="adminBarraMassa" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:#1a1214;color:#fff;padding:10px 16px;border-radius:9px;margin-bottom:12px;">
         <span id="adminBarraMassaTexto" style="font-size:12.5px;font-weight:600;">0 produtos selecionados</span>
         <div style="display:flex;gap:8px;">
@@ -2688,6 +2465,7 @@ document.addEventListener('keydown', (e) => {
       </div>
       <div id="adminProdutosGrid" class="admin-grid"></div>
     </div>
+
     <div class="admin-subpage" id="atab-modelos">
       <div style="max-width:760px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;margin-bottom:16px;">
         <h3 style="font-size:18px;margin-bottom:6px;">Configuração central dos modelos</h3>
@@ -2704,6 +2482,7 @@ document.addEventListener('keydown', (e) => {
         <div id="adminNormalizacaoResumo" style="font-size:12px;margin-top:12px;white-space:pre-line;"></div>
       </div>
     </div>
+
     <div class="admin-subpage" id="atab-ofertas">
       <div style="max-width:680px;background:#fff;padding:20px;border:1px solid #ecddd6;border-radius:12px;">
         <h3 style="font-size:18px;margin-bottom:6px;">Ofertas exibidas ao adicionar ao carrinho</h3>
@@ -2732,6 +2511,7 @@ document.addEventListener('keydown', (e) => {
         <button class="admin-btn-primary" onclick="adminSalvarOfertasGlobais()">Salvar ofertas globais</button>
       </div>
     </div>
+
     <!-- TEMAS -->
     <div class="admin-subpage" id="atab-temas">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
@@ -2741,6 +2521,7 @@ document.addEventListener('keydown', (e) => {
       <div style="margin-bottom:14px;max-width:420px;"><input id="adminBuscaTema" type="search" placeholder="🔍 Pesquisar tema..." oninput="adminRenderTemas()" style="width:100%;padding:10px 12px;border:1.5px solid #ecddd6;border-radius:9px;font-size:13px;"></div>
       <div id="adminTemasGrid" class="admin-grid"></div>
     </div>
+
     <!-- BANNERS -->
     <div class="admin-subpage" id="atab-banners">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
@@ -2749,6 +2530,7 @@ document.addEventListener('keydown', (e) => {
       </div>
       <div id="adminBannersGrid" class="admin-grid"></div>
     </div>
+
     <!-- CORES -->
     <div class="admin-subpage" id="atab-cores">
       <div class="admin-card" style="max-width:480px;">
@@ -2759,6 +2541,7 @@ document.addEventListener('keydown', (e) => {
         <div class="admin-cor-row" style="border-bottom:none;"><span>Texto Secundário</span><input type="color" id="acorTextoMuted" value="#9a8890" onchange="adminSalvarCores()"></div>
       </div>
     </div>
+
     <!-- LOGO -->
     <div class="admin-subpage" id="atab-logo">
       <div class="admin-card" style="max-width:420px;">
@@ -2774,6 +2557,7 @@ document.addEventListener('keydown', (e) => {
     </div>
   </div>
 </div>
+
 <!-- MODAL: PRODUTO (admin) -->
 <div id="adminModalProduto" class="admin-modal-overlay">
   <div class="admin-modal">
@@ -2815,10 +2599,12 @@ document.addEventListener('keydown', (e) => {
       </div>
       <div class="admin-field"><label>Modelo de convite</label><select id="aModelo" onchange="adminAtualizarCamposModelo()"><option value="">Produto sem modelo central</option></select></div>
       <div class="admin-field"><label>Nome do produto</label><input type="text" id="aNome" placeholder="Ex: Convite Interativo Animado"></div>
+
       <div class="admin-check-row" id="aSobConsultaRow">
         <label><input type="checkbox" id="aSobConsulta" onchange="adminToggleSobConsulta()"> Sem preço fixo (sob consulta via WhatsApp)</label>
       </div>
       <div class="admin-field" id="aPrecoGroup"><label>Preço (R$)</label><input type="number" id="aPreco" step="0.01" min="0"></div>
+
       <div class="admin-check-row" id="aPromoCheckRow">
         <label><input type="checkbox" id="aPromoAtiva" onchange="adminTogglePromo()"> Produto em promoção</label>
       </div>
@@ -2831,7 +2617,9 @@ document.addEventListener('keydown', (e) => {
         </div>
         <div class="admin-field"><label id="aPromoValorLabel">Desconto (%)</label><input type="number" id="aPromoValor" step="0.01" min="0"></div>
       </div>
+
       <div class="admin-field"><label>Descrição</label><textarea id="aDescricao" rows="3"></textarea></div>
+
       <p style="font-size:11.5px;color:#9a8890;">As ofertas e os produtos adicionais são configurados uma única vez em “Ofertas globais”.</p>
     </div>
     <div class="admin-modal-footer">
@@ -2840,6 +2628,7 @@ document.addEventListener('keydown', (e) => {
     </div>
   </div>
 </div>
+
 <!-- MODAL: TEMA (admin) -->
 <div id="adminModalTema" class="admin-modal-overlay">
   <div class="admin-modal" style="max-width:400px;">
@@ -2868,6 +2657,7 @@ document.addEventListener('keydown', (e) => {
     </div>
   </div>
 </div>
+
 <!-- MODAL: BANNER (admin) -->
 <div id="adminModalBanner" class="admin-modal-overlay">
   <div class="admin-modal" style="max-width:420px;">
@@ -2901,6 +2691,7 @@ document.addEventListener('keydown', (e) => {
     </div>
   </div>
 </div>
+
 <style>
   .admin-tab { padding:9px 16px; font-size:12.5px; font-weight:600; color:#9a8890; cursor:pointer; border-bottom:2.5px solid transparent; margin-bottom:-1.5px; }
   .admin-tab.active { color:#e8546a; border-bottom-color:#e8546a; }
@@ -2973,6 +2764,7 @@ document.addEventListener('keydown', (e) => {
   .adicional-row-admin input[type=number] { flex:1; }
   .adicional-row-admin button { background:none; border:none; color:#e84040; font-size:15px; }
 </style>
+
 <script>
 // ============================================================
 // PAINEL ADMIN OCULTO — acesso só via ?painel=luluzices2026admin, com login real
@@ -2980,11 +2772,13 @@ document.addEventListener('keydown', (e) => {
 // esse mesmo login antes de aceitar qualquer escrita — ver regras no console).
 // ============================================================
 const ADMIN_URL_KEY = 'luluzices2026admin';
+
 let bannersSite = [];
 let _fotosGaleriaAdmin = [];
 let _editandoProdutoIdx = null;
 let _editandoTemaIdx = null;
 let _editandoBannerIdx = null;
+
 function checarAcessoAdmin() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('painel') === ADMIN_URL_KEY) {
@@ -2999,11 +2793,13 @@ function checarAcessoAdmin() {
     });
   }
 }
+
 async function verificarSenhaAdmin() {
   const email = document.getElementById('adminEmailInput').value.trim();
   const senha = document.getElementById('adminSenhaInput').value;
   const erroEl = document.getElementById('adminSenhaErro');
   erroEl.style.display = 'none';
+
   try {
     await auth.signInWithEmailAndPassword(email, senha);
     document.getElementById('adminLoginBox').style.display = 'none';
@@ -3014,6 +2810,7 @@ async function verificarSenhaAdmin() {
     erroEl.style.display = 'block';
   }
 }
+
 function fecharAdmin() {
   auth.signOut();
   document.getElementById('adminOverlay').style.display = 'none';
@@ -3023,30 +2820,28 @@ function fecharAdmin() {
   document.getElementById('adminSenhaInput').value = '';
   document.getElementById('adminSenhaErro').style.display = 'none';
 }
+
 function adminGoTab(tab) {
   document.querySelectorAll('.admin-tab').forEach(el => el.classList.toggle('active', el.dataset.atab === tab));
   document.querySelectorAll('.admin-subpage').forEach(el => el.classList.remove('active'));
   document.getElementById('atab-' + tab).classList.add('active');
 }
+
 function adminFecharModal(id) { document.getElementById(id).classList.remove('open'); }
+
 async function adminCarregarTudo() {
-  await Promise.all([carregarTemas(), carregarCatalogoCompleto(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
-  try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.error('Erro ao sincronizar catálogo paginado:',e); }
+  await Promise.all([carregarProdutos(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin()]);
   adminCarregarOfertasGlobais();
   adminRenderProdutos();
-async function adminCarregarTudo() {
-  await Promise.all([carregarProdutos(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin(), carregarSelecaoHome()]);
-  if (!homeProdutoIds.length) homeProdutoIds = getProdutosCatalogo().slice(0,LIMITE_CONVITES_HOME).map(p => String(p.id));
-  adminCarregarOfertasGlobais();
-  adminRenderProdutos();
-  adminRenderSelecaoHome();
   adminRenderTemas();
   adminRenderModelos();
   adminRenderBanners();
 }
+
 function escaparHTMLCatalogo(valor) {
   return String(valor ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
+
 function adminPopularSelecaoModelo() {
   const select = document.getElementById('aModelo');
   if (!select) return;
@@ -3054,6 +2849,7 @@ function adminPopularSelecaoModelo() {
   select.innerHTML = '<option value="">Produto sem modelo central</option>' + modelosSite.map(m => `<option value="${m.id}">${escaparHTMLCatalogo(m.nome)}</option>`).join('');
   if (modelosSite.some(m => m.id === valorAtual)) select.value = valorAtual;
 }
+
 function adminRenderModelos() {
   const root = document.getElementById('adminModelosLista');
   if (!root) return;
@@ -3076,6 +2872,7 @@ function adminRenderModelos() {
   }
   adminPopularSelecaoModelo();
 }
+
 async function adminSalvarModelos() {
   const atualizados = modelosSite.map(m => {
     const nome = document.getElementById(`modeloNome_${m.id}`)?.value.trim() || '';
@@ -3107,6 +2904,7 @@ async function adminSalvarModelos() {
     showToast('Não foi possível salvar os modelos.', 'error');
   }
 }
+
 function adminPreverNormalizacao() {
   const seguros = [];
   const pendentes = [];
@@ -3137,6 +2935,7 @@ function adminPreverNormalizacao() {
   ];
   document.getElementById('adminNormalizacaoResumo').textContent = resumo.join('\n');
 }
+
 function baixarBackupCatalogo() {
   const conteudo = JSON.stringify({ exportadoEm:new Date().toISOString(), produtos, temasSite, modelosSite }, null, 2);
   const url = URL.createObjectURL(new Blob([conteudo], { type:'application/json' }));
@@ -3146,6 +2945,7 @@ function baixarBackupCatalogo() {
   link.click();
   URL.revokeObjectURL(url);
 }
+
 async function adminAplicarNormalizacao() {
   if (!migracaoNormalizacaoAtual?.seguros?.length) return;
   const qtdAplicados = migracaoNormalizacaoAtual.seguros.length;
@@ -3178,7 +2978,6 @@ async function adminAplicarNormalizacao() {
   batch.set(db.collection('config').doc('modelosSite'), { data:JSON.stringify(modelosSite) }, { merge:true });
   try {
     await batch.commit();
-    await sincronizarProdutosPaginadosSite(produtosAtualizados);
     produtos = produtosAtualizados;
     modelosSiteSalvos = true;
     adminRenderProdutos();
@@ -3191,6 +2990,7 @@ async function adminAplicarNormalizacao() {
     showToast('Falha ao salvar a normalização. O backup foi baixado; nenhum sucesso foi confirmado.', 'error');
   }
 }
+
 function adminCarregarOfertasGlobais() {
   const crossSelect = document.getElementById('aCrossSellGlobal');
   const opcoes = produtos.map(produtoComModelo).map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
@@ -3206,6 +3006,7 @@ function adminCarregarOfertasGlobais() {
   adicionaisGlobaisRascunho = adicionaisGlobais.slice(0, 3);
   adminRenderSeletorAdicionais();
 }
+
 function adminRenderModelosAceitosCrossSell() {
   const wrap = document.getElementById('crossSellModelosWrap');
   const lista = document.getElementById('crossSellModelosLista');
@@ -3222,6 +3023,7 @@ function adminRenderModelosAceitosCrossSell() {
     adminRenderModelosAceitosCrossSell();
   }));
 }
+
 function adminRenderSeletorAdicionais() {
   const lista = document.getElementById('listaAdicionaisGlobais');
   const selecionados = document.getElementById('adicionaisGlobaisSelecionados');
@@ -3235,6 +3037,7 @@ function adminRenderSeletorAdicionais() {
     return `<span class="adicional-admin-chip">${escaparHTMLCatalogo(nome)}<button type="button" data-remover-adicional="${escaparHTMLCatalogo(id)}" aria-label="Remover ${escaparHTMLCatalogo(nome)}">×</button></span>`;
   }).join('') || '<span style="font-size:11px;color:#9a8890;">Nenhum produto selecionado.</span>';
   selecionados.querySelectorAll('[data-remover-adicional]').forEach(botao => botao.addEventListener('click', () => adminAlternarAdicionalGlobal(botao.dataset.removerAdicional)));
+
   const filtrados = produtosAdicionais.filter(p => {
     if (!busca) return true;
     return normalizarTextoBusca(`${p.nome || ''} ${p.temaNome || ''} ${p.categoria || ''}`).includes(busca);
@@ -3253,6 +3056,7 @@ function adminRenderSeletorAdicionais() {
   }).join('');
   lista.querySelectorAll('[data-escolher-adicional]').forEach(botao => botao.addEventListener('click', () => adminAlternarAdicionalGlobal(botao.dataset.escolherAdicional)));
 }
+
 function adminAlternarAdicionalGlobal(id) {
   const indice = adicionaisGlobaisRascunho.indexOf(id);
   if (indice >= 0) adicionaisGlobaisRascunho.splice(indice, 1);
@@ -3262,6 +3066,7 @@ function adminAlternarAdicionalGlobal(id) {
   } else adicionaisGlobaisRascunho.push(id);
   adminRenderSeletorAdicionais();
 }
+
 async function adminSalvarOfertasGlobais() {
   const extras = adicionaisGlobaisRascunho.slice();
   if (extras.length > 3) { showToast('Ajuste os produtos adicionais selecionados antes de salvar.', 'error'); return; }
@@ -3296,6 +3101,7 @@ async function adminSalvarOfertasGlobais() {
     showToast('Não foi possível salvar as ofertas.', 'error');
   }
 }
+
 async function carregarBannersAdmin() {
   try {
     const doc = await db.collection('config').doc('bannersSite').get();
@@ -3329,6 +3135,7 @@ async function adminSalvarCores() {
 }
 const CLOUDINARY_CLOUD_NAME = 'dtseuwgwi';
 const CLOUDINARY_UPLOAD_PRESET = 'ml_default';
+
 function adminUploadImagemCloudinary(arquivo, aoProgredir, aceitarVideo = false) {
   if (!arquivo) return Promise.reject(new Error('Selecione um arquivo.'));
   const tipoVideo = arquivo.type.startsWith('video/');
@@ -3359,6 +3166,7 @@ function adminUploadImagemCloudinary(arquivo, aoProgredir, aceitarVideo = false)
     xhr.send(form);
   });
 }
+
 async function adminEnviarFotoProduto() {
   const input = document.getElementById('aFotoNovaArquivo');
   const botao = document.getElementById('btnUploadFotoProduto');
@@ -3395,6 +3203,7 @@ async function adminEnviarFotoProduto() {
     botao.disabled = false;
   }
 }
+
 async function carregarLogoAdmin() {
   try {
     const doc = await db.collection('config').doc('logoSite').get();
@@ -3416,26 +3225,6 @@ function aplicarLogoSite(url) {
     marca.replaceChildren(img);
   } else {
     marca.textContent = '🎈 Lulu';
-  }
-}
-function aplicarLogoSite(url) {
-  const marca = document.querySelector('.header-top .logo');
-  const marcaLoading = document.getElementById('siteLoadingLogo');
-  if (url) {
-    if (marca) {
-      const img = document.createElement('img');
-      img.src = url;
-      img.alt = 'Luluzices';
-      img.onerror = () => { marca.textContent = '🎈 Lulu'; };
-      marca.replaceChildren(img);
-    }
-    if (marcaLoading) {
-      marcaLoading.innerHTML = `<img src="${escaparHTMLCatalogo(url)}" alt="Luluzices">`;
-      marcaLoading.querySelector('img').onerror = () => { marcaLoading.textContent = '🎈 Lulu'; };
-    }
-  } else {
-    if (marca) marca.textContent = '🎈 Lulu';
-    if (marcaLoading) marcaLoading.textContent = '🎈 Lulu';
   }
 }
 function adminPreviewLogo() {
@@ -3467,12 +3256,14 @@ async function adminSalvarLogo() {
     showToast('Logo salva e aplicada na loja ✓','success');
   } catch(e) { showToast('Erro ao salvar logo: '+e.message,'error'); }
 }
+
 // ── PRODUTOS ──────────────────────────────────────────────────────────────────
 // ── IMPORTAÇÃO EM MASSA VIA CSV ──────────────────────────────────────────────
 // Colunas esperadas (nessa ordem): nome, categoria, tema, preco, foto, descricao
 // - "tema" é opcional: se o nome não existir ainda na lista de Temas, ele é criado automaticamente
 // - "foto" é opcional: aceita um link de imagem (a primeira foto vira a capa)
 // - Produtos com preço 0 ou vazio entram como "sob consulta"
+
 function adminBaixarModeloCSV() {
   const linhas = [
     ['nome','categoria','tema','preco','foto','descricao'],
@@ -3486,6 +3277,7 @@ function adminBaixarModeloCSV() {
   a.href = url; a.download = 'modelo-produtos-luluzices.csv'; a.click();
   URL.revokeObjectURL(url);
 }
+
 /** Parser simples de CSV que respeita aspas e vírgulas dentro de campos entre aspas */
 function adminParseCSV(texto) {
   const linhas = [];
@@ -3507,6 +3299,7 @@ function adminParseCSV(texto) {
   if (campoAtual || linhaAtual.length) { linhaAtual.push(campoAtual); linhas.push(linhaAtual); }
   return linhas.filter(l => l.some(c => c.trim() !== ''));
 }
+
 function adminMostrarStatusCSV(msg, tipo) {
   const el = document.getElementById('adminCsvStatus');
   el.style.display = 'block';
@@ -3514,12 +3307,15 @@ function adminMostrarStatusCSV(msg, tipo) {
   el.style.color = tipo === 'erro' ? '#c0392b' : (tipo === 'aviso' ? '#7a5200' : '#1e6b48');
   el.innerHTML = msg;
 }
+
 async function adminImportarCSV(event) {
   const file = event.target.files[0];
   if (!file) return;
+
   const texto = await file.text();
   const linhas = adminParseCSV(texto);
   if (linhas.length < 2) { adminMostrarStatusCSV('O arquivo parece vazio ou sem produtos.', 'erro'); event.target.value = ''; return; }
+
   const cabecalho = linhas[0].map(h => h.trim().toLowerCase());
   const idxNome = cabecalho.indexOf('nome');
   const idxCategoria = cabecalho.indexOf('categoria');
@@ -3527,21 +3323,26 @@ async function adminImportarCSV(event) {
   const idxPreco = cabecalho.indexOf('preco');
   const idxFoto = cabecalho.indexOf('foto');
   const idxDescricao = cabecalho.indexOf('descricao');
+
   if (idxNome === -1) {
     adminMostrarStatusCSV('A coluna "nome" é obrigatória no CSV. Baixe o modelo e confira os nomes das colunas.', 'erro');
     event.target.value = '';
     return;
   }
+
   let importados = 0, comAvisoTema = 0, ignorados = 0;
+
   linhas.slice(1).forEach(linha => {
     const nome = (linha[idxNome] || '').trim();
     if (!nome) { ignorados++; return; }
+
     const categoria = idxCategoria >= 0 ? (linha[idxCategoria] || '').trim() : '';
     const temaNomeCsv = idxTema >= 0 ? (linha[idxTema] || '').trim() : '';
     const precoTexto = idxPreco >= 0 ? (linha[idxPreco] || '').trim() : '';
     const preco = parseFloat(precoTexto.replace(',', '.')) || 0;
     const foto = idxFoto >= 0 ? (linha[idxFoto] || '').trim() : '';
     const descricao = idxDescricao >= 0 ? (linha[idxDescricao] || '').trim() : '';
+
     // Resolve o tema: usa um existente com o mesmo nome, ou cria um novo automaticamente
     let temaId = null, temaNome = null;
     if (temaNomeCsv) {
@@ -3553,8 +3354,7 @@ async function adminImportarCSV(event) {
       }
       temaId = tema.id; temaNome = tema.nome;
     }
-  produtos.push({
-      id: 'ps_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+
     produtos.push({
       id: 'ps_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
       nome, categoria: categoria || 'Aniversário',
@@ -3562,31 +3362,36 @@ async function adminImportarCSV(event) {
       descricao,
       fotos: foto ? [foto] : [],
       foto: foto || null,
-      temaId, temaNome, createdAtMs:Date.now(),
       temaId, temaNome,
       promoAtiva: false, promoTipo: 'percentual', promoValor: 0,
       adicionais: [], crossSell: [],
     });
     importados++;
   });
+
   try {
     await salvarProdutosSite();
     if (comAvisoTema > 0) await salvarTemasRemote();
   } catch(e) { console.warn(e); }
+
   adminRenderProdutos();
   adminRenderTemas();
+
   let msg = `✓ ${importados} produto${importados===1?'':'s'} importado${importados===1?'':'s'} com sucesso.`;
   if (comAvisoTema > 0) msg += ` ${comAvisoTema} tema${comAvisoTema===1?'':'s'} novo${comAvisoTema===1?'':'s'} criado${comAvisoTema===1?'':'s'} automaticamente.`;
   if (ignorados > 0) msg += ` ${ignorados} linha${ignorados===1?'':'s'} ignorada${ignorados===1?'':'s'} por falta de nome.`;
   adminMostrarStatusCSV(msg, ignorados > 0 ? 'aviso' : 'sucesso');
   event.target.value = '';
 }
+
 let produtosSelecionadosMassa = new Set();
+
 function adminToggleSelecaoMassa(id, checked) {
   if (checked) produtosSelecionadosMassa.add(id);
   else produtosSelecionadosMassa.delete(id);
   adminAtualizarBarraMassa();
 }
+
 function adminAtualizarBarraMassa() {
   const barra = document.getElementById('adminBarraMassa');
   const contagem = produtosSelecionadosMassa.size;
@@ -3595,11 +3400,13 @@ function adminAtualizarBarraMassa() {
   const label = document.getElementById('adminBarraMassaTexto');
   if (label) label.textContent = `${contagem} produto${contagem===1?'':'s'} selecionado${contagem===1?'':'s'}`;
 }
+
 function adminLimparSelecaoMassa() {
   produtosSelecionadosMassa.clear();
   adminAtualizarBarraMassa();
   adminRenderProdutos();
 }
+
 async function adminExcluirSelecionadosMassa() {
   const qtd = produtosSelecionadosMassa.size;
   if (qtd === 0) return;
@@ -3611,6 +3418,7 @@ async function adminExcluirSelecionadosMassa() {
   adminRenderProdutos();
   showToast(`${qtd} produto${qtd===1?'':'s'} excluído${qtd===1?'':'s'}`, 'error');
 }
+
 function adminPopularFiltroCategorias() {
   const sel = document.getElementById('adminFiltroCategoria');
   if (!sel) return;
@@ -3619,13 +3427,17 @@ function adminPopularFiltroCategorias() {
   sel.innerHTML = '<option value="">Todas as categorias</option>' + categorias.map(c => `<option value="${c}">${c}</option>`).join('');
   sel.value = valorAtual;
 }
+
 function adminRenderProdutos() {
   adminPopularFiltroCategorias();
+
   const grid = document.getElementById('adminProdutosGrid');
   if (!produtos.length) { grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto cadastrado.</p>'; return; }
+
   const busca = (document.getElementById('adminBuscaProduto')?.value || '').trim().toLowerCase();
   const categoriaFiltro = document.getElementById('adminFiltroCategoria')?.value || '';
   const statusFiltro = document.getElementById('adminFiltroStatus')?.value || '';
+
   const filtrados = produtos.map(produtoComModelo).filter(p => {
     if (busca) {
       const alvo = `${p.nome || ''} ${p.temaNome || ''}`.toLowerCase();
@@ -3637,10 +3449,12 @@ function adminRenderProdutos() {
     if (statusFiltro === 'inativos' && ativo) return false;
     return true;
   });
+
   if (!filtrados.length) {
     grid.innerHTML = '<p style="color:#9a8890;font-size:12.5px;">Nenhum produto encontrado com esse filtro.</p>';
     return;
   }
+
   grid.innerHTML = filtrados.map((p) => {
     const fotos = (p.fotos && p.fotos.length) ? p.fotos : (p.foto ? [p.foto] : []);
     const marcado = produtosSelecionadosMassa.has(p.id);
@@ -3666,6 +3480,7 @@ function adminRenderProdutos() {
     </div>`;
   }).join('');
 }
+
 /** Ativa/desativa um produto sem excluí-lo — produtos inativos somem do site público mas continuam no admin */
 async function adminToggleAtivoProduto(id) {
   const p = produtos.find(x => x.id === id);
@@ -3675,6 +3490,7 @@ async function adminToggleAtivoProduto(id) {
   adminRenderProdutos();
   showToast(p.ativo === false ? 'Produto desativado' : 'Produto ativado ✓', p.ativo === false ? 'error' : 'success');
 }
+
 function adminEditarProdutoPorId(id) {
   const idx = produtos.findIndex(p => p.id === id);
   if (idx >= 0) adminAbrirModalProduto(idx);
@@ -3687,6 +3503,7 @@ async function adminExcluirProdutoPorId(id) {
   const idx = produtos.findIndex(p => p.id === id);
   if (idx >= 0) await adminExcluirProduto(idx);
 }
+
 function adminToggleSobConsulta() {
   const comModelo = !!document.getElementById('aModelo')?.value;
   document.getElementById('aPrecoGroup').style.display = !comModelo && document.getElementById('aSobConsulta').checked ? 'none' : 'block';
@@ -3699,6 +3516,7 @@ function adminTogglePromo() {
 function adminTogglePromoTipo() {
   document.getElementById('aPromoValorLabel').textContent = document.getElementById('aPromoTipo').value === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)';
 }
+
 function adminAtualizarCamposModelo() {
   const modelo = modelosSite.find(m => m.id === document.getElementById('aModelo')?.value);
   const temaInput = document.getElementById('aTemaInput');
@@ -3724,10 +3542,12 @@ function adminAtualizarCamposModelo() {
   adminToggleSobConsulta();
   adminTogglePromo();
 }
+
 /** Detecta se um link de mídia é vídeo pela extensão do arquivo */
 function ehVideo(url) {
   return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url || '');
 }
+
 function adminRenderFotosGaleria() {
   const el = document.getElementById('adminFotosGaleria');
   const contador = document.getElementById('adminFotosContador');
@@ -3757,6 +3577,7 @@ function adminMoverFoto(i, deslocamento) {
   adminRenderFotosGaleria();
 }
 function adminRemoverFoto(i) { _fotosGaleriaAdmin.splice(i,1); adminRenderFotosGaleria(); }
+
 function adminOnTemaInput() {
   const termo = document.getElementById('aTemaInput').value.trim().toLowerCase();
   const el = document.getElementById('adminTemaSugestoes');
@@ -3776,12 +3597,15 @@ function adminFecharTemaSugestoes() {
   const el = document.getElementById('adminTemaSugestoes');
   if (el) { el.innerHTML=''; el.classList.remove('open'); }
 }
+
 let _produtosDisponiveisOrderBump = [];
+
 function adminPopularCrossSell(idExcluir) {
   const outros = produtos.filter(p => p.id !== idExcluir).map(produtoComModelo);
   document.getElementById('aCrossSell').innerHTML = outros.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
   _produtosDisponiveisOrderBump = outros;
 }
+
 function adminOnOrderBumpInput() {
   const termo = document.getElementById('aOrderBumpInput').value.trim().toLowerCase();
   const el = document.getElementById('adminOrderBumpSugestoes');
@@ -3809,6 +3633,7 @@ function adminLimparOrderBump() {
   document.getElementById('aOrderBump').value = '';
   adminOrderBumpToggleCampos();
 }
+
 function adminOrderBumpToggleCampos() {
   document.getElementById('aOrderBumpCampos').style.display = document.getElementById('aOrderBump').value ? 'block' : 'none';
 }
@@ -3816,6 +3641,7 @@ function adminOrderBumpToggleTipo() {
   const tipo = document.getElementById('aOrderBumpDescontoTipo').value;
   document.getElementById('aOrderBumpDescontoLabel').textContent = tipo === 'percentual' ? 'Desconto (%)' : 'Desconto (R$)';
 }
+
 function adminAddAdicionalLinha(nome='', preco='') {
   const c = document.getElementById('adminAdicionaisContainer');
   const row = document.createElement('div');
@@ -3833,14 +3659,17 @@ function adminColetarAdicionais() {
   });
   return out;
 }
+
 function adminNovoProduto() { adminAbrirModalProduto(null); }
 function adminEditarProduto(idx) { adminAbrirModalProduto(idx); }
+
 /** Abre o modal já preenchido com os dados de um produto existente, mas em modo
  * "criação" — ao salvar, gera um produto novo em vez de sobrescrever o original.
  * Poupa o trabalho de digitar tudo de novo quando os produtos são parecidos. */
 function adminDuplicarProduto(idx) {
   adminAbrirModalProduto(idx, /* comoNovoDuplicado */ true);
 }
+
 function adminAbrirModalProduto(idx, comoNovoDuplicado) {
   // No modo duplicado, carrega os dados do produto em idx, mas trata como "novo"
   // (sem editar o original) — _editandoProdutoIdx fica null pra salvar como item novo.
@@ -3850,6 +3679,7 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
   adminPopularSelecaoModelo();
   _fotosGaleriaAdmin = editando ? [...(editando.fotos || (editando.foto ? [editando.foto] : []))] : [];
   adminRenderFotosGaleria();
+
   if (editando) {
     const p = editando;
     document.getElementById('adminModalProdutoTitle').textContent = comoNovoDuplicado ? 'Duplicar Produto' : 'Editar Produto';
@@ -3876,6 +3706,7 @@ function adminAbrirModalProduto(idx, comoNovoDuplicado) {
   adminAtualizarCamposModelo(); adminToggleSobConsulta(); adminTogglePromo(); adminTogglePromoTipo();
   document.getElementById('adminModalProduto').classList.add('open');
 }
+
 async function adminSalvarProduto() {
   const temaId = document.getElementById('aTemaId').value || null;
   const temaNomeDigitado = document.getElementById('aTemaInput').value.trim();
@@ -3884,11 +3715,13 @@ async function adminSalvarProduto() {
   const modelo = modelosSite.find(m => m.id === document.getElementById('aModelo').value);
   if (modelo && !temaValido) { showToast('Selecione um tema cadastrado para gerar o título automaticamente.', 'error'); return; }
   if (modelo && (modelo.preco <= 0 || !modelo.descricao)) { showToast('Configure preço e descrição do modelo na aba Modelos.', 'error'); return; }
+
   const sobConsulta = modelo ? false : document.getElementById('aSobConsulta').checked;
   const preco = modelo ? Number(modelo.preco) : (sobConsulta ? 0 : (parseFloat(document.getElementById('aPreco').value) || 0));
   const nome = modelo ? `${modelo.nome} - ${tema.nome}` : document.getElementById('aNome').value.trim();
   if (!nome) { showToast('Preencha o nome','error'); return; }
   if (!sobConsulta && preco <= 0) { showToast('Informe um preço válido','error'); return; }
+
   const id = _editandoProdutoIdx !== null ? produtos[_editandoProdutoIdx].id : 'ps_' + Date.now();
   const anterior = _editandoProdutoIdx !== null ? produtos[_editandoProdutoIdx] : null;
   const promoIndividualAtiva = modelo
@@ -3900,10 +3733,6 @@ async function adminSalvarProduto() {
   const promoValor = modelo
     ? (modelo.promoConflito ? (Number(anterior?.promoValor)||0) : (modelo.promoAtiva ? Math.max(0, Number(modelo.preco)-Number(modelo.promoPreco)) : 0))
     : (parseFloat(document.getElementById('aPromoValor').value) || 0);
-  const produtoData = {
-    ...(anterior || {}),
-    id, nome,
-    createdAtMs:anterior?.createdAtMs || dataAdicaoProdutoMs({ id }),
   const produtoData = {
     ...(anterior || {}),
     id, nome,
@@ -3920,8 +3749,10 @@ async function adminSalvarProduto() {
     promoTipo,
     promoValor,
   };
+
   if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = produtoData;
   else produtos.push(produtoData);
+
   try { await salvarProdutosSite(); }
   catch(e) {
     if (_editandoProdutoIdx !== null) produtos[_editandoProdutoIdx] = anterior;
@@ -3934,6 +3765,7 @@ async function adminSalvarProduto() {
   adminFecharModal('adminModalProduto');
   showToast('Produto salvo ✓','success');
 }
+
 async function adminExcluirProduto(idx) {
   if (!confirm(`Excluir "${produtos[idx].nome}"?`)) return;
   produtos.splice(idx,1);
@@ -3941,6 +3773,7 @@ async function adminExcluirProduto(idx) {
   adminRenderProdutos();
   showToast('Produto excluído','error');
 }
+
 // ── TEMAS ────────────────────────────────────────────────────────────────────
 function adminRenderTemas() {
   const grid = document.getElementById('adminTemasGrid');
@@ -4032,7 +3865,6 @@ async function adminSalvarTema() {
   }
   try { await salvarTemasRemote(); }
   catch (e) { temasSite = estadoAnterior; showToast('Não foi possível salvar o tema.', 'error'); return; }
-  try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.warn('Falha ao atualizar catálogo paginado após editar tema:',e); }
   adminRenderTemas();
   renderTemasLoja();
   renderCategorias();
@@ -4046,7 +3878,6 @@ async function adminToggleTema(id) {
   tema.ativo = tema.ativo === false;
   try {
     await salvarTemasRemote();
-    try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.warn('Falha ao atualizar catálogo paginado após alterar tema:',e); }
     adminRenderTemas();
     renderCategorias();
     renderCatalogo();
@@ -4089,7 +3920,6 @@ async function adminExcluirTema(idx) {
   }, { merge:true });
   try {
     await batch.commit();
-    await sincronizarProdutosPaginadosSite(produtosAtualizados);
     temasSite = temasAtualizados;
     produtos = produtosAtualizados;
     adicionaisGlobais = adicionaisAtualizados;
@@ -4105,6 +3935,7 @@ async function adminExcluirTema(idx) {
   renderCatalogo();
   showToast(`Tema e ${vinculados.length} produto(s) excluído(s)`, 'success');
 }
+
 // ── BANNERS ──────────────────────────────────────────────────────────────────
 function adminRenderBanners() {
   const grid = document.getElementById('adminBannersGrid');
@@ -4209,6 +4040,7 @@ async function adminExcluirBanner(idx) {
   adminRenderBanners();
   showToast('Banner excluído','error');
 }
+
 function renderBannersPublicos() {
   const carrossel = document.getElementById('bannerCarrossel');
   if (!carrossel || !bannersSite.length) return; // mantém os banners padrão antigos se não houver cadastro
@@ -4227,6 +4059,7 @@ function renderBannersPublicos() {
   });
   initBannerCarrossel();
 }
+
 function abrirDestinoBanner(banner) {
   if (!banner) return;
   if (banner.tipoDestino === 'pesquisa') {
@@ -4245,14 +4078,11 @@ function abrirDestinoBanner(banner) {
   }
   if (banner.destino) window.location.href = banner.destino;
 }
+
 checarAcessoAdmin();
 carregarLogoAdmin();
-configurarGestoVoltarProduto();
-checarAcessoAdmin();
-iniciarHomePublica();
 configurarGestoVoltarProduto();
 document.addEventListener('keydown', evento => { if (evento.key === 'Escape') fecharZoomMidiaProduto(); });
 </script>
 </body>
-</html>
 </html>
