@@ -856,7 +856,7 @@
 
   <div class="home-body">
     <div class="secao-titulo">
-      <h2>🔥 Todos os convites</h2>
+      <h2>✨ Novidades</h2>
     </div>
 
     <div class="catalogo" id="catalogoGrid">
@@ -1266,7 +1266,7 @@ async function salvarProdutosSite() {
 async function sincronizarProdutosPaginadosSite(lista) {
   const col = db.collection('siteCatalogProducts');
   const existentes = await col.get();
-  const contagensExistentes = new Map(existentes.docs.map(d => [d.id, Number(d.data().salesCount)||0]));
+  const dadosExistentes = new Map(existentes.docs.map(d => [d.id, d.data()]));
   const publico = lista.filter(p => {
     const resolvido = produtoComModelo(p);
     return p?.id && !produtoEhAdicional(resolvido) && resolvido.ativo !== false &&
@@ -1276,7 +1276,13 @@ async function sincronizarProdutosPaginadosSite(lista) {
   let batch = db.batch(), operacoes = 0;
   const commit = async () => { if (operacoes) { await batch.commit(); batch = db.batch(); operacoes = 0; } };
   for (const p of publico) {
-    batch.set(col.doc(String(p.id)), { ...p, modelo:produtoComModelo(p).modelo || p.modelo || null, salesCount:contagensExistentes.get(String(p.id)) ?? Number(p.salesCount) ?? 0 }, { merge:true });
+    const existente = dadosExistentes.get(String(p.id)) || {};
+    batch.set(col.doc(String(p.id)), {
+      ...p,
+      modelo:produtoComModelo(p).modelo || p.modelo || null,
+      createdAtMs:Number(existente.createdAtMs) || dataAdicaoProdutoMs(p),
+      salesCount:Number(existente.salesCount) || Number(p.salesCount) || 0,
+    }, { merge:true });
     if (++operacoes >= 450) await commit();
   }
   for (const doc of existentes.docs) {
@@ -1373,8 +1379,7 @@ async function carregarProximoLoteHome() {
   if (carregandoProdutosHome || fimProdutosHome) return;
   carregandoProdutosHome = true; atualizarIndicadorPaginacaoHome('Carregando mais convites…');
   try {
-    let consulta = db.collection('siteCatalogProducts').orderBy('salesCount','desc').limit(TAMANHO_LOTE_HOME);
-    if (cursorProdutosHome) consulta = consulta.startAfter(cursorProdutosHome);
+    const consulta = db.collection('siteCatalogProducts').orderBy('createdAtMs','desc').limit(TAMANHO_LOTE_HOME);
     const snap = await consulta.get();
     if (snap.empty) {
       fimProdutosHome = true;
@@ -1388,10 +1393,10 @@ async function carregarProximoLoteHome() {
     cursorProdutosHome = snap.docs[snap.docs.length - 1];
     const vistos = new Set(produtosHome.map(p => String(p.id)));
     produtosHome.push(...snap.docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
-    if (snap.size < TAMANHO_LOTE_HOME) fimProdutosHome = true;
+    fimProdutosHome = true; // HOME exibe somente as 10 novidades mais recentes.
     renderCategorias(); renderTemasLoja(); renderCatalogo();
-    atualizarIndicadorPaginacaoHome(fimProdutosHome ? '' : 'Role para ver mais convites');
-    if (fimProdutosHome) observerProdutosHome?.disconnect(); else observarFimCatalogoHome();
+    atualizarIndicadorPaginacaoHome('');
+    observerProdutosHome?.disconnect();
   } catch (e) {
     console.error('Erro ao carregar mais convites:',e);
     if (!produtosHome.length) document.getElementById('catalogoGrid').innerHTML = '<div class="empty-state"><div class="icon">😕</div><p>Não foi possível carregar os convites agora. Tente novamente em instantes.</p></div>';
@@ -1754,6 +1759,16 @@ let bannerIgnorarCliqueAte = 0;
 function reiniciarTimerBanner(total) {
   if (bannerTimer) clearInterval(bannerTimer);
   if (total > 1) bannerTimer = setInterval(() => irParaBannerSlide((bannerIdx + 1) % total), 4500);
+}
+
+function dataAdicaoProdutoMs(produto) {
+  const explicita = Number(produto?.createdAtMs);
+  if (Number.isFinite(explicita) && explicita > 0) return explicita;
+  const data = produto?.createdAt;
+  if (data && typeof data.toMillis === 'function') return data.toMillis();
+  if (data) { const convertida = new Date(data).getTime(); if (Number.isFinite(convertida) && convertida > 0) return convertida; }
+  const timestampNoId = String(produto?.id || '').match(/(?:^|_)(\d{13})(?:_|$)/);
+  return timestampNoId ? Number(timestampNoId[1]) : 0;
 }
 
 function configurarDeslizeBanner(carrossel) {
@@ -3485,14 +3500,14 @@ async function adminImportarCSV(event) {
       temaId = tema.id; temaNome = tema.nome;
     }
 
-    produtos.push({
+  produtos.push({
       id: 'ps_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
       nome, categoria: categoria || 'Aniversário',
       preco, sobConsulta: preco <= 0,
       descricao,
       fotos: foto ? [foto] : [],
       foto: foto || null,
-      temaId, temaNome,
+      temaId, temaNome, createdAtMs:Date.now(),
       promoAtiva: false, promoTipo: 'percentual', promoValor: 0,
       adicionais: [], crossSell: [],
     });
@@ -3866,6 +3881,7 @@ async function adminSalvarProduto() {
   const produtoData = {
     ...(anterior || {}),
     id, nome,
+    createdAtMs:anterior?.createdAtMs || dataAdicaoProdutoMs({ id }),
     categoria: document.getElementById('aCategoria').value,
     preco, sobConsulta,
     descricao: modelo ? modelo.descricao : document.getElementById('aDescricao').value.trim(),
