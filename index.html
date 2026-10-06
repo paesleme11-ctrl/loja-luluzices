@@ -1373,7 +1373,16 @@ async function carregarProximoLoteHome() {
     let consulta = db.collection('siteCatalogProducts').orderBy('salesCount','desc').limit(TAMANHO_LOTE_HOME);
     if (cursorProdutosHome) consulta = consulta.startAfter(cursorProdutosHome);
     const snap = await consulta.get();
-    if (snap.empty) { fimProdutosHome = true; atualizarIndicadorPaginacaoHome(''); observerProdutosHome?.disconnect(); renderCatalogo(); return; }
+    if (snap.empty) {
+      if (!cursorProdutosHome && !produtosHome.length) {
+        await carregarCatalogoLegadoParaFallback();
+      }
+      fimProdutosHome = true;
+      atualizarIndicadorPaginacaoHome('');
+      observerProdutosHome?.disconnect();
+      renderCategorias(); renderTemasLoja(); renderCatalogo();
+      return;
+    }
     cursorProdutosHome = snap.docs[snap.docs.length - 1];
     const vistos = new Set(produtosHome.map(p => String(p.id)));
     produtosHome.push(...snap.docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
@@ -1381,8 +1390,36 @@ async function carregarProximoLoteHome() {
     renderCategorias(); renderTemasLoja(); renderCatalogo();
     atualizarIndicadorPaginacaoHome(fimProdutosHome ? '' : 'Role para ver mais convites');
     if (fimProdutosHome) observerProdutosHome?.disconnect(); else observarFimCatalogoHome();
-  } catch (e) { console.error('Erro ao carregar mais convites:',e); atualizarIndicadorPaginacaoHome('Não foi possível carregar mais. Tente rolar novamente.'); }
+  } catch (e) {
+    console.error('Erro ao carregar mais convites:',e);
+    if (!cursorProdutosHome && !produtosHome.length) {
+      try {
+        await carregarCatalogoLegadoParaFallback();
+        fimProdutosHome = true;
+        renderCategorias(); renderTemasLoja(); renderCatalogo();
+        atualizarIndicadorPaginacaoHome('');
+      } catch (fallbackError) {
+        console.error('Falha também ao recuperar o catálogo legado:',fallbackError);
+        atualizarIndicadorPaginacaoHome('Não foi possível carregar os convites. Tente novamente.');
+      }
+    } else atualizarIndicadorPaginacaoHome('Não foi possível carregar mais. Tente rolar novamente.');
+  }
   finally { carregandoProdutosHome = false; }
+}
+
+// Compatibilidade de migração: se a coleção paginável ainda não foi populada,
+// mostra o catálogo legado para não deixar a loja vazia. O painel cria o espelho
+// e as próximas visitas usam somente as consultas paginadas.
+async function carregarCatalogoLegadoParaFallback() {
+  const doc = await db.collection('config').doc('produtosSite').get();
+  const dados = doc.exists ? doc.data() || {} : {};
+  const lista = JSON.parse(dados.data || '[]');
+  produtos = lista.map(p => ({ ...p, categoria:p.categoria || inferirCategoria(p.nome) }));
+  produtosHome = produtos.map(p => ({ ...p, salesCount:Number(p.salesCount)||0 }));
+  ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(dados.crossSellGlobal || {}) };
+  adicionaisGlobais = Array.isArray(dados.adicionaisGlobais) ? dados.adicionaisGlobais.slice(0,3) : [];
+  catalogoCompletoCarregado = true;
+  await carregarModelos(produtos);
 }
 
 async function carregarCatalogoCompleto() {
