@@ -154,7 +154,9 @@
     color: #fff;
     cursor:pointer;
   }
-  .banner-slide.active { display: flex; }
+  .banner-slide.active { display: flex; animation: bannerIn .28s ease; }
+  @keyframes bannerIn { from { opacity: .35; } to { opacity: 1; } }
+  .banner-carrossel { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
   .banner-slide-text { flex: 1; }
   .banner-slide-tag {
     display: inline-block; background: rgba(255,255,255,0.2);
@@ -1722,15 +1724,58 @@ function initBannerCarrossel() {
   const slides = document.querySelectorAll('.banner-slide');
   const dotsEl = document.getElementById('bannerDots');
   if (!dotsEl || !slides.length) return;
-  if (bannerTimer) clearInterval(bannerTimer);
   bannerIdx = 0;
   dotsEl.innerHTML = Array.from(slides).map((_, i) =>
     `<div class="banner-dot ${i===0?'active':''}" onclick="irParaBannerSlide(${i})"></div>`
   ).join('');
 
-  bannerTimer = setInterval(() => {
-    irParaBannerSlide((bannerIdx + 1) % slides.length);
-  }, 4500);
+  iniciarTimerBanner();
+  configurarSwipeBanner();
+}
+
+function iniciarTimerBanner() {
+  if (bannerTimer) clearInterval(bannerTimer);
+  const total = document.querySelectorAll('.banner-slide').length;
+  if (total < 2) return;
+  bannerTimer = setInterval(() => irParaBannerSlide((bannerIdx + 1) % total), 4500);
+}
+
+/** Navega pelos banners arrastando (toque ou mouse). Registrado uma única vez no carrossel. */
+let swipeBannerConfigurado = false;
+let bannerFoiArrastado = false;
+function configurarSwipeBanner() {
+  const el = document.getElementById('bannerCarrossel');
+  if (!el || swipeBannerConfigurado) return;
+  swipeBannerConfigurado = true;
+  let x0 = 0, y0 = 0, ativo = false;
+
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    ativo = true; bannerFoiArrastado = false;
+    x0 = e.clientX; y0 = e.clientY;
+    if (bannerTimer) clearInterval(bannerTimer);   // pausa o automático enquanto o usuário interage
+  });
+
+  const finalizar = e => {
+    if (!ativo) return;
+    ativo = false;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    const total = document.querySelectorAll('.banner-slide').length;
+    if (total > 1 && Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+      bannerFoiArrastado = true;                    // impede o clique de abrir o destino do banner
+      const prox = dx < 0 ? (bannerIdx + 1) % total : (bannerIdx - 1 + total) % total;
+      irParaBannerSlide(prox);
+    }
+    iniciarTimerBanner();
+  };
+  el.addEventListener('pointerup', finalizar);
+  el.addEventListener('pointercancel', finalizar);
+
+  // Se foi arrasto, cancela o clique antes de chegar no slide
+  el.addEventListener('click', e => {
+    if (bannerFoiArrastado) { e.stopPropagation(); e.preventDefault(); bannerFoiArrastado = false; }
+  }, true);
+  el.addEventListener('dragstart', e => e.preventDefault());
 }
 
 function irParaBannerSlide(idx) {
@@ -1740,6 +1785,7 @@ function irParaBannerSlide(idx) {
   dots.forEach((d, i) => d.classList.toggle('active', i === idx));
   bannerIdx = idx;
 }
+
 
 // ── Página de produto ──────────────────────────────────────────────────────
 /** Mantém o carrossel, a paginação e a reprodução de vídeo sincronizados. */
