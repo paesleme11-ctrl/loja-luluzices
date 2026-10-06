@@ -1224,6 +1224,8 @@ function linkProdutoDireto(produtoId) {
 
 // ── Estado global ──────────────────────────────────────────────────────────
 let produtos = [];       // catálogo carregado do Firestore
+let produtos = [];       // catálogo carregado do Firestore
+let homeProdutoIds = [];
 let categoriaAtiva = 'todas';
 let termoBusca = '';
 let carrinho = [];        // [{ id, nome, preco, categoria }]
@@ -1259,6 +1261,30 @@ async function salvarProdutosSite() {
     adicionaisGlobais: adicionaisGlobais,
   });
   await sincronizarProdutosPaginadosSite(produtos);
+}
+  await sincronizarProdutosPaginadosSite(produtos);
+  await salvarOfertasCompactasSite();
+}
+
+async function salvarOfertasCompactasSite() {
+  return db.collection('config').doc('siteOffers').set({
+    crossSellGlobal:ofertaCrossSellGlobal,
+    adicionaisGlobais:Array.isArray(adicionaisGlobais) ? adicionaisGlobais.slice(0,3) : [],
+  }, { merge:true });
+}
+
+async function carregarConfiguracaoPublicaHome() {
+  const [homeSnap, ofertasSnap] = await Promise.all([
+    db.collection('config').doc('siteHome').get(),
+    db.collection('config').doc('siteOffers').get(),
+  ]);
+  const home = homeSnap.exists ? homeSnap.data() || {} : {};
+  homeProdutoIds = Array.isArray(home.productIds) ? [...new Set(home.productIds.map(String))].slice(0,10) : [];
+  if (ofertasSnap.exists) {
+    const ofertas = ofertasSnap.data() || {};
+    ofertaCrossSellGlobal = { ...ofertaCrossSellGlobal, ...(ofertas.crossSellGlobal || {}) };
+    adicionaisGlobais = Array.isArray(ofertas.adicionaisGlobais) ? ofertas.adicionaisGlobais.slice(0,3) : [];
+  }
 }
 
 // Espelho individual para consultas paginadas públicas; o documento legado
@@ -1376,12 +1402,25 @@ function observarFimCatalogoHome() {
   observerProdutosHome.observe(alvo);
 }
 async function carregarProximoLoteHome() {
+async function carregarProximoLoteHome() {
   if (carregandoProdutosHome || fimProdutosHome) return;
   carregandoProdutosHome = true; atualizarIndicadorPaginacaoHome('Carregando mais convites…');
   try {
     const consulta = db.collection('siteCatalogProducts').orderBy('createdAtMs','desc').limit(TAMANHO_LOTE_HOME);
     const snap = await consulta.get();
     if (snap.empty) {
+    let docs;
+    if (homeProdutoIds.length) {
+      const ids = homeProdutoIds.slice(0,TAMANHO_LOTE_HOME);
+      const snap = await db.collection('siteCatalogProducts')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
+      const porId = new Map(snap.docs.map(doc => [doc.id,doc]));
+      docs = ids.map(id => porId.get(id)).filter(Boolean);
+    } else {
+      const snap = await db.collection('siteCatalogProducts').orderBy('createdAtMs','desc').limit(TAMANHO_LOTE_HOME).get();
+      docs = snap.docs;
+    }
+    if (!docs.length) {
       fimProdutosHome = true;
       atualizarIndicadorPaginacaoHome('');
       observerProdutosHome?.disconnect();
@@ -1393,6 +1432,8 @@ async function carregarProximoLoteHome() {
     cursorProdutosHome = snap.docs[snap.docs.length - 1];
     const vistos = new Set(produtosHome.map(p => String(p.id)));
     produtosHome.push(...snap.docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
+    const vistos = new Set(produtosHome.map(p => String(p.id)));
+    produtosHome.push(...docs.map(d => ({ ...d.data(), id:d.id, categoria:d.data().categoria || inferirCategoria(d.data().nome) })).filter(p => !vistos.has(String(p.id))));
     fimProdutosHome = true; // HOME exibe somente as 10 novidades mais recentes.
     renderCategorias(); renderTemasLoja(); renderCatalogo();
     atualizarIndicadorPaginacaoHome('');
@@ -1426,6 +1467,9 @@ async function carregarProdutos() {
     await carregarTemas();
     await carregarBannersAdmin();
     await carregarModelos([]);
+async function carregarProdutos() {
+  try {
+    await Promise.all([carregarTemas(), carregarBannersAdmin(), carregarModelos([]), carregarConfiguracaoPublicaHome()]);
     renderCategorias();
     renderTemasLoja();
     renderBannersPublicos();
@@ -1440,6 +1484,10 @@ async function carregarProdutos() {
     else { await carregarProximoLoteHome(); observarFimCatalogoHome(); }
     const produtoDireto = new URLSearchParams(window.location.search).get('produto');
     if (produtoDireto) abrirProduto(produtoDireto);
+    if (params.has('busca') && !params.has('produto')) { await carregarCatalogoCompleto(); renderCatalogo(); }
+    else if (!params.has('produto')) { await carregarProximoLoteHome(); observarFimCatalogoHome(); }
+    const produtoDireto = new URLSearchParams(window.location.search).get('produto');
+    if (produtoDireto) await abrirProduto(produtoDireto);
   } catch (e) {
     console.error('Erro ao carregar produtos:', e);
     document.getElementById('catalogoGrid').innerHTML = `
@@ -1741,6 +1789,7 @@ function renderCatalogo() {
       ${badge ? `<div class="produto-badge">${badge}</div>` : ''}
       ${emPromocao ? `<div class="produto-badge-oferta">OFERTA</div>` : ''}
       <div class="produto-thumb">${capaFoto ? `<img src="${capaFoto}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
+      <div class="produto-thumb">${capaFoto ? `<img src="${capaFoto}" alt="${p.nome}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;">` : emojiPara(p.categoria)}</div>
       <div class="produto-info">
         <div class="produto-categoria">${p.categoria}</div>
         <h3 class="produto-nome">${p.nome}</h3>
@@ -1807,6 +1856,17 @@ function initBannerCarrossel() {
   const dotsEl = document.getElementById('bannerDots');
   if (!dotsEl || !slides.length) return;
   configurarDeslizeBanner(document.getElementById('bannerCarrossel'));
+  const slides = document.querySelectorAll('.banner-slide');
+  const dotsEl = document.getElementById('bannerDots');
+  if (!dotsEl || !slides.length) return;
+  const carrossel = document.getElementById('bannerCarrossel');
+  configurarDeslizeBanner(carrossel);
+  carrossel.querySelectorAll('.banner-slide:not([data-banner-index])').forEach(slide => {
+    if (slide.dataset.defaultAction === 'true') return;
+    slide.dataset.defaultAction = 'true';
+    slide.addEventListener('click', scrollParaNovidadesHome);
+    slide.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); scrollParaNovidadesHome(); } });
+  });
   bannerIdx = 0;
   dotsEl.innerHTML = Array.from(slides).map((_, i) =>
     `<div class="banner-dot ${i===0?'active':''}" onclick="irParaBannerSlide(${i})"></div>`
@@ -1927,6 +1987,7 @@ function abrirZoomMidiaProduto(indice) {
 }
 
 function fecharZoomMidiaProduto() {
+function fecharZoomMidiaProduto() {
   const overlay = document.getElementById('produtoZoomOverlay');
   if (!overlay?.classList.contains('open')) return;
   const videoZoom = document.querySelector('#produtoZoomConteudo video');
@@ -1939,6 +2000,39 @@ function fecharZoomMidiaProduto() {
 
 function abrirProduto(id) {
   const original = produtos.find(x => x.id === id) || produtosHome.find(x => x.id === id);
+}
+
+function produtoEmMemoria(id) {
+  return produtosHome.find(p => String(p.id) === String(id)) || produtos.find(p => String(p.id) === String(id)) || null;
+}
+
+function guardarProdutoSiteEmMemoria(doc) {
+  if (!doc?.exists) return null;
+  const dado = { ...doc.data(), id:doc.id, categoria:doc.data().categoria || inferirCategoria(doc.data().nome) };
+  if (!produtos.some(p => String(p.id) === String(dado.id))) produtos.push(dado);
+  return produtoEmMemoria(dado.id) || dado;
+}
+
+async function carregarProdutoSitePorId(id) {
+  const atual = produtoEmMemoria(id);
+  if (atual) return atual;
+  const doc = await db.collection('siteCatalogProducts').doc(String(id)).get();
+  return guardarProdutoSiteEmMemoria(doc);
+}
+
+async function carregarProdutosSitePorIds(ids) {
+  const ausentes = [...new Set(ids.map(String))].filter(id => !produtoEmMemoria(id));
+  if (!ausentes.length) return;
+  const snapshots = await Promise.all(ausentes.map(id => db.collection('siteCatalogProducts').doc(id).get()));
+  snapshots.forEach(guardarProdutoSiteEmMemoria);
+}
+
+async function abrirProduto(id) {
+  let original = produtoEmMemoria(id);
+  if (!original) {
+    try { original = await carregarProdutoSitePorId(id); }
+    catch (e) { console.error('Não foi possível carregar este convite:',e); }
+  }
   if (!original || original.ativo === false || !(Number(original.preco) > 0 || original.sobConsulta) || !temaAtivoDoProduto(original)) return;
   const p = produtoComModelo(original);
   if (!p) return;
@@ -2066,6 +2160,8 @@ function configurarGestoVoltarProduto() {
 // ── Carrinho ───────────────────────────────────────────────────────────────
 function adicionarAoCarrinho(id) {
   const raw = produtos.find(x => x.id === id);
+function adicionarAoCarrinho(id) {
+  const raw = produtoEmMemoria(id);
   const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
   carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId || null, adicionais:[] });
@@ -2095,6 +2191,8 @@ function atualizarPrecoTotalProduto() {
 /** Adiciona ao carrinho considerando os adicionais marcados na página do produto */
 function adicionarAoCarrinhoComAdicionais(id) {
   const raw = produtos.find(x => x.id === id);
+function adicionarAoCarrinhoComAdicionais(id) {
+  const raw = produtoEmMemoria(id);
   const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
   carrinho.push({
@@ -2128,6 +2226,7 @@ function carrinhoTemModeloAceitoCrossSell() {
     // Configurações antigas não tinham filtro de modelo; preserva nelas a regra anterior.
     if (!Array.isArray(aceitos)) return true;
     const raw = produtos.find(p => p.id === item.id);
+    const raw = produtoEmMemoria(item.id);
     const modeloId = item.modeloId || modeloDoProduto(raw)?.id || null;
     return !!modeloId && aceitos.includes(modeloId);
   });
@@ -2135,6 +2234,7 @@ function carrinhoTemModeloAceitoCrossSell() {
 
 function precoItemCarrinho(item) {
   const raw = produtos.find(p => p.id === item.id);
+  const raw = produtoEmMemoria(item.id);
   const produto = raw ? produtoComModelo(raw) : null;
   const precoNormal = produto ? precoPromocionalProduto(produto) : Number(item.preco) || 0;
   if (item.id === ofertaCrossSellGlobal.produtoId && carrinhoTemModeloAceitoCrossSell()) {
@@ -2149,11 +2249,22 @@ function abrirOfertasParaItem(item) {
   renderOfertasGlobais();
   document.getElementById('ofertasOverlay').classList.add('open');
 }
+async function abrirOfertasParaItem(item) {
+  produtoPendenteOfertas = item;
+  adicionaisGlobaisSelecionados = new Set();
+  renderOfertasGlobais();
+  document.getElementById('ofertasOverlay').classList.add('open');
+  const idPendente = item?.id;
+  carregarProdutosSitePorIds([...(adicionaisGlobais || []), ofertaCrossSellGlobal.produtoId].filter(Boolean))
+    .then(() => { if (produtoPendenteOfertas?.id === idPendente && document.getElementById('ofertasOverlay').classList.contains('open')) renderOfertasGlobais(); })
+    .catch(e => console.warn('Não foi possível carregar todas as ofertas da loja:',e));
+}
 
 function renderOfertasGlobais() {
   const body = document.getElementById('ofertasBody');
   const idsNoCarrinho = new Set(carrinho.map(i => i.id));
   const extras = (adicionaisGlobais || []).map(id => produtos.find(p => p.id === id)).filter(p => p && p.id !== ofertaCrossSellGlobal.produtoId && p.ativo !== false && temaAtivoDoProduto(p) && (Number(p.preco) > 0 || p.sobConsulta) && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).map(produtoComModelo).slice(0, 3);
+  const extras = (adicionaisGlobais || []).map(produtoEmMemoria).filter(p => p && p.id !== ofertaCrossSellGlobal.produtoId && p.ativo !== false && temaAtivoDoProduto(p) && (Number(p.preco) > 0 || p.sobConsulta) && !idsNoCarrinho.has(p.id) && p.id !== produtoPendenteOfertas?.id).map(produtoComModelo).slice(0, 3);
   let html = '';
   if (extras.length) {
     html += `<div class="adicionais-globais-titulo">Quer incluir mais algum serviço?</div><div class="adicionais-globais-grid" data-count="${extras.length}">${extras.map(p => { const foto=(p.fotos&&p.fotos[0])||p.foto; const incluido=adicionaisGlobaisSelecionados.has(p.id); const precoAtual=precoPromocionalProduto(p); return `<button type="button" class="adicional-global-card ${incluido?'selecionado':''}" id="adicionalGlobalCard_${p.id}" onclick="abrirDetalheAdicionalGlobal('${p.id}')"><span class="adicional-global-status">${incluido?'Incluído':'Ver detalhes'}</span><div class="adicional-global-foto">${foto && !ehVideo(foto) ? `<img src="${foto}" alt="${p.nome}">` : emojiPara(p.categoria)}</div><div class="adicional-global-info"><div class="adicional-global-nome">${p.nome}</div><div class="adicional-global-preco">${precoAtual < p.preco ? `<span style="text-decoration:line-through;color:var(--ink-muted);font-weight:400;">${BRL(p.preco)}</span> ` : ''}${BRL(precoAtual)}</div></div></button>`; }).join('')}</div>`;
@@ -2164,6 +2275,7 @@ function renderOfertasGlobais() {
 
 function abrirDetalheAdicionalGlobal(id, tipo = 'extra') {
   const raw = produtos.find(item => item.id === id);
+  const raw = produtoEmMemoria(id);
   const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
   adicionalGlobalEmDetalhe = p;
@@ -2205,6 +2317,7 @@ function confirmarOfertas() {
   const nomeProdutoAdicionado = produtoPendenteOfertas?.nome || 'Produto';
   for (const id of adicionaisGlobaisSelecionados) {
     const raw = produtos.find(x => x.id === id);
+    const raw = produtoEmMemoria(id);
     const p = raw ? produtoComModelo(raw) : null;
     if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId||null, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
   }
@@ -2230,6 +2343,7 @@ function removerDoCarrinho(idx) {
 function getOrderBumpDisponivel() {
   if (!carrinho.length || !ofertaCrossSellGlobal.produtoId || !carrinhoTemModeloAceitoCrossSell()) return null;
   const raw = produtos.find(p => p.id === ofertaCrossSellGlobal.produtoId);
+  const raw = produtoEmMemoria(ofertaCrossSellGlobal.produtoId);
   const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || bump.ativo === false || !temaAtivoDoProduto(raw) || bump.sobConsulta || carrinho.some(item => item.id === bump.id)) return null;
   return { bump };
@@ -2263,6 +2377,7 @@ function renderOrderBumpNoCarrinho() {
 function aceitarOrderBump(bumpId) {
   const disponivel = getOrderBumpDisponivel();
   const raw = produtos.find(p => p.id === bumpId);
+  const raw = produtoEmMemoria(bumpId);
   const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || !disponivel) return;
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
@@ -2303,6 +2418,7 @@ function atualizarCarrinhoUI() {
       ? `<div class="cart-item-adicionais">${item.adicionais.map(a => a.nome).join(' · ')}</div>`
       : '';
     const produtoAtual = produtos.find(p => p.id === item.id);
+    const produtoAtual = produtoEmMemoria(item.id);
     const precoRegular = produtoAtual ? precoPromocionalProduto(produtoComModelo(produtoAtual)) : Number(item.precoBase) || item.preco;
     const descontoOferta = item.id === ofertaCrossSellGlobal.produtoId && Number(item.preco) < precoRegular;
     const selinhoOferta = descontoOferta ? `<div class="cart-item-selo-oferta">🎁 Oferta especial</div>` : '';
@@ -2588,6 +2704,19 @@ document.addEventListener('keydown', (e) => {
         </div>
       </div>
       <div id="adminCsvStatus" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:9px;font-size:12.5px;"></div>
+      <div id="adminBarraMassa" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:#1a1214;color:#fff;padding:10px 16px;border-radius:9px;margin-bottom:12px;">
+      </div>
+      <div id="adminCsvStatus" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:9px;font-size:12.5px;"></div>
+      <section style="max-width:760px;background:#fff;padding:16px;border:1px solid #ecddd6;border-radius:12px;margin-bottom:16px;">
+        <h3 style="font-size:17px;margin-bottom:5px;">Convites exibidos em Novidades</h3>
+        <p style="font-size:12.5px;color:#9a8890;margin:0 0 10px;">Escolha até 10 convites. Se nenhum for marcado, a HOME mostra automaticamente os 10 mais recentes.</p>
+        <input id="adminHomeBusca" type="search" placeholder="Buscar convite para selecionar" oninput="adminRenderSelecaoHome()" style="width:100%;padding:9px 12px;border:1.5px solid #ecddd6;border-radius:9px;margin-bottom:8px;">
+        <div id="adminHomeSelecaoLista" style="max-height:250px;overflow:auto;border:1px solid #f0e5df;border-radius:9px;padding:6px;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;flex-wrap:wrap;">
+          <span id="adminHomeSelecaoStatus" style="font-size:12px;color:#9a8890;"></span>
+          <button class="admin-btn-primary" type="button" onclick="adminSalvarSelecaoHome()">Salvar seleção da HOME</button>
+        </div>
+      </section>
       <div id="adminBarraMassa" style="display:none;align-items:center;justify-content:space-between;gap:10px;background:#1a1214;color:#fff;padding:10px 16px;border-radius:9px;margin-bottom:12px;">
         <span id="adminBarraMassaTexto" style="font-size:12.5px;font-weight:600;">0 produtos selecionados</span>
         <div style="display:flex;gap:8px;">
@@ -2977,9 +3106,65 @@ async function adminCarregarTudo() {
   try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.error('Erro ao sincronizar catálogo paginado:',e); }
   adminCarregarOfertasGlobais();
   adminRenderProdutos();
+async function adminCarregarTudo() {
+  await Promise.all([carregarTemas(), carregarCatalogoCompleto(), carregarBannersAdmin(), carregarCoresAdmin(), carregarLogoAdmin(), carregarConfiguracaoPublicaHome()]);
+  try { await sincronizarProdutosPaginadosSite(produtos); } catch (e) { console.error('Erro ao sincronizar catálogo paginado:',e); }
+  try { await salvarOfertasCompactasSite(); } catch (e) { console.error('Erro ao sincronizar ofertas leves:',e); }
+  const produtosPublicos = new Set(getProdutosCatalogo().map(p => String(p.id)));
+  homeProdutoIds = homeProdutoIds.filter(id => produtosPublicos.has(String(id))).slice(0,TAMANHO_LOTE_HOME);
+  adminCarregarOfertasGlobais();
+  adminRenderProdutos();
+  adminRenderSelecaoHome();
   adminRenderTemas();
   adminRenderModelos();
   adminRenderBanners();
+}
+  adminRenderBanners();
+}
+
+function adminRenderSelecaoHome() {
+  const listaEl = document.getElementById('adminHomeSelecaoLista');
+  if (!listaEl) return;
+  const termo = normalizarTextoBusca(document.getElementById('adminHomeBusca')?.value || '');
+  const elegiveis = getProdutosCatalogo();
+  const escolhidos = homeProdutoIds.map(id => elegiveis.find(p => String(p.id) === String(id))).filter(Boolean);
+  const restante = elegiveis.filter(p => !homeProdutoIds.includes(String(p.id)))
+    .sort((a,b) => String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  const opcoes = [...escolhidos, ...restante].filter(p => !termo || normalizarTextoBusca(`${p.nome} ${p.temaNome||''}`).includes(termo));
+  listaEl.innerHTML = opcoes.length ? opcoes.map(p => `
+    <label style="display:flex;align-items:center;gap:9px;padding:8px;border-bottom:1px solid #f4ece8;font-size:12.5px;cursor:pointer;">
+      <input type="checkbox" data-home-produto="${escaparHTMLCatalogo(p.id)}" ${homeProdutoIds.includes(String(p.id))?'checked':''}>
+      <span>${escaparHTMLCatalogo(p.nome)}</span>
+    </label>`).join('') : '<p style="padding:10px;color:#9a8890;font-size:12px;">Nenhum convite encontrado.</p>';
+  listaEl.querySelectorAll('[data-home-produto]').forEach(campo => campo.addEventListener('change', () => {
+    const id = campo.dataset.homeProduto;
+    if (campo.checked) {
+      if (homeProdutoIds.length >= TAMANHO_LOTE_HOME) {
+        showToast('A HOME permite selecionar até 10 convites.','error');
+        campo.checked = false;
+        return;
+      }
+      if (!homeProdutoIds.includes(id)) homeProdutoIds.push(id);
+    } else homeProdutoIds = homeProdutoIds.filter(item => item !== id);
+    adminRenderSelecaoHome();
+  }));
+  const status = document.getElementById('adminHomeSelecaoStatus');
+  if (status) status.textContent = `${homeProdutoIds.length} de ${TAMANHO_LOTE_HOME} selecionados${homeProdutoIds.length ? ' · a ordem de seleção será mantida' : ' · usando as novidades automáticas'}`;
+}
+
+async function adminSalvarSelecaoHome() {
+  const idsValidos = new Set(getProdutosCatalogo().map(p => String(p.id)));
+  homeProdutoIds = homeProdutoIds.filter(id => idsValidos.has(String(id))).slice(0,TAMANHO_LOTE_HOME);
+  try {
+    await db.collection('config').doc('siteHome').set({ productIds:homeProdutoIds, updatedAtMs:Date.now() }, { merge:true });
+    produtosHome = [];
+    fimProdutosHome = false;
+    showToast(homeProdutoIds.length ? 'Seleção da HOME salva ✓' : 'HOME configurada para mostrar os mais recentes ✓','success');
+    adminRenderSelecaoHome();
+  } catch (e) {
+    console.error('Erro ao salvar a seleção da HOME:',e);
+    showToast('Não foi possível salvar a seleção da HOME.','error');
+  }
 }
 
 function escaparHTMLCatalogo(valor) {
@@ -4210,6 +4395,7 @@ function renderBannersPublicos() {
 }
 
 function abrirDestinoBanner(banner) {
+async function abrirDestinoBanner(banner) {
   if (!banner) return;
   if (banner.tipoDestino === 'pesquisa') {
     const input = document.getElementById('searchInput');
@@ -4220,12 +4406,24 @@ function abrirDestinoBanner(banner) {
   if (banner.tipoDestino === 'produto') { abrirProduto(banner.destino); return; }
   if (banner.tipoDestino === 'categoria') {
     categoriaAtiva = banner.destino || 'todas';
+    await aplicarBuscaCatalogo();
+    return;
+  }
+  if (banner.tipoDestino === 'produto') { await abrirProduto(banner.destino); return; }
+  if (banner.tipoDestino === 'categoria') {
+    await carregarCatalogoCompleto();
+    categoriaAtiva = banner.destino || 'todas';
     renderCategorias();
     renderCatalogo();
     document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior:'smooth', block:'start' });
     return;
   }
   if (banner.destino) window.location.href = banner.destino;
+}
+}
+
+function scrollParaNovidadesHome() {
+  document.querySelector('#view-catalogo .home-body')?.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
 checarAcessoAdmin();
