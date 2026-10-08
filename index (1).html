@@ -1054,7 +1054,10 @@
         <h2 style="font-family:'DM Serif Display',serif;font-size:22px;">Catálogo de Produtos</h2>
         <p style="font-size:13px;color:var(--ink-muted);margin-top:2px;">Gerencie produtos, fotos, preços e adicionais — usado no lançamento de vendas e no site</p>
       </div>
-      <button class="btn btn-primary" onclick="abrirModalProduto()">+ Novo Produto</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="abrirVinculoVendas()">🔗 Vincular vendas antigas</button>
+        <button class="btn btn-primary" onclick="abrirModalProduto()">+ Novo Produto</button>
+      </div>
     </div>
     <div class="produtos-admin-grid" id="produtosAdminGrid"></div>
   </div>
@@ -1319,6 +1322,18 @@
       </div>
       <div class="form-row">
         <div class="form-group" style="position:relative;">
+          <label>Convite (catálogo do site — modelo + tema)</label>
+          <input type="text" id="vConvite" placeholder="Digite p/ buscar — ex: animado safari" autocomplete="off"
+                 oninput="onConviteInput()" onfocus="onConviteInput()" onblur="setTimeout(fecharSugestoesConvite, 150)">
+          <div id="conviteSugestoes" class="produto-sugestoes"></div>
+          <div id="vConviteInfo" style="margin-top:8px;"></div>
+          <div id="vAdicionaisLista"></div>
+          <select id="vAdicionalSelect" style="margin-top:8px" onchange="adicionarAdicionalVenda(this.value);this.value=''"></select>
+          <small style="color:var(--ink-muted);display:block;margin-top:4px;">Ao escolher o convite, modelo, tema e valor são preenchidos sozinhos. Sem escolher, use o campo Produto(s) abaixo como antes.</small>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="position:relative;">
           <label>Produto(s)</label>
           <input type="text" id="vProduto" placeholder="Digite p/ buscar — ex: interativo animado, personalização" autocomplete="off"
                  oninput="onProdutoInput()" onfocus="onProdutoInput()" onblur="setTimeout(fecharSugestoesProduto, 150)"
@@ -1428,6 +1443,18 @@
 </div>
 
 <!-- DETALHES DO FORMULÁRIO DO PEDIDO -->
+<div class="modal-overlay" id="modalVinculo">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">🔗 Vincular vendas antigas aos produtos</span>
+      <button class="modal-close" onclick="closeModal('modalVinculo')">✕</button>
+    </div>
+    <div class="modal-body" id="vinculoBody"></div>
+    <datalist id="dlConvitesSite"></datalist>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('modalVinculo')">Fechar</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalDetalhesForm">
   <div class="modal modal-sm">
     <div class="modal-header">
@@ -1638,6 +1665,7 @@ async function loadFromFirebase() {
     if (metasSnap.exists) { metas = JSON.parse(metasSnap.data().data||'{}'); LS.set('metas',metas); }
 
     await loadProdutosRemote();
+    await loadCatalogoSite();
     await loadListasConfigRemote();
 
     db.collection('vendas').onSnapshot(snap => {
@@ -3231,6 +3259,7 @@ function openModalVenda(v=null) {
   mostrarCampoPrazo(isPers, v?.data || '');
   // Nova venda: sinal começa sob controle automático. Edição: respeita o valor já salvo.
   resetSinalAuto(!!(v && v.sinal));
+  iniciarItensVenda(v);
   document.getElementById('modalVenda').classList.add('open');
 }
 
@@ -3240,6 +3269,279 @@ function onStatusChange() {
     const vp = parseFloat(document.getElementById('vValorProd').value) || 0;
     if (vp > 0) document.getElementById('vValorPago').value = vp.toFixed(2);
   }
+}
+
+// ============================================================
+// VENDA ESTRUTURADA — convite (modelo + tema) do catálogo do site + adicionais
+// O campo `produto` (texto) continua sendo gravado, derivado dos itens.
+// ============================================================
+let catalogoSite = LS.get('catalogoSite', { produtos:[], modelos:[], temas:[] });
+
+async function loadCatalogoSite() {
+  if (!db) return;
+  try {
+    const cfg = db.collection('config');
+    const [p, m, t] = await Promise.all([cfg.doc('produtosSite').get(), cfg.doc('modelosSite').get(), cfg.doc('temasSite').get()]);
+    catalogoSite = {
+      produtos: p.exists ? JSON.parse(p.data().data || '[]') : [],
+      modelos:  m.exists ? JSON.parse(m.data().data || '[]') : [],
+      temas:    t.exists ? JSON.parse(t.data().data || '[]') : [],
+    };
+    LS.set('catalogoSite', catalogoSite);
+  } catch (e) { console.warn('Erro ao carregar catálogo do site:', e); }
+}
+
+function normBuscaVenda(v) { return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
+
+/** Converte um produto do site em {produto_id, nome, modelo, tema, preco, ativo} */
+function resolverProdutoSite(p) {
+  const modelo = (catalogoSite.modelos || []).find(m => m.id === p.modeloId);
+  const tema = (catalogoSite.temas || []).find(t => t.id === p.temaId);
+  const modeloNome = modelo?.nome || p.modelo || '';
+  const temaNome = tema?.nome || p.temaNome || '';
+  let preco = Number(modelo ? modelo.preco : p.preco) || 0;
+  if (modelo) {
+    if (modelo.promoAtiva && Number(modelo.promoPreco) > 0 && Number(modelo.promoPreco) < preco) preco = Number(modelo.promoPreco);
+  } else if (p.promoAtiva && Number(p.promoValor) > 0) {
+    preco = p.promoTipo === 'percentual' ? preco * (1 - p.promoValor / 100) : Math.max(preco - p.promoValor, 0);
+  }
+  return {
+    produto_id: p.id,
+    nome: (modeloNome && temaNome) ? `${modeloNome} ${temaNome}` : (p.nome || ''),
+    modelo: modeloNome || null, tema: temaNome || null,
+    preco: Math.round(preco * 100) / 100,
+    ativo: p.ativo !== false && tema?.ativo !== false,
+  };
+}
+
+function getConvitesSite() {
+  return (catalogoSite.produtos || []).filter(p => !p.sobConsulta).map(resolverProdutoSite).filter(p => p.ativo && p.preco > 0);
+}
+
+function getAdicionaisDisponiveis() {
+  return (catalogoProdutos || []).filter(p => /filtro|lembrete|forms|urg[eê]ncia|personaliza|artes/i.test(p.nome));
+}
+
+let _vendaItens = { convite: null, adicionais: [] };
+let _conviteSugestoes = [];
+
+function iniciarItensVenda(v) {
+  const itens = Array.isArray(v?.itens) ? v.itens : [];
+  const c = itens.find(i => i.tipo === 'convite');
+  _vendaItens = {
+    convite: c ? { produto_id: c.produto_id || null, nome: c.nome, modelo: c.modelo || null, tema: c.tema || null, preco: Number(c.preco) || 0 } : null,
+    adicionais: itens.filter(i => i.tipo === 'adicional').map(i => ({ nome: i.nome, preco: Number(i.preco) || 0 })),
+  };
+  document.getElementById('vConvite').value = '';
+  renderItensVenda();
+}
+
+function renderItensVenda() {
+  const c = _vendaItens.convite;
+  document.getElementById('vConviteInfo').innerHTML = c
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;">
+        <strong>${c.nome}</strong><span style="color:var(--ink-muted)">Modelo: ${c.modelo || '—'} · Tema: ${c.tema || '—'} · ${BRL_RAW_plain(c.preco)}</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="limparConvite()">✕ Trocar</button></div>` : '';
+  const opcoes = getAdicionaisDisponiveis();
+  document.getElementById('vAdicionaisLista').innerHTML = _vendaItens.adicionais.map((a, i) =>
+    `<div style="display:flex;gap:6px;align-items:center;margin-top:6px;"><span style="flex:1;font-size:13px;">${a.nome}</span>
+      <input type="number" step="0.01" min="0" value="${a.preco}" style="width:90px" onchange="editarPrecoAdicional(${i}, this.value)">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="removerAdicionalVenda(${i})">✕</button></div>`).join('');
+  document.getElementById('vAdicionalSelect').innerHTML = '<option value="">+ Adicionar adicional…</option>' +
+    opcoes.map((o, i) => `<option value="${i}">${o.nome}${o.preco > 0 ? ' — ' + BRL_RAW_plain(o.preco) : ''}</option>`).join('');
+  document.getElementById('vProduto').readOnly = !!c;
+}
+
+function onConviteInput() {
+  const termos = normBuscaVenda(document.getElementById('vConvite').value).split(/\s+/).filter(Boolean);
+  const el = document.getElementById('conviteSugestoes');
+  _conviteSugestoes = getConvitesSite().filter(p => termos.every(t => normBuscaVenda(p.nome).includes(t))).slice(0, 30);
+  el.innerHTML = _conviteSugestoes.length
+    ? _conviteSugestoes.map((p, i) => `<div class="produto-sugestao-item" onmousedown="selecionarConvite(${i})">${p.nome}<span style="color:var(--ink-muted);font-size:11px;margin-left:6px;">${BRL_RAW_plain(p.preco)}</span></div>`).join('')
+    : '<div class="produto-sugestao-item" style="color:var(--ink-muted)">Nenhum produto do catálogo encontrado</div>';
+  el.classList.add('open');
+}
+function fecharSugestoesConvite() { document.getElementById('conviteSugestoes')?.classList.remove('open'); }
+
+function selecionarConvite(i) {
+  const p = _conviteSugestoes[i];
+  if (!p) return;
+  _vendaItens.convite = { produto_id: p.produto_id, nome: p.nome, modelo: p.modelo, tema: p.tema, preco: p.preco };
+  document.getElementById('vConvite').value = '';
+  fecharSugestoesConvite();
+  recalcularItensVenda();
+}
+function limparConvite() { _vendaItens.convite = null; document.getElementById('vProduto').readOnly = false; recalcularItensVenda(); }
+function adicionarAdicionalVenda(idx) {
+  const o = getAdicionaisDisponiveis()[Number(idx)];
+  if (!o) return;
+  _vendaItens.adicionais.push({ nome: o.nome, preco: Number(o.preco) || 0 });
+  recalcularItensVenda();
+}
+function removerAdicionalVenda(i) { _vendaItens.adicionais.splice(i, 1); recalcularItensVenda(); }
+function editarPrecoAdicional(i, valor) { _vendaItens.adicionais[i].preco = parseFloat(valor) || 0; recalcularItensVenda(); }
+
+/** Atualiza o texto legado `produto` e o valor total (modo automático) a partir dos itens */
+function recalcularItensVenda() {
+  renderItensVenda();
+  const { convite, adicionais } = _vendaItens;
+  if (!convite) return;
+  document.getElementById('vProduto').value = [convite.nome, ...adicionais.map(a => a.nome)].join(', ');
+  const total = convite.preco + adicionais.reduce((s, a) => s + a.preco, 0);
+  const valorEl = document.getElementById('vValorProd');
+  valorEl.value = total.toFixed(2);
+  valorEl.dataset.autoPreco = 'true';
+  const tag = document.getElementById('vValorProdAutoTag');
+  if (tag) tag.style.display = 'block';
+  _sinalAutoPreenchido = true;
+  autoSinal();
+}
+
+/** Campos estruturados gravados junto com a venda (venda sem convite do catálogo fica com produto_id = null) */
+function montarCamposEstruturados() {
+  const { convite, adicionais } = _vendaItens;
+  if (!convite) return { produto_id: null, itens: [] };
+  return {
+    produto_id: convite.produto_id, produto_nome: convite.nome, modelo: convite.modelo, tema: convite.tema,
+    qtdConvites: 1, qtdAdicionais: adicionais.length,
+    itens: [
+      { tipo: 'convite', produto_id: convite.produto_id, nome: convite.nome, modelo: convite.modelo, tema: convite.tema, preco: convite.preco, qtd: 1 },
+      ...adicionais.map(a => ({ tipo: 'adicional', nome: a.nome, preco: a.preco, qtd: 1 })),
+    ],
+  };
+}
+
+// ============================================================
+// VINCULAR VENDAS ANTIGAS — prévia segura, backup e vínculo manual
+// Nunca altera `produto`, valores, datas ou status; só acrescenta campos estruturados.
+// ============================================================
+const ADICIONAL_RE = /filtro|lembrete|forms?\b|urg[eê]ncia|personaliza|artes/i;
+const escV = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+let _vinculo = { itens: [] };
+
+function modelosConhecidosSite() {
+  const mapa = new Map();
+  (catalogoSite.modelos || []).forEach(m => mapa.set(m.id, { id: m.id, nome: m.nome, aliases: m.aliases || [] }));
+  (catalogoSite.produtos || []).forEach(p => { if (p.modeloId && p.modelo && !mapa.has(p.modeloId)) mapa.set(p.modeloId, { id: p.modeloId, nome: p.modelo, aliases: [] }); });
+  return [...mapa.values()];
+}
+
+/** Interpreta o texto antigo de `produto`. Só conclui quando há 1 convite claramente identificado. */
+function analisarVendaLegado(v) {
+  const tokens = String(v.produto || '').split(',').map(t => t.trim()).filter(Boolean);
+  if (!tokens.length) return { status: 'revisar', motivo: 'venda sem produto informado' };
+  const adicionais = tokens.filter(t => ADICIONAL_RE.test(t));
+  const convites = tokens.filter(t => !ADICIONAL_RE.test(t));
+  if (convites.length !== 1) return { status: 'revisar', motivo: convites.length ? 'mais de um item de convite' : 'nenhum convite identificado', adicionais };
+  const texto = convites[0];
+  const tk = normBuscaVenda(texto).replace(/\s*[-–—:]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  let modelo = null, resto = '';
+  for (const m of modelosConhecidosSite()) {
+    for (const nome of [m.nome, ...m.aliases].map(normBuscaVenda).filter(Boolean)) {
+      if ((tk === nome || tk.startsWith(nome + ' ')) && (!modelo || nome.length > modelo.len)) { modelo = { ...m, len: nome.length }; resto = tk.slice(nome.length).trim(); }
+    }
+  }
+  if (!modelo) return { status: 'revisar', motivo: 'modelo não reconhecido ("' + texto + '")', adicionais, texto };
+  const base = { modelo: modelo.nome, modeloId: modelo.id, adicionais, texto };
+  if (!resto) return { ...base, status: 'parcial', tema: null };
+  const tema = (catalogoSite.temas || []).find(t => normBuscaVenda(t.nome) === resto);
+  if (!tema) return { ...base, status: 'parcial', tema: null };
+  const achados = (catalogoSite.produtos || []).filter(p => p.modeloId === modelo.id && p.temaId === tema.id);
+  if (achados.length > 1) return { status: 'revisar', motivo: 'mais de um produto com esse modelo e tema', adicionais, texto };
+  if (!achados.length) return { ...base, status: 'parcial', tema: tema.nome };
+  return { ...base, status: 'completo', tema: tema.nome, produto: resolverProdutoSite(achados[0]) };
+}
+
+function camposDeVinculo(v, a, origem) {
+  const preco = (a.adicionais || []).length ? null : (Number(v.valorProd) || null);
+  const nome = a.produto?.nome || a.texto || null;
+  return {
+    produto_id: a.produto?.produto_id || null, produto_nome: nome,
+    modelo: a.modelo || null, tema: a.tema || null,
+    qtdConvites: 1, qtdAdicionais: (a.adicionais || []).length,
+    itens: [
+      { tipo: 'convite', produto_id: a.produto?.produto_id || null, nome, modelo: a.modelo || null, tema: a.tema || null, preco, qtd: 1 },
+      ...(a.adicionais || []).map(n => ({ tipo: 'adicional', nome: n, preco: null, qtd: 1 })),
+    ],
+    vinculo: origem, vinculadoEm: today(),
+  };
+}
+
+function abrirVinculoVendas() {
+  if (!(catalogoSite.produtos || []).length) { showToast('Catálogo do site ainda não carregado. Recarregue a página.', 'error'); return; }
+  const pend = vendas.filter(v => !v.vinculo && !(Array.isArray(v.itens) && v.itens.length));
+  _vinculo = { itens: pend.map(v => ({ id: v.id, a: analisarVendaLegado(v) })) };
+  renderVinculo();
+  document.getElementById('modalVinculo').classList.add('open');
+}
+
+function renderVinculo() {
+  const por = s => _vinculo.itens.filter(i => i.a.status === s);
+  const comp = por('completo'), parc = por('parcial'), rev = por('revisar');
+  const jaVinc = vendas.filter(v => v.vinculo || (Array.isArray(v.itens) && v.itens.length)).length;
+  const manuais = [...rev, ...parc].map(i => ({ ...i, v: vendas.find(x => x.id === i.id) })).filter(i => i.v)
+    .sort((x, y) => (y.v.data || '').localeCompare(x.v.data || '')).slice(0, 40);
+  document.getElementById('dlConvitesSite').innerHTML = getConvitesSite().map(p => `<option value="${escV(p.nome)}"></option>`).join('');
+  document.getElementById('vinculoBody').innerHTML = `
+    <p style="font-size:13px;color:var(--ink-light);margin-bottom:12px;">Nada é alterado até você aplicar. O texto do produto, valores, datas e status das vendas ficam intactos; só são acrescentados campos estruturados (produto_id, modelo, tema, itens).</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;font-size:13px;">
+      <div class="card" style="padding:10px"><strong>${comp.length}</strong> com modelo e tema identificados</div>
+      <div class="card" style="padding:10px"><strong>${parc.length}</strong> só modelo (ou tema sem produto no catálogo)</div>
+      <div class="card" style="padding:10px"><strong>${rev.length}</strong> precisam de vínculo manual</div>
+      <div class="card" style="padding:10px"><strong>${jaVinc}</strong> já vinculadas</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+      <button class="btn btn-primary" ${comp.length ? '' : 'disabled'} onclick="aplicarVinculoAuto(['completo'])">Aplicar completos (${comp.length})</button>
+      <button class="btn btn-ghost" ${parc.length ? '' : 'disabled'} onclick="aplicarVinculoAuto(['completo','parcial'])">Aplicar completos + só modelo (${comp.length + parc.length})</button>
+    </div>
+    ${manuais.length ? `<div style="font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Vincular manualmente${(rev.length + parc.length) > 40 ? ' (40 mais recentes)' : ''}</div>` : '<p style="color:var(--ink-muted);font-size:13px;">Nenhuma venda pendente de vínculo.</p>'}
+    ${manuais.map(i => `<div style="border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;">
+      <div><strong>${escV(i.v.contato)}</strong> · ${escV((i.v.data || '').split('-').reverse().join('/'))} · ${BRL_RAW_plain(i.v.valorProd)}</div>
+      <div style="color:var(--ink-muted)">${escV(i.v.produto || '—')}${i.a.motivo ? ' — ' + escV(i.a.motivo) : ' — só modelo: ' + escV(i.a.modelo)}</div>
+      <div style="display:flex;gap:6px;margin-top:5px;"><input type="text" list="dlConvitesSite" id="vinc_${escV(i.id)}" placeholder="Buscar convite do catálogo…" style="flex:1">
+      <button class="btn btn-ghost btn-sm" onclick="vincularManual('${escV(i.id)}')">Vincular</button></div></div>`).join('')}`;
+}
+
+function baixarBackupVendas() {
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ exportadoEm: new Date().toISOString(), vendas }, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = `backup-vendas-${today()}.json`; a.click(); URL.revokeObjectURL(url);
+}
+
+async function aplicarVinculoAuto(statusAceitos) {
+  if (!db) { showToast('Sem conexão com o Firebase. Nada foi alterado.', 'error'); return; }
+  const alvo = _vinculo.itens.filter(i => statusAceitos.includes(i.a.status));
+  if (!alvo.length) return;
+  if (!confirm(`Vincular ${alvo.length} venda(s)? Um backup JSON de todas as vendas será baixado antes. Textos, valores e datas não mudam.`)) return;
+  baixarBackupVendas();
+  try {
+    for (let k = 0; k < alvo.length; k += 400) {
+      const batch = db.batch();
+      alvo.slice(k, k + 400).forEach(i => {
+        const v = vendas.find(x => x.id === i.id);
+        batch.set(db.collection('vendas').doc(i.id), camposDeVinculo(v, i.a, i.a.status === 'completo' ? 'auto-completo' : 'auto-parcial'), { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (e) { console.error(e); showToast('Falha ao gravar. Verifique antes de repetir; o backup foi baixado.', 'error'); return; }
+  alvo.forEach(i => { const v = vendas.find(x => x.id === i.id); Object.assign(v, camposDeVinculo(v, i.a, i.a.status === 'completo' ? 'auto-completo' : 'auto-parcial')); });
+  save();
+  showToast(`${alvo.length} venda(s) vinculada(s) ✓`, 'success');
+  abrirVinculoVendas();
+}
+
+async function vincularManual(id) {
+  const nome = document.getElementById('vinc_' + id)?.value.trim();
+  const opcoes = getConvitesSite().filter(p => p.nome === nome);
+  if (opcoes.length !== 1) { showToast(opcoes.length ? 'Há mais de um produto com esse nome.' : 'Escolha um convite da lista do catálogo.', 'error'); return; }
+  const v = vendas.find(x => x.id === id);
+  if (!v || !db) return;
+  const a = { ...analisarVendaLegado(v), status: 'completo', modelo: opcoes[0].modelo, tema: opcoes[0].tema, produto: opcoes[0] };
+  a.adicionais = a.adicionais || String(v.produto || '').split(',').map(t => t.trim()).filter(t => t && ADICIONAL_RE.test(t));
+  const campos = camposDeVinculo(v, a, 'manual');
+  try { await db.collection('vendas').doc(id).set(campos, { merge: true }); } catch (e) { showToast('Não foi possível gravar.', 'error'); return; }
+  Object.assign(v, campos); save();
+  showToast('Venda vinculada ✓', 'success');
+  abrirVinculoVendas();
 }
 
 // ============================================================
@@ -3478,6 +3780,7 @@ function getTermoAtualProduto() {
 }
 
 function onProdutoInput() {
+  if (document.getElementById('vProduto').readOnly) return;
   const termo = getTermoAtualProduto().toLowerCase();
   const sugestoesEl = document.getElementById('produtoSugestoes');
   const nomes = getNomesProdutos();
@@ -3862,6 +4165,7 @@ function saveVenda(forcarSalvar=false) {
     numContatos: document.querySelector('input[name="vNumContatos"]:checked')?.value || null,
     ...(dataFinalizacao ? { dataFinalizacao } : {}),
   };
+  Object.assign(v, montarCamposEstruturados());
   if (!v.contato) { showToast('Preencha o contato','error'); return; }
   if (!v.data) { showToast('Preencha a data','error'); return; }
 
