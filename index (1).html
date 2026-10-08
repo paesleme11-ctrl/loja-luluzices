@@ -796,6 +796,21 @@
       </div>
     </div>
 
+    <div class="card" id="cardDesempenho" style="margin-bottom:20px">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+        <span class="card-title">📈 Desempenho dos Produtos</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span id="desempIndicador" style="font-size:12px;color:var(--ink-muted);"></span>
+          <select id="desempPeriodo" onchange="setDesempPeriodo(this.value)" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);">
+            <option value="hoje">Hoje</option><option value="7d">Últimos 7 dias</option><option value="30d">Últimos 30 dias</option>
+            <option value="mes">Mês atual</option><option value="mesAnt">Mês anterior</option><option value="custom">Personalizado</option>
+          </select>
+          <span id="desempCustom" style="display:none;gap:6px;align-items:center;"><input type="date" id="desempDe" onchange="setDesempData()"><input type="date" id="desempAte" onchange="setDesempData()"></span>
+        </div>
+      </div>
+      <div class="card-body" id="desempBody"></div>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <span class="card-title">Últimas Vendas</span>
@@ -2759,6 +2774,7 @@ function renderDashboard() {
         <td style="color:var(--green)">${BRL(v.valorPago)}</td>
       </tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--ink-muted);padding:32px">Nenhuma venda no mês</td></tr>';
+  renderDesempenhoProdutos();
 }
 
 // ============================================================
@@ -3542,6 +3558,166 @@ async function vincularManual(id) {
   Object.assign(v, campos); save();
   showToast('Venda vinculada ✓', 'success');
   abrirVinculoVendas();
+}
+
+// ============================================================
+// DESEMPENHO DOS PRODUTOS — rankings, faturamento e evolução por produto/modelo/tema
+// Fonte: campos estruturados das vendas (itens, produto_id, modelo, tema). Vendas sem vínculo aparecem à parte.
+// Faturamento aqui = valor das vendas (valorProd) por data do pedido, exceto canceladas.
+// ============================================================
+let _desemp = { periodo: 'mes', de: '', ate: '', dim: 'modelo', sel: null };
+let _desempChips = [];
+const DESEMP_CORES = ['#e8546a', '#4a7fc1', '#3dab7a', '#f0a030', '#8e5bd0', '#17a2b8'];
+
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDias = (s, n) => { const [y, m, d] = s.split('-').map(Number); return ymd(new Date(y, m - 1, d + n)); };
+const diffDias = (a, b) => { const [y1, m1, d1] = a.split('-').map(Number), [y2, m2, d2] = b.split('-').map(Number); return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 864e5) + 1; };
+
+function faixasDesemp() {
+  const hoje = ymd(new Date()), [y, m] = hoje.split('-').map(Number);
+  const mes = (ano, m0) => [ymd(new Date(ano, m0, 1)), ymd(new Date(ano, m0 + 1, 0))];
+  const p = _desemp.periodo;
+  if (p === 'hoje') return { cur: [hoje, hoje], prev: [addDias(hoje, -1), addDias(hoje, -1)] };
+  if (p === '7d') return { cur: [addDias(hoje, -6), hoje], prev: [addDias(hoje, -13), addDias(hoje, -7)] };
+  if (p === '30d') return { cur: [addDias(hoje, -29), hoje], prev: [addDias(hoje, -59), addDias(hoje, -30)] };
+  if (p === 'mesAnt') return { cur: mes(y, m - 2), prev: mes(y, m - 3) };
+  if (p === 'custom' && _desemp.de && _desemp.ate && _desemp.de <= _desemp.ate) {
+    const cur = [_desemp.de, _desemp.ate], n = diffDias(cur[0], cur[1]);
+    return { cur, prev: [addDias(cur[0], -n), addDias(cur[0], -1)] };
+  }
+  return { cur: mes(y, m - 1), prev: mes(y, m - 2) };
+}
+
+const vendasDaFaixa = ([de, ate]) => vendas.filter(v => v.data && v.data >= de && v.data <= ate && v.status !== 'cancelado');
+
+function agregarDesemp(lista) {
+  const r = { pedidos: 0, receita: 0, vinculadas: 0, convites: 0, adicionais: 0, produto: {}, modelo: {}, tema: {}, adicional: {}, semVinculo: { n: 0, receita: 0 } };
+  lista.forEach(v => {
+    const valor = Number(v.valorProd) || 0;
+    r.pedidos++; r.receita += valor;
+    const itens = Array.isArray(v.itens) ? v.itens : [];
+    const conv = itens.find(i => i.tipo === 'convite');
+    if (!conv) { r.semVinculo.n++; r.semVinculo.receita += valor; return; }
+    const ads = itens.filter(i => i.tipo === 'adicional');
+    const recConv = Math.max(valor - ads.reduce((s, a) => s + (Number(a.preco) || 0), 0), 0);
+    r.vinculadas++; r.convites += Number(v.qtdConvites) || 1; r.adicionais += ads.length;
+    const add = (dim, key, nome, rec) => {
+      if (!key) return;
+      const k = dim === 'produto' ? key : normBuscaVenda(key);
+      const o = r[dim][k] || (r[dim][k] = { key: k, nome, n: 0, receita: 0 });
+      o.n++; o.receita += rec;
+    };
+    add('modelo', conv.modelo, conv.modelo, recConv);
+    add('tema', conv.tema, conv.tema, recConv);
+    add('produto', conv.produto_id, v.produto_nome || conv.nome, recConv);
+    ads.forEach(a => add('adicional', a.nome, a.nome, Number(a.preco) || 0));
+  });
+  return r;
+}
+
+const rankDesemp = (dict, campo = 'n') => Object.values(dict).sort((a, b) => b[campo] - a[campo] || b.receita - a.receita);
+
+function desempDelta(atual, anterior) {
+  if (!anterior) return atual ? '<span style="color:var(--blue)">novo</span>' : '—';
+  const p = Math.round((atual - anterior) / anterior * 100);
+  return p === 0 ? '0%' : `<span style="color:var(--${p > 0 ? 'green' : 'red'})">${p > 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
+}
+
+function tabelaRankDesemp(titulo, dim, atual, anterior) {
+  const lista = rankDesemp(atual[dim]).slice(0, 10);
+  const total = Object.values(atual[dim]).reduce((s, o) => s + o.n, 0);
+  return `<div style="margin-bottom:18px;"><div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">${titulo}</div>
+    ${lista.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Nome</th><th>Vendas</th><th>Faturamento</th><th>Ticket</th><th>%</th><th>vs anterior</th></tr></thead><tbody>
+      ${lista.map((o, i) => `<tr><td>${i + 1}</td><td>${escV(o.nome)}</td><td>${o.n}</td><td>${BRL(o.receita)}</td><td>${BRL(o.receita / o.n)}</td><td>${total ? Math.round(o.n / total * 100) : 0}%</td><td>${desempDelta(o.n, anterior[dim][o.key]?.n || 0)}</td></tr>`).join('')}
+    </tbody></table></div>` : '<p style="color:var(--ink-muted);font-size:13px;">Sem dados vinculados neste período.</p>'}</div>`;
+}
+
+function destaqueDesemp(rotulo, lista, campo) {
+  const o = lista[0];
+  return `<div class="card" style="padding:10px 12px;"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${rotulo}</div>
+    <div style="font-size:14px;font-weight:700;margin-top:3px;">${o ? escV(o.nome) : '—'}</div>
+    <div style="font-size:12px;color:var(--ink-muted)">${o ? (campo === 'n' ? o.n + ' vendas' : BRL(o.receita)) : 'sem dados'}</div></div>`;
+}
+
+function setDesempPeriodo(p) { _desemp.periodo = p; _desemp.sel = null; renderDesempenhoProdutos(); }
+function setDesempData() {
+  _desemp.de = document.getElementById('desempDe').value; _desemp.ate = document.getElementById('desempAte').value;
+  _desemp.sel = null; renderDesempenhoProdutos();
+}
+function setDesempDim(d) { _desemp.dim = d; _desemp.sel = null; renderDesempenhoProdutos(); }
+function toggleDesempItem(i) {
+  const k = _desempChips[i]?.key; if (!k) return;
+  const sel = new Set(_desemp.sel || []);
+  if (sel.has(k)) sel.delete(k); else if (sel.size < 5) sel.add(k); else { showToast('Compare até 5 itens por vez.', 'error'); return; }
+  _desemp.sel = [...sel]; renderDesempenhoProdutos();
+}
+
+function renderDesempenhoProdutos() {
+  const corpo = document.getElementById('desempBody');
+  if (!corpo) return;
+  const { cur, prev } = faixasDesemp();
+  const lista = vendasDaFaixa(cur);
+  const A = agregarDesemp(lista), P = agregarDesemp(vendasDaFaixa(prev));
+  document.getElementById('desempPeriodo').value = _desemp.periodo;
+  document.getElementById('desempCustom').style.display = _desemp.periodo === 'custom' ? 'flex' : 'none';
+  document.getElementById('desempIndicador').textContent = `${cur[0].split('-').reverse().join('/')} a ${cur[1].split('-').reverse().join('/')}`;
+
+  if (!A.pedidos) { corpo.innerHTML = '<p style="color:var(--ink-muted);padding:20px 0;text-align:center;">Nenhuma venda no período selecionado.</p>'; return; }
+  const cobertura = Math.round(A.vinculadas / A.pedidos * 100);
+  const kpi = (t, v) => `<div class="card" style="padding:10px 12px;"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${t}</div><div style="font-size:18px;font-weight:700;margin-top:3px;">${v}</div></div>`;
+
+  _desempChips = rankDesemp(A[_desemp.dim]).slice(0, 8);
+  const sel = _desemp.sel || _desempChips.slice(0, 3).map(o => o.key);
+  const chips = _desempChips.map((o, i) => `<button class="btn btn-sm ${sel.includes(o.key) ? 'btn-primary' : 'btn-ghost'}" onclick="toggleDesempItem(${i})">${escV(o.nome)}</button>`).join(' ');
+
+  corpo.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
+      ${kpi('Pedidos', A.pedidos)}${kpi('Faturamento', BRL(A.receita))}${kpi('Ticket médio', BRL(A.receita / A.pedidos))}
+      ${kpi('Convites vinculados', A.convites)}${kpi('Adicionais', A.adicionais)}${kpi('Vendas vinculadas', cobertura + '%')}
+    </div>
+    ${A.semVinculo.n ? `<p style="font-size:12px;color:var(--ink-muted);margin-bottom:12px;">${A.semVinculo.n} pedido(s) (${BRL(A.semVinculo.receita)}) ainda sem vínculo com produto — entram nos totais acima, mas não nos rankings. Use "🔗 Vincular vendas antigas" na aba Produtos.</p>` : ''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:16px;">
+      ${destaqueDesemp('Produto mais vendido', rankDesemp(A.produto), 'n')}${destaqueDesemp('Modelo mais vendido', rankDesemp(A.modelo), 'n')}${destaqueDesemp('Tema mais vendido', rankDesemp(A.tema), 'n')}
+      ${destaqueDesemp('Produto que mais faturou', rankDesemp(A.produto, 'receita'), 'r')}${destaqueDesemp('Modelo que mais faturou', rankDesemp(A.modelo, 'receita'), 'r')}${destaqueDesemp('Tema que mais faturou', rankDesemp(A.tema, 'receita'), 'r')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px;">
+      <div><div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Modelos mais vendidos</div><div style="height:200px;position:relative"><canvas id="chartDesempModelos"></canvas></div></div>
+      <div><div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Temas mais vendidos</div><div style="height:200px;position:relative"><canvas id="chartDesempTemas"></canvas></div></div>
+    </div>
+    ${tabelaRankDesemp('Top 10 produtos', 'produto', A, P)}${tabelaRankDesemp('Top 10 modelos', 'modelo', A, P)}${tabelaRankDesemp('Top 10 temas', 'tema', A, P)}
+    ${rankDesemp(A.adicional).length ? tabelaRankDesemp('Adicionais (não contam como convite)', 'adicional', A, P) : ''}
+    <div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Evolução e comparação</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+      ${['produto', 'modelo', 'tema'].map(d => `<button class="btn btn-sm ${_desemp.dim === d ? 'btn-primary' : 'btn-ghost'}" onclick="setDesempDim('${d}')">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}
+      <span style="color:var(--ink-muted);font-size:12px;">· escolha até 5 para comparar:</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${chips || '<span style="color:var(--ink-muted);font-size:13px;">Sem dados vinculados.</span>'}</div>
+    <div style="height:240px;position:relative"><canvas id="chartDesempEvolucao"></canvas></div>`;
+
+  const cores = chartThemeColors();
+  const barras = (id, dict, cor) => {
+    const top = rankDesemp(dict).slice(0, 10);
+    mkChart(id, { type: 'bar', data: { labels: top.map(o => o.nome.length > 20 ? o.nome.slice(0, 18) + '…' : o.nome), datasets: [{ label: 'Vendas', data: top.map(o => o.n), backgroundColor: cor, borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: cores.text, font: { size: 10 }, stepSize: 1 }, grid: { color: cores.grid } }, y: { ticks: { color: cores.text, font: { size: 10 } }, grid: { display: false } } } } });
+  };
+  barras('chartDesempModelos', A.modelo, 'rgba(232,84,106,0.75)');
+  barras('chartDesempTemas', A.tema, 'rgba(74,127,193,0.75)');
+
+  // Evolução: por dia (até 62 dias) ou por mês
+  const diario = diffDias(cur[0], cur[1]) <= 62;
+  const baldes = [];
+  if (diario) { for (let d = cur[0]; d <= cur[1]; d = addDias(d, 1)) baldes.push(d); }
+  else { for (let [y, m] = cur[0].split('-').map(Number); `${y}-${String(m).padStart(2, '0')}` <= cur[1].slice(0, 7); m++ > 11 && (m = 1, y++)) baldes.push(`${y}-${String(m).padStart(2, '0')}`); }
+  const dimKey = { produto: c => c.produto_id, modelo: c => c.modelo && normBuscaVenda(c.modelo), tema: c => c.tema && normBuscaVenda(c.tema) }[_desemp.dim];
+  const series = sel.map((k, idx) => {
+    const nome = (_desempChips.find(o => o.key === k) || Object.values(A[_desemp.dim]).find(o => o.key === k) || { nome: k }).nome;
+    const dados = baldes.map(b => lista.filter(v => {
+      const c = (v.itens || []).find(i => i.tipo === 'convite');
+      return c && dimKey(c) === k && (diario ? v.data === b : v.data.startsWith(b));
+    }).length);
+    return { label: nome, data: dados, borderColor: DESEMP_CORES[idx % 6], backgroundColor: DESEMP_CORES[idx % 6], tension: .25, pointRadius: 2 };
+  });
+  mkChart('chartDesempEvolucao', { type: 'line', data: { labels: baldes.map(b => diario ? b.slice(8) + '/' + b.slice(5, 7) : b.slice(5) + '/' + b.slice(2, 4)), datasets: series },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: cores.text, boxWidth: 10, font: { size: 11 } } } }, scales: { x: { ticks: { color: cores.text, font: { size: 10 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: cores.text, stepSize: 1 }, grid: { color: cores.grid } } } } });
 }
 
 // ============================================================
