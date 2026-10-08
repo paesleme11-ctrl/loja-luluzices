@@ -4342,6 +4342,9 @@ function saveVenda(forcarSalvar=false) {
     ...(dataFinalizacao ? { dataFinalizacao } : {}),
   };
   Object.assign(v, montarCamposEstruturados());
+  // Guarda a ligação com o pedido do site (preparação para cruzar com tráfego e conversão no futuro)
+  if (_pedidoFormAguardandoConfirmacao) v.pedidoSiteId = _pedidoFormAguardandoConfirmacao;
+  else if (existing?.pedidoSiteId) v.pedidoSiteId = existing.pedidoSiteId;
   if (!v.contato) { showToast('Preencha o contato','error'); return; }
   if (!v.data) { showToast('Preencha a data','error'); return; }
 
@@ -5313,18 +5316,36 @@ function cancelarMassa() {
 
 let _pedidoFormAguardandoConfirmacao = null;
 
+/** Monta os dados da venda a partir de um pedido do site (itens estruturados quando existirem). */
+function montarPrefillPedidoSite(ped) {
+  const itens = Array.isArray(ped.itens) ? ped.itens : [];
+  const base = {
+    contato: `${ped.nomeComprador || '—'} (${ped.whatsapp || ''})`, fonte: 'catálogo', obs: ped.obs || '',
+    data: ped.criadoEm ? ped.criadoEm.split('T')[0] : today(),
+    produto: itens.map(i => i.nome).filter(Boolean).join(', '), valorProd: Number(ped.valorTotal) || '',
+  };
+  const convites = itens.filter(i => i.tipo === 'convite' && i.produtoId);
+  if (convites.length !== 1) return base;   // 0 convites estruturados ou mais de um: só texto e valor; o usuário confere
+  const c = convites[0];
+  const prod = (catalogoSite.produtos || []).find(p => p.id === c.produtoId);
+  const r = prod ? resolverProdutoSite(prod) : null;
+  const nome = r?.nome || ((c.modeloNome && c.temaNome) ? `${c.modeloNome} ${c.temaNome}` : c.nome);
+  return {
+    ...base,
+    produto: [nome, ...itens.filter(i => i !== c).map(i => i.nome)].filter(Boolean).join(', '),
+    itens: [
+      { tipo: 'convite', produto_id: c.produtoId, nome, modelo: r?.modelo || c.modeloNome || null, tema: r?.tema || c.temaNome || null, preco: Number(c.preco) || 0, qtd: 1 },
+      ...itens.filter(i => i !== c).map(i => ({ tipo: 'adicional', nome: i.nome, preco: Number(i.preco) || 0, qtd: 1 })),
+    ],
+  };
+}
+
 function confirmarPedidoForm(docId) {
   const ped = pedidosPendentesForm.find(p => p._docId === docId);
   if (!ped) return;
   _pedidoFormAguardandoConfirmacao = docId;
   // Usa a data em que o cliente preencheu o formulário, não a data de hoje
-  const dataFormulario = ped.criadoEm ? ped.criadoEm.split('T')[0] : today();
-  openModalVenda({
-    contato: `${ped.nomeComprador || '—'} (${ped.whatsapp || ''})`,
-    fonte: 'catálogo',
-    obs: ped.obs || '',
-    data: dataFormulario,
-  });
+  openModalVenda(montarPrefillPedidoSite(ped));
 }
 
 async function descartarPedidoForm(docId) {
