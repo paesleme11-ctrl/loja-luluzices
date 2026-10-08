@@ -2048,7 +2048,7 @@ function adicionarAoCarrinho(id) {
   const raw = produtos.find(x => x.id === id);
   const p = raw ? produtoComModelo(raw) : null;
   if (!p) return;
-  carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId || null, adicionais:[] });
+  carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId||null, modeloNome:p.modelo||null, temaId:p.temaId||null, temaNome:p.temaNome||null, adicionais:[] });
   atualizarCarrinhoUI();
   showToast(`${p.nome} adicionado ao carrinho ✓`, 'success');
   abrirOfertasParaItem(carrinho[carrinho.length - 1]);
@@ -2083,7 +2083,7 @@ function adicionarAoCarrinhoComAdicionais(id) {
     preco: precoPromocionalProduto(p),
     precoBase: p.preco,
     categoria: p.categoria,
-    modeloId: p.modeloId || null,
+    modeloId:p.modeloId||null, modeloNome:p.modelo||null, temaId:p.temaId||null, temaNome:p.temaNome||null,
     foto: (p.fotos && p.fotos[0]) || p.foto || null,
     adicionais: [],
   });
@@ -2186,7 +2186,7 @@ function confirmarOfertas() {
   for (const id of adicionaisGlobaisSelecionados) {
     const raw = produtos.find(x => x.id === id);
     const p = raw ? produtoComModelo(raw) : null;
-    if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId||null, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
+    if (p && p.ativo !== false && temaAtivoDoProduto(raw) && (Number(p.preco) > 0 || p.sobConsulta) && !carrinho.some(i => i.id === p.id)) carrinho.push({ id:p.id, nome:p.nome, preco:precoPromocionalProduto(p), precoBase:p.preco, categoria:p.categoria, modeloId:p.modeloId||null, modeloNome:p.modelo||null, temaId:p.temaId||null, temaNome:p.temaNome||null, foto:(p.fotos&&p.fotos[0])||p.foto||null, adicionais:[], _viaAdicionalGlobal:true });
   }
   fecharOfertas();
   atualizarCarrinhoUI();
@@ -2246,7 +2246,7 @@ function aceitarOrderBump(bumpId) {
   const bump = raw ? produtoComModelo(raw) : null;
   if (!bump || !disponivel) return;
   const precoComDesconto = calcularPrecoCrossSellGlobal(bump);
-  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, modeloId:bump.modeloId||null, adicionais: [], _viaOrderBump: true });
+  carrinho.push({ id: bump.id, nome: bump.nome, preco: precoComDesconto, precoBase: bump.preco, foto: (bump.fotos && bump.fotos[0]) || bump.foto, categoria: bump.categoria, modeloId:bump.modeloId||null, modeloNome:bump.modelo||null, temaId:bump.temaId||null, temaNome:bump.temaNome||null, adicionais: [], _viaOrderBump: true });
   orderBumpAceito = bumpId;
   atualizarCarrinhoUI();
   showToast(`${bump.nome} adicionado com desconto ✓`, 'success');
@@ -2451,7 +2451,11 @@ async function finalizarPedido(meioPagamento) {
       whatsapp,
       valorTotal,
       meioPagamento: meioPagamentoTexto,
-      itens: carrinho.map(i => ({ nome: i.nome, preco: i.preco, adicionais: i.adicionais || [] })),
+      itens: carrinho.map(i => ({ produtoId: i.id || null, nome: i.nome, preco: i.preco, precoBase: i.precoBase ?? i.preco,
+        tipo: (i.modeloId && !i._viaAdicionalGlobal && !i._viaOrderBump) ? 'convite' : 'adicional',
+        modeloId: i.modeloId || null, modeloNome: i.modeloNome || null, temaId: i.temaId || null, temaNome: i.temaNome || null,
+        adicionais: i.adicionais || [] })),
+      origem: 'site',
       obs: `* Meio de pagamento - ${meioPagamentoTexto}\n* Número de WhatsApp para confirmação - ${whatsapp}`,
       criadoEm: new Date().toISOString(),
     });
