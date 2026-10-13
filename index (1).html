@@ -1341,7 +1341,7 @@
       <div class="form-row">
         <div class="form-group" style="position:relative;">
           <label>Convite (catálogo do site — modelo + tema)</label>
-          <input type="text" id="vConvite" placeholder="Digite p/ buscar — ex: animado safari" autocomplete="off"
+          <input type="text" id="vConvite" placeholder="Buscar (ex: animado safari) ou colar o link do produto" autocomplete="off"
                  oninput="onConviteInput()" onfocus="onConviteInput()" onblur="setTimeout(fecharSugestoesConvite, 150)">
           <div id="conviteSugestoes" class="produto-sugestoes"></div>
           <div id="vConviteInfo" style="margin-top:8px;"></div>
@@ -3332,11 +3332,44 @@ function resolverProdutoSite(p) {
     modelo: modeloNome || null, tema: temaNome || null,
     preco: Math.round(preco * 100) / 100,
     ativo: p.ativo !== false && tema?.ativo !== false,
+    foto: fotoDoProdutoSite(p),
   };
 }
 
-function getConvitesSite() {
-  return (catalogoSite.produtos || []).filter(p => !p.sobConsulta).map(resolverProdutoSite).filter(p => p.ativo && p.preco > 0);
+const ehVideoUrl = u => /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(u || '');
+function fotoDoProdutoSite(p) {
+  const url = [...(p.fotos || []), p.foto].find(u => typeof u === 'string' && u && !ehVideoUrl(u));
+  return url ? url.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_120/') : null;
+}
+
+/** Todos os produtos do site com rótulo único: quando o nome se repete, acrescenta um código curto estável (#final do ID) */
+function catalogoComRotulos() {
+  const todos = (catalogoSite.produtos || []).filter(p => !p.sobConsulta).map(resolverProdutoSite);
+  const grupos = {};
+  todos.forEach(p => { const k = normBuscaVenda(p.nome); (grupos[k] = grupos[k] || []).push(p); });
+  Object.values(grupos).forEach(g => {
+    if (g.length < 2) return;
+    for (let n = 4; n <= 12; n++) {
+      const cods = g.map(p => String(p.produto_id).slice(-n));
+      if (new Set(cods).size === g.length || n === 12) { g.forEach((p, i) => { p.codigo = cods[i]; p.rotulo = `${p.nome} · #${cods[i]}`; }); break; }
+    }
+  });
+  todos.forEach(p => { if (!p.rotulo) p.rotulo = p.nome; });
+  return todos;
+}
+
+function getConvitesSite() { return catalogoComRotulos().filter(p => p.ativo && p.preco > 0); }
+
+/** Acha um produto exato por rótulo, nome único, link da loja (?produto=ID) ou ID colado */
+function acharConvitePorEntrada(txt) {
+  const t = String(txt || '').trim();
+  if (!t) return { erro: 'campo vazio' };
+  const lista = catalogoComRotulos();
+  const m = t.match(/[?&]produto=([^&\s#]+)/) || t.match(/^(ps_[\w-]+)$/);
+  if (m) { const id = decodeURIComponent(m[1]); const p = lista.find(x => x.produto_id === id); return p ? { p } : { erro: 'link/código não encontrado no catálogo' }; }
+  const exatos = lista.filter(x => x.rotulo === t || normBuscaVenda(x.nome) === normBuscaVenda(t));
+  if (exatos.length === 1) return { p: exatos[0] };
+  return { erro: exatos.length ? 'há mais de um produto com esse nome — escolha pela foto ou cole o link do produto' : 'não encontrado' };
 }
 
 function getAdicionaisDisponiveis() {
@@ -3359,9 +3392,11 @@ function iniciarItensVenda(v) {
 
 function renderItensVenda() {
   const c = _vendaItens.convite;
+  const ref = c && c.produto_id ? catalogoComRotulos().find(x => x.produto_id === c.produto_id) : null;
   document.getElementById('vConviteInfo').innerHTML = c
     ? `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;">
-        <strong>${c.nome}</strong><span style="color:var(--ink-muted)">Modelo: ${c.modelo || '—'} · Tema: ${c.tema || '—'} · ${BRL_RAW_plain(c.preco)}</span>
+        ${ref?.foto ? `<img src="${escV(ref.foto)}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">` : ''}
+        <strong>${c.nome}${ref?.codigo ? ' #' + escV(ref.codigo) : ''}</strong><span style="color:var(--ink-muted)">Modelo: ${c.modelo || '—'} · Tema: ${c.tema || '—'} · ${BRL_RAW_plain(c.preco)}</span>
         <button type="button" class="btn btn-ghost btn-sm" onclick="limparConvite()">✕ Trocar</button></div>` : '';
   const opcoes = getAdicionaisDisponiveis();
   document.getElementById('vAdicionaisLista').innerHTML = _vendaItens.adicionais.map((a, i) =>
@@ -3374,11 +3409,19 @@ function renderItensVenda() {
 }
 
 function onConviteInput() {
-  const termos = normBuscaVenda(document.getElementById('vConvite').value).split(/\s+/).filter(Boolean);
+  const bruto = document.getElementById('vConvite').value;
+  if (/[?&]produto=|^\s*ps_[\w-]+\s*$/.test(bruto)) {   // link da loja ou ID colado: seleciona o produto exato
+    const r = acharConvitePorEntrada(bruto);
+    if (r.p) { _conviteSugestoes = [r.p]; selecionarConvite(0); return; }
+  }
+  const termos = normBuscaVenda(bruto).split(/\s+/).filter(Boolean);
   const el = document.getElementById('conviteSugestoes');
-  _conviteSugestoes = getConvitesSite().filter(p => termos.every(t => normBuscaVenda(p.nome).includes(t))).slice(0, 30);
+  _conviteSugestoes = getConvitesSite().filter(p => termos.every(t => normBuscaVenda(p.rotulo).includes(t))).slice(0, 30);
   el.innerHTML = _conviteSugestoes.length
-    ? _conviteSugestoes.map((p, i) => `<div class="produto-sugestao-item" onmousedown="selecionarConvite(${i})">${p.nome}<span style="color:var(--ink-muted);font-size:11px;margin-left:6px;">${BRL_RAW_plain(p.preco)}</span></div>`).join('')
+    ? _conviteSugestoes.map((p, i) => `<div class="produto-sugestao-item" onmousedown="selecionarConvite(${i})" style="display:flex;align-items:center;gap:10px;">
+        <span style="width:40px;height:40px;border-radius:6px;overflow:hidden;background:var(--cream);flex:0 0 40px;display:flex;align-items:center;justify-content:center;">${p.foto ? `<img src="${escV(p.foto)}" alt="" style="width:100%;height:100%;object-fit:cover">` : '🎉'}</span>
+        <span style="flex:1;min-width:0;">${escV(p.nome)}${p.codigo ? ` <span style="color:var(--ink-muted);font-size:11px;">#${escV(p.codigo)}</span>` : ''}</span>
+        <span style="color:var(--ink-muted);font-size:11px;">${BRL_RAW_plain(p.preco)}</span></div>`).join('')
     : '<div class="produto-sugestao-item" style="color:var(--ink-muted)">Nenhum produto do catálogo encontrado</div>';
   el.classList.add('open');
 }
@@ -3502,7 +3545,7 @@ function renderVinculo() {
   const jaVinc = vendas.filter(v => v.vinculo || (Array.isArray(v.itens) && v.itens.length)).length;
   const manuais = [...rev, ...parc].map(i => ({ ...i, v: vendas.find(x => x.id === i.id) })).filter(i => i.v)
     .sort((x, y) => (y.v.data || '').localeCompare(x.v.data || '')).slice(0, 40);
-  document.getElementById('dlConvitesSite').innerHTML = getConvitesSite().map(p => `<option value="${escV(p.nome)}"></option>`).join('');
+  document.getElementById('dlConvitesSite').innerHTML = getConvitesSite().map(p => `<option value="${escV(p.rotulo)}"></option>`).join('');
   document.getElementById('vinculoBody').innerHTML = `
     <p style="font-size:13px;color:var(--ink-light);margin-bottom:12px;">Nada é alterado até você aplicar. O texto do produto, valores, datas e status das vendas ficam intactos; só são acrescentados campos estruturados (produto_id, modelo, tema, itens).</p>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;font-size:13px;">
@@ -3519,7 +3562,7 @@ function renderVinculo() {
     ${manuais.map(i => `<div style="border-top:1px solid var(--border);padding:8px 0;font-size:12.5px;">
       <div><strong>${escV(i.v.contato)}</strong> · ${escV((i.v.data || '').split('-').reverse().join('/'))} · ${BRL_RAW_plain(i.v.valorProd)}</div>
       <div style="color:var(--ink-muted)">${escV(i.v.produto || '—')}${i.a.motivo ? ' — ' + escV(i.a.motivo) : ' — só modelo: ' + escV(i.a.modelo)}</div>
-      <div style="display:flex;gap:6px;margin-top:5px;"><input type="text" list="dlConvitesSite" id="vinc_${escV(i.id)}" placeholder="Buscar convite do catálogo…" style="flex:1">
+      <div style="display:flex;gap:6px;margin-top:5px;"><input type="text" list="dlConvitesSite" id="vinc_${escV(i.id)}" placeholder="Buscar convite ou colar o link do produto…" style="flex:1">
       <button class="btn btn-ghost btn-sm" onclick="vincularManual('${escV(i.id)}')">Vincular</button></div></div>`).join('')}`;
 }
 
@@ -3551,9 +3594,9 @@ async function aplicarVinculoAuto(statusAceitos) {
 }
 
 async function vincularManual(id) {
-  const nome = document.getElementById('vinc_' + id)?.value.trim();
-  const opcoes = getConvitesSite().filter(p => p.nome === nome);
-  if (opcoes.length !== 1) { showToast(opcoes.length ? 'Há mais de um produto com esse nome.' : 'Escolha um convite da lista do catálogo.', 'error'); return; }
+  const r = acharConvitePorEntrada(document.getElementById('vinc_' + id)?.value);
+  if (!r.p) { showToast('Convite: ' + r.erro, 'error'); return; }
+  const opcoes = [r.p];
   const v = vendas.find(x => x.id === id);
   if (!v || !db) return;
   const a = { ...analisarVendaLegado(v), status: 'completo', modelo: opcoes[0].modelo, tema: opcoes[0].tema, produto: opcoes[0] };
@@ -3620,6 +3663,8 @@ function agregarDesemp(lista) {
   return r;
 }
 
+let _mapaRotulosDesemp = {};
+const rotuloDesemp = (dim, o) => (dim === 'produto' && _mapaRotulosDesemp[o.key]) || o.nome;
 const rankDesemp = (dict, campo = 'n') => Object.values(dict).sort((a, b) => b[campo] - a[campo] || b.receita - a.receita);
 
 function desempDelta(atual, anterior) {
@@ -3633,14 +3678,14 @@ function tabelaRankDesemp(titulo, dim, atual, anterior) {
   const total = Object.values(atual[dim]).reduce((s, o) => s + o.n, 0);
   return `<div style="margin-bottom:18px;"><div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">${titulo}</div>
     ${lista.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Nome</th><th>Vendas</th><th>Faturamento</th><th>Ticket</th><th>%</th><th>vs anterior</th></tr></thead><tbody>
-      ${lista.map((o, i) => `<tr><td>${i + 1}</td><td>${escV(o.nome)}</td><td>${o.n}</td><td>${BRL(o.receita)}</td><td>${BRL(o.receita / o.n)}</td><td>${total ? Math.round(o.n / total * 100) : 0}%</td><td>${desempDelta(o.n, anterior[dim][o.key]?.n || 0)}</td></tr>`).join('')}
+      ${lista.map((o, i) => `<tr><td>${i + 1}</td><td>${escV(rotuloDesemp(dim, o))}</td><td>${o.n}</td><td>${BRL(o.receita)}</td><td>${BRL(o.receita / o.n)}</td><td>${total ? Math.round(o.n / total * 100) : 0}%</td><td>${desempDelta(o.n, anterior[dim][o.key]?.n || 0)}</td></tr>`).join('')}
     </tbody></table></div>` : '<p style="color:var(--ink-muted);font-size:13px;">Sem dados vinculados neste período.</p>'}</div>`;
 }
 
-function destaqueDesemp(rotulo, lista, campo) {
+function destaqueDesemp(rotulo, lista, campo, dim) {
   const o = lista[0];
   return `<div class="card" style="padding:10px 12px;"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${rotulo}</div>
-    <div style="font-size:14px;font-weight:700;margin-top:3px;">${o ? escV(o.nome) : '—'}</div>
+    <div style="font-size:14px;font-weight:700;margin-top:3px;">${o ? escV(rotuloDesemp(dim, o)) : '—'}</div>
     <div style="font-size:12px;color:var(--ink-muted)">${o ? (campo === 'n' ? o.n + ' vendas' : BRL(o.receita)) : 'sem dados'}</div></div>`;
 }
 
@@ -3662,6 +3707,7 @@ function renderDesempenhoProdutos() {
   if (!corpo) return;
   const { cur, prev } = faixasDesemp();
   const lista = vendasDaFaixa(cur);
+  _mapaRotulosDesemp = Object.fromEntries(catalogoComRotulos().map(p => [p.produto_id, p.rotulo]));
   const A = agregarDesemp(lista), P = agregarDesemp(vendasDaFaixa(prev));
   document.getElementById('desempPeriodo').value = _desemp.periodo;
   document.getElementById('desempCustom').style.display = _desemp.periodo === 'custom' ? 'flex' : 'none';
@@ -3673,7 +3719,7 @@ function renderDesempenhoProdutos() {
 
   _desempChips = rankDesemp(A[_desemp.dim]).slice(0, 8);
   const sel = _desemp.sel || _desempChips.slice(0, 3).map(o => o.key);
-  const chips = _desempChips.map((o, i) => `<button class="btn btn-sm ${sel.includes(o.key) ? 'btn-primary' : 'btn-ghost'}" onclick="toggleDesempItem(${i})">${escV(o.nome)}</button>`).join(' ');
+  const chips = _desempChips.map((o, i) => `<button class="btn btn-sm ${sel.includes(o.key) ? 'btn-primary' : 'btn-ghost'}" onclick="toggleDesempItem(${i})">${escV(rotuloDesemp(_desemp.dim, o))}</button>`).join(' ');
 
   corpo.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">
@@ -3682,8 +3728,8 @@ function renderDesempenhoProdutos() {
     </div>
     ${A.semVinculo.n ? `<p style="font-size:12px;color:var(--ink-muted);margin-bottom:12px;">${A.semVinculo.n} pedido(s) (${BRL(A.semVinculo.receita)}) ainda sem vínculo com produto — entram nos totais acima, mas não nos rankings. Use "🔗 Vincular vendas antigas" na aba Produtos.</p>` : ''}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:16px;">
-      ${destaqueDesemp('Produto mais vendido', rankDesemp(A.produto), 'n')}${destaqueDesemp('Modelo mais vendido', rankDesemp(A.modelo), 'n')}${destaqueDesemp('Tema mais vendido', rankDesemp(A.tema), 'n')}
-      ${destaqueDesemp('Produto que mais faturou', rankDesemp(A.produto, 'receita'), 'r')}${destaqueDesemp('Modelo que mais faturou', rankDesemp(A.modelo, 'receita'), 'r')}${destaqueDesemp('Tema que mais faturou', rankDesemp(A.tema, 'receita'), 'r')}
+      ${destaqueDesemp('Produto mais vendido', rankDesemp(A.produto), 'n', 'produto')}${destaqueDesemp('Modelo mais vendido', rankDesemp(A.modelo), 'n')}${destaqueDesemp('Tema mais vendido', rankDesemp(A.tema), 'n')}
+      ${destaqueDesemp('Produto que mais faturou', rankDesemp(A.produto, 'receita'), 'r', 'produto')}${destaqueDesemp('Modelo que mais faturou', rankDesemp(A.modelo, 'receita'), 'r')}${destaqueDesemp('Tema que mais faturou', rankDesemp(A.tema, 'receita'), 'r')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px;">
       <div><div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Modelos mais vendidos</div><div style="height:200px;position:relative"><canvas id="chartDesempModelos"></canvas></div></div>
@@ -3714,7 +3760,7 @@ function renderDesempenhoProdutos() {
   else { for (let [y, m] = cur[0].split('-').map(Number); `${y}-${String(m).padStart(2, '0')}` <= cur[1].slice(0, 7); m++ > 11 && (m = 1, y++)) baldes.push(`${y}-${String(m).padStart(2, '0')}`); }
   const dimKey = { produto: c => c.produto_id, modelo: c => c.modelo && normBuscaVenda(c.modelo), tema: c => c.tema && normBuscaVenda(c.tema) }[_desemp.dim];
   const series = sel.map((k, idx) => {
-    const nome = (_desempChips.find(o => o.key === k) || Object.values(A[_desemp.dim]).find(o => o.key === k) || { nome: k }).nome;
+    const nome = rotuloDesemp(_desemp.dim, _desempChips.find(o => o.key === k) || Object.values(A[_desemp.dim]).find(o => o.key === k) || { nome: k, key: k });
     const dados = baldes.map(b => lista.filter(v => {
       const c = (v.itens || []).find(i => i.tipo === 'convite');
       return c && dimKey(c) === k && (diario ? v.data === b : v.data.startsWith(b));
