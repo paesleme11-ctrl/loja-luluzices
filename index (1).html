@@ -756,7 +756,7 @@
         <div class="card-header"><span class="card-title">Projeção do Mês</span></div>
         <div class="card-body">
           <div class="projecao-box">
-            <div class="projecao-label">Faturamento Projetado</div>
+            <div class="projecao-label" id="projecaoLabel">Faturamento Projetado</div>
             <div class="projecao-value" id="projecaoVal">—</div>
             <div class="projecao-sub" id="projecaoSub">—</div>
             
@@ -2550,12 +2550,13 @@ function renderDashboard() {
   const ehMesAtual = isCurrentMonth(mesKey);
   const diaAtual = ehMesAtual ? new Date().getDate() : diasMes;
   const mediaAtual = diaAtual > 0 ? fatTotal / diaAtual : 0;
-  const projecao = ehMesAtual ? mediaAtual * diasMes : fatTotal; // histórico = real
+  const proj = ehMesAtual ? projetarMes({ mes, ano, fatTotal, aReceber, diaAtual, diasMes, despesasAtuais, marketingGasto, mesKey }) : null;
+  const projecao = proj ? proj.provavel : fatTotal; // histórico = real
   const mediaNec = ehMesAtual ? (meta.receita - fatTotal) / Math.max(diasMes - diaAtual, 1) : 0;
   const pctMeta = meta.receita > 0 ? Math.min((fatTotal / meta.receita) * 100, 100) : null;
   const pctDias = Math.min((diaAtual / diasMes) * 100, 100);
 
-  const projecaoDespesa = diaAtual > 0 ? (despesasAtuais / diaAtual) * (ehMesAtual ? diasMes : diaAtual) : 0;
+  const projecaoDespesa = proj ? proj.despesa : despesasAtuais; // histórico = real
   const lucroProj = projecao - projecaoDespesa;
 
   const roiColor = roiNum >= (meta.roi || 0) ? 'var(--green)' : (roiNum > 0 ? 'var(--red)' : 'var(--ink-muted)');
@@ -2584,7 +2585,8 @@ function renderDashboard() {
     </div>`;
 
   document.getElementById('projecaoVal').innerHTML = BRL(projecao);
-  document.getElementById('projecaoSub').innerHTML = ehMesAtual ? `Média/dia: ${BRL(mediaAtual)} | Necessária: ${BRL(mediaNec)}` : `Média/dia: ${BRL(mediaAtual)} | Mês encerrado`;
+  document.getElementById('projecaoLabel').textContent = ehMesAtual ? 'Faturamento Projetado (provável)' : 'Faturamento Projetado';
+  document.getElementById('projecaoSub').innerHTML = ehMesAtual ? `Garantido: ${BRL(proj.garantido)} · Otimista: ${BRL(proj.otimista)}<br>Ritmo (14 dias): ${BRL(proj.ritmo)}/dia | Necessária: ${BRL(mediaNec)}` : `Média/dia: ${BRL(mediaAtual)} | Mês encerrado`;
   document.getElementById('lucroProjVal').innerHTML = BRL(lucroProj);
 
   // Indicador de meta de lucro se configurada
@@ -3721,6 +3723,59 @@ function renderDesempenhoProdutos() {
   });
   mkChart('chartDesempEvolucao', { type: 'line', data: { labels: baldes.map(b => diario ? b.slice(8) + '/' + b.slice(5, 7) : b.slice(5) + '/' + b.slice(2, 4)), datasets: series },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: cores.text, boxWidth: 10, font: { size: 11 } } } }, scales: { x: { ticks: { color: cores.text, font: { size: 10 }, maxTicksLimit: 12 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: cores.text, stepSize: 1 }, grid: { color: cores.grid } } } } });
+}
+
+// ============================================================
+// PROJEÇÃO DO MÊS — faixa (garantido / provável / otimista) + despesa projetada por componente
+// ============================================================
+/** Receita por dia (caixa aproximado): sinal no dia do pedido; restante no dia da finalização */
+function receitaPorDia() {
+  const mapa = {};
+  const add = (d, valor) => { if (d && valor > 0) mapa[d] = (mapa[d] || 0) + valor; };
+  vendas.forEach(v => {
+    if (v.status === 'cancelado') return;
+    const sinal = parseFloat(v.sinal) || 0;
+    add(v.data, sinal);
+    if (v.status === 'finalizado') add(v.dataFinalizacao || v.data, Math.max((parseFloat(v.valorPago) || 0) - sinal, 0));
+  });
+  return mapa;
+}
+
+/**
+ * Garantido  = já recebido + a receber dos pedidos em aberto (piso)
+ * Provável   = já recebido + ritmo dos últimos 14 dias × dias restantes (nunca abaixo do garantido)
+ * Otimista   = já recebido + ritmo da melhor semana dos últimos ~28 dias × dias restantes
+ * Nos primeiros 7 dias do mês, o ritmo recente é misturado com a média diária dos 3 meses anteriores (até 50%).
+ * Despesa    = gasto até hoje + custos agendados do mês (exceto marketing) + marketing pelo ritmo diário.
+ */
+function projetarMes({ mes, ano, fatTotal, aReceber, diaAtual, diasMes, despesasAtuais, marketingGasto, mesKey }) {
+  const hoje = ymd(new Date()), ontem = addDias(hoje, -1), mapa = receitaPorDia();
+  const soma = (ini, n) => { let t = 0; for (let i = 0; i < n; i++) t += mapa[addDias(ini, i)] || 0; return t; };
+  const r14 = soma(addDias(ontem, -13), 14) / 14;
+  let rMelhor = 0;
+  for (let fim = 0; fim < 22; fim++) rMelhor = Math.max(rMelhor, soma(addDias(ontem, -fim - 6), 7) / 7);
+
+  let fat3 = 0, dias3 = 0;
+  for (let i = 1; i <= 3; i++) {
+    const d = new Date(ano, mes - i, 1), key = getMesKey(d.getMonth(), d.getFullYear());
+    const f = getFaturamento(getVendasMes(key), key);
+    if (f > 0) { fat3 += f; dias3 += new Date(ano, mes - i + 1, 0).getDate(); }
+  }
+  const r3m = dias3 > 0 ? fat3 / dias3 : 0;
+  const peso3m = (r3m > 0 && diaAtual < 7) ? ((7 - diaAtual) / 7) * 0.5 : 0;
+  const ritmo = r14 * (1 - peso3m) + r3m * peso3m;
+  const restantes = Math.max(diasMes - diaAtual, 0);
+
+  const garantido = fatTotal + aReceber;
+  const provavel = Math.max(fatTotal + ritmo * restantes, garantido);
+  // Teto de sanidade: um dia atípico muito grande não pode inflar o cenário otimista além de 2× o ritmo normal
+  const rOtim = Math.min(Math.max(rMelhor, ritmo), 2 * Math.max(ritmo, r3m));
+  const otimista = Math.max(fatTotal + rOtim * restantes, provavel);
+
+  const agendadas = fluxo.filter(f => (f.data || '').startsWith(mesKey) && f.tipo === 'saida' && f.status === 'agendado'
+    && CATEGORIAS_CUSTO.includes(f.categoria) && f.categoria !== 'marketing').reduce((s, f) => s + f.valor, 0);
+  const mktProj = diaAtual > 0 ? (marketingGasto / diaAtual) * restantes : 0;
+  return { garantido, provavel, otimista, ritmo, despesa: despesasAtuais + agendadas + mktProj };
 }
 
 // ============================================================
