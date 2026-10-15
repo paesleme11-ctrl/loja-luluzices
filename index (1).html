@@ -964,6 +964,8 @@
       <span id="anualIndicador" style="font-size:12px;color:var(--ink-muted);margin-left:auto;"></span>
     </div>
 
+    <div id="planoAnualCard"></div>
+
     <div class="kpi-grid" id="anualKpiGrid"></div>
 
     <div class="card" style="margin-bottom:20px;">
@@ -1461,6 +1463,20 @@
 </div>
 
 <!-- DETALHES DO FORMULÁRIO DO PEDIDO -->
+<div class="modal-overlay" id="modalPlanoAnual">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="planoEditTitulo">Plano anual</span>
+      <button class="modal-close" onclick="closeModal('modalPlanoAnual')">✕</button>
+    </div>
+    <div class="modal-body" id="planoEditBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modalPlanoAnual')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoPlano()">Salvar plano</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalVinculo">
   <div class="modal">
     <div class="modal-header">
@@ -1684,6 +1700,7 @@ async function loadFromFirebase() {
 
     await loadProdutosRemote();
     await loadCatalogoSite();
+    await loadPlanosAnuais();
     await loadListasConfigRemote();
 
     db.collection('vendas').onSnapshot(snap => {
@@ -2896,6 +2913,7 @@ function renderDashboardAnual() {
   for (let m = 0; m < 12; m++) {
     dadosMeses.push(calcularMesAnual(ano, m));
   }
+  renderPlanoAnual(ano, dadosMeses);
 
   const totalFaturamento = dadosMeses.reduce((s,d) => s + d.faturamento, 0);
   const totalPedidos = dadosMeses.reduce((s,d) => s + d.pedidos, 0);
@@ -3822,6 +3840,248 @@ function projetarMes({ mes, ano, fatTotal, aReceber, diaAtual, diasMes, despesas
     && CATEGORIAS_CUSTO.includes(f.categoria) && f.categoria !== 'marketing').reduce((s, f) => s + f.valor, 0);
   const mktProj = diaAtual > 0 ? (marketingGasto / diaAtual) * restantes : 0;
   return { garantido, provavel, otimista, ritmo, despesa: despesasAtuais + agendadas + mktProj };
+}
+
+// ============================================================
+// PLANO ANUAL — Livro de Guerra (meta anual, painel de comando, fechamento trimestral, checklist)
+// Faturamento/lucro seguem a mesma regra do Dashboard (calcularMesAnual), para meta anual e mensal nunca divergirem.
+// ============================================================
+const PLANO_PADRAO_2027 = {
+  ano: 2027, versao: '1.0 (out/2026)',
+  metasMensais: [16000, 17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 26000, 27000, 27000],
+  ticketInicial: 47, ticketMeta: 55, cacAlvo: 12, cacAlerta: 15, roasAlvo: 4, capacidadeDia: 20, orcamentoDia: 120,
+  obsMes: ['Base & validação do funil', 'Ajuste de combos de convite', 'Consolidação de processos', 'Início do 2º trimestre', 'Aumento de eficiência comercial', 'Revisão do meio de ano',
+    'Aceleração de campanhas', 'Ajuste de novos criativos', 'Preparação para o pico anual', 'Entrada na alta temporada', 'Pico operacional 1', 'Pico operacional 2 & fechamento'],
+  trimestres: {}, checklist: {},
+};
+const MESES_PLANO = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+let planosAnuais = LS.get('planosAnuais', {});
+
+function getPlanoAnual(ano) {
+  if (!planosAnuais[ano] && Number(ano) === 2027) planosAnuais[ano] = JSON.parse(JSON.stringify(PLANO_PADRAO_2027));
+  return planosAnuais[ano] || null;
+}
+const ticketAlvoMes = (p, m) => p.ticketInicial + (p.ticketMeta - p.ticketInicial) * m / 11;
+const metaAnualDoPlano = p => (p.metasMensais || []).reduce((s, v) => s + (Number(v) || 0), 0);
+
+function salvarPlanos() {
+  LS.set('planosAnuais', planosAnuais);
+  if (db) db.collection('config').doc('planoAnual').set({ data: JSON.stringify(planosAnuais) }).catch(() => {});
+}
+async function loadPlanosAnuais() {
+  if (!db) return;
+  try {
+    const d = await db.collection('config').doc('planoAnual').get();
+    if (d.exists) { planosAnuais = JSON.parse(d.data().data || '{}'); LS.set('planosAnuais', planosAnuais); }
+  } catch (e) { console.warn('Erro ao carregar plano anual:', e); }
+}
+
+/** Preenche as metas mensais do Dashboard com as do plano — só onde ainda não há meta de receita (nunca sobrescreve) */
+function semearMetasPlano(forcar) {
+  let mudou = false;
+  Object.keys(planosAnuais).concat(['2027']).filter((a, i, arr) => arr.indexOf(a) === i).forEach(a => {
+    const p = getPlanoAnual(a); if (!p) return;
+    for (let m = 0; m < 12; m++) {
+      const key = getMesKey(m, Number(a)), cur = metas[key], valor = Number(p.metasMensais[m]) || 0;
+      if (!valor || (!forcar && cur && cur.receita)) continue;
+      metas[key] = { vendas: Math.ceil(valor / ticketAlvoMes(p, m)), roi: p.roasAlvo, cac: p.cacAlvo, dias: new Date(Number(a), m + 1, 0).getDate(), ...(cur || {}), receita: valor };
+      mudou = true;
+    }
+  });
+  if (mudou) { LS.set('metas', metas); saveMetasRemote(); }
+}
+
+function statusMeta(real, meta, fase, fracao = 1) {
+  if (fase === 'futuro' || !meta) return { cor: 'var(--ink-muted)', texto: '—' };
+  const r = real / (fase === 'atual' ? meta * fracao : meta);
+  if (r >= 1) return { cor: 'var(--green)', texto: fase === 'atual' ? '● No ritmo' : '● Meta batida' };
+  if (r >= 0.9) return { cor: 'var(--amber)', texto: fase === 'atual' ? '● Atenção' : '● Quase' };
+  return { cor: 'var(--red)', texto: fase === 'atual' ? '● Atrás do ritmo' : '● Abaixo' };
+}
+
+/** Alerta do livro: CAC diário acima do limite por 3 dias seguidos (só avalia se houve gasto de tráfego lançado nos 3 dias) */
+function alertaCacDiario(p) {
+  const hoje = ymd(new Date()), dias = [1, 2, 3].map(n => addDias(hoje, -n));
+  const gasto = d => fluxo.filter(f => f.data === d && f.tipo === 'saida' && f.categoria === 'marketing' && f.status !== 'agendado').reduce((s, f) => s + f.valor, 0);
+  const pedidos = d => vendas.filter(v => v.data === d && v.status !== 'cancelado').length;
+  const linhas = dias.map(d => ({ g: gasto(d), n: pedidos(d) }));
+  if (linhas.some(l => l.g <= 0)) return { avaliavel: false };
+  const cacs = linhas.map(l => l.n > 0 ? l.g / l.n : Infinity);
+  return { avaliavel: true, cacs, alerta: cacs.every(c => c > p.cacAlerta) };
+}
+
+function upsellTrimestre(ano, meses) {
+  const lista = vendas.filter(v => v.status !== 'cancelado' && meses.some(m => (v.data || '').startsWith(getMesKey(m, ano))));
+  const vinc = lista.filter(v => (v.itens || []).some(i => i.tipo === 'convite'));
+  const contagem = {};
+  vinc.forEach(v => (v.itens || []).filter(i => i.tipo === 'adicional').forEach(i => { contagem[i.nome] = (contagem[i.nome] || 0) + 1; }));
+  const top = Object.entries(contagem).sort((a, b) => b[1] - a[1])[0];
+  const comAd = vinc.filter(v => (v.itens || []).some(i => i.tipo === 'adicional')).length;
+  return { pedidos: lista.length, vinculadas: vinc.length, adesao: vinc.length ? Math.round(comAd / vinc.length * 100) : null, topAdicional: top ? `${top[0]} (${top[1]})` : null };
+}
+
+function mktDoMes(ano, m) {
+  return fluxo.filter(f => (f.data || '').startsWith(getMesKey(m, ano)) && f.tipo === 'saida' && f.categoria === 'marketing' && f.status !== 'agendado').reduce((s, f) => s + f.valor, 0);
+}
+
+function salvarObsMes(ano, m, v) { const p = getPlanoAnual(ano); p.obsMes[m] = v; salvarPlanos(); }
+function salvarNotaTrim(ano, q, campo, v) { const p = getPlanoAnual(ano); (p.trimestres[q] = p.trimestres[q] || {})[campo] = v; salvarPlanos(); }
+function toggleChecklist(ano, k, v) { const p = getPlanoAnual(ano); p.checklist[k] = v; salvarPlanos(); }
+
+function criarPlanoAnual(ano) {
+  const base = PLANO_PADRAO_2027;
+  planosAnuais[ano] = { ...JSON.parse(JSON.stringify(base)), ano, versao: '1.0', obsMes: Array(12).fill(''),
+    metasMensais: Array.from({ length: 12 }, (_, m) => Number((metas[getMesKey(m, ano)] || {}).receita) || 0), trimestres: {}, checklist: {} };
+  salvarPlanos(); renderDashboardAnual(); abrirEditarPlano(ano);
+}
+
+function abrirEditarPlano(ano) {
+  const p = getPlanoAnual(ano); if (!p) return;
+  const campo = (id, rot, val, step = '0.01') => `<div class="form-group"><label>${rot}</label><input type="number" id="${id}" step="${step}" min="0" value="${val}"></div>`;
+  document.getElementById('planoEditTitulo').textContent = `✏️ Plano anual ${ano}`;
+  document.getElementById('planoEditBody').innerHTML = `<input type="hidden" id="plAno" value="${ano}">
+    <div style="font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Meta de faturamento por mês (R$)</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${MESES_PLANO.map((n, m) => campo('plMeta_' + m, n, p.metasMensais[m] || 0, '1')).join('')}</div>
+    <div style="font-size:11px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin:12px 0 6px;">Regras do plano</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+      ${campo('plTicketIni', 'Ticket inicial (R$)', p.ticketInicial)}${campo('plTicketMeta', 'Ticket meta no fim do ano (R$)', p.ticketMeta)}
+      ${campo('plCacAlvo', 'CAC alvo (R$)', p.cacAlvo)}${campo('plCacAlerta', 'CAC de alerta (R$)', p.cacAlerta)}
+      ${campo('plRoas', 'ROAS alvo (x)', p.roasAlvo)}${campo('plCap', 'Capacidade (pedidos/dia)', p.capacidadeDia, '1')}
+    </div>
+    <p style="font-size:12px;color:var(--ink-muted);margin-top:10px;">Ao salvar, as metas mensais do Dashboard deste ano são atualizadas com estes valores.</p>`;
+  document.getElementById('modalPlanoAnual').classList.add('open');
+}
+
+function salvarEdicaoPlano() {
+  const ano = Number(document.getElementById('plAno').value), p = getPlanoAnual(ano);
+  const n = id => parseFloat(document.getElementById(id).value);
+  const metasNovas = MESES_PLANO.map((_, m) => n('plMeta_' + m) || 0);
+  const regras = { ticketInicial: n('plTicketIni'), ticketMeta: n('plTicketMeta'), cacAlvo: n('plCacAlvo'), cacAlerta: n('plCacAlerta'), roasAlvo: n('plRoas'), capacidadeDia: n('plCap') };
+  if (Object.values(regras).some(v => !(v > 0)) || regras.cacAlerta < regras.cacAlvo) { showToast('Revise as regras: valores positivos e CAC de alerta maior que o alvo.', 'error'); return; }
+  Object.assign(p, regras, { metasMensais: metasNovas });
+  salvarPlanos();
+  metasNovas.forEach((v, m) => { const key = getMesKey(m, ano); if (v > 0) metas[key] = { ...(metas[key] || { vendas: 0, roi: 0, cac: 0, dias: new Date(ano, m + 1, 0).getDate() }), receita: v }; });
+  LS.set('metas', metas); saveMetasRemote();
+  closeModal('modalPlanoAnual'); renderDashboardAnual();
+  showToast('Plano atualizado ✓', 'success');
+}
+
+function renderPlanoAnual(ano, dadosMeses) {
+  const el = document.getElementById('planoAnualCard');
+  if (!el) return;
+  const plano = getPlanoAnual(ano);
+  if (!plano) {
+    el.innerHTML = `<div class="card" style="margin-bottom:20px;"><div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span style="color:var(--ink-muted);font-size:13px;">🎯 Nenhum plano anual cadastrado para ${ano}.</span><button class="btn btn-ghost btn-sm" onclick="criarPlanoAnual(${ano})">Criar plano ${ano}</button></div></div>`;
+    return;
+  }
+  semearMetasPlano();
+  const { mes: mesReal, ano: anoReal } = getMesAno();
+  const fase = m => ano < anoReal ? 'passado' : ano > anoReal ? 'futuro' : (m < mesReal ? 'passado' : m === mesReal ? 'atual' : 'futuro');
+  const fracao = new Date().getDate() / new Date(anoReal, mesReal + 1, 0).getDate();
+  const metaAnual = metaAnualDoPlano(plano);
+  let acumAlvo = 0, acumReal = 0, alvoProp = 0;
+  const linhas = dadosMeses.map((d, m) => {
+    const meta = Number(plano.metasMensais[m]) || 0, f = fase(m);
+    acumAlvo += meta; if (f !== 'futuro') acumReal += d.faturamento;
+    alvoProp += f === 'passado' ? meta : f === 'atual' ? meta * fracao : 0;
+    return { m, meta, f, fat: d.faturamento, lucro: d.lucro, acumAlvo, acumReal: f === 'futuro' ? null : acumReal, st: statusMeta(d.faturamento, meta, f, fracao) };
+  });
+  const totalFat = acumReal, pct = metaAnual ? totalFat / metaAnual * 100 : 0, dif = totalFat - alvoProp;
+  const comDados = linhas.filter(l => l.f !== 'futuro').length, futuros = linhas.filter(l => l.f === 'futuro').length;
+  const media = comDados ? totalFat / comDados : 0, noRitmo = totalFat + media * futuros;
+  const falta = Math.max(metaAnual - totalFat, 0);
+  const pctAlvo = metaAnual ? Math.min(alvoProp / metaAnual * 100, 100) : 0;
+
+  const kpi = (t, v, sub, cor) => `<div class="card" style="padding:10px 12px;"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${t}</div><div style="font-size:17px;font-weight:700;margin-top:3px;${cor ? 'color:' + cor : ''}">${v}</div><div style="font-size:11.5px;color:var(--ink-muted)">${sub}</div></div>`;
+  const dot = (cor, txt) => `<span style="color:${cor};font-weight:700;">${txt}</span>`;
+
+  // Painel de comando (mês atual no ano corrente; dezembro em anos encerrados)
+  let painel = '';
+  const mRef = ano === anoReal ? mesReal : (ano < anoReal ? 11 : null);
+  if (mRef !== null) {
+    const d = dadosMeses[mRef], mkt = mktDoMes(ano, mRef);
+    const diasConsiderados = ano === anoReal ? Math.max(new Date().getDate(), 1) : new Date(ano, mRef + 1, 0).getDate();
+    const ticket = d.pedidos ? d.faturamento / d.pedidos : 0, tAlvo = ticketAlvoMes(plano, mRef);
+    const cac = mkt > 0 && d.pedidos ? mkt / d.pedidos : 0, roas = mkt > 0 ? d.faturamento / mkt : 0;
+    const margem = d.faturamento > 0 ? d.lucro / d.faturamento * 100 : 0, cap = d.pedidos / diasConsiderados / plano.capacidadeDia * 100;
+    const cor = (ok, atencao) => ok ? 'var(--green)' : atencao ? 'var(--amber)' : 'var(--red)';
+    const cell = (rot, val, alvo, c) => `<div class="card" style="padding:10px 12px;border-left:3px solid ${c};"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${rot}</div><div style="font-size:16px;font-weight:700;margin-top:2px;">${val}</div><div style="font-size:11px;color:var(--ink-muted)">${alvo}</div></div>`;
+    const sem = 'var(--ink-muted)', al = ano === anoReal ? alertaCacDiario(plano) : { avaliavel: false };
+    painel = `<div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin:16px 0 6px;">🎖️ Painel de comando — ${MESES_PLANO[mRef]}/${ano}</div>
+      ${al.alerta ? `<div style="background:var(--red);color:#fff;padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;margin-bottom:8px;">⚠️ CAC acima de ${BRL(plano.cacAlerta)} por 3 dias seguidos (${al.cacs.map(c => c === Infinity ? 'sem vendas' : BRL(c)).join(' · ')}). Regra do livro: PAUSAR testes, revisar atendimento e checar fadiga de criativo.</div>` : ''}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;">
+        ${cell('Ticket médio', d.pedidos ? BRL(ticket) : '—', 'alvo do mês ' + BRL(tAlvo), d.pedidos ? cor(ticket >= tAlvo, ticket >= tAlvo * 0.95) : sem)}
+        ${cell('CAC', cac ? BRL(cac) : '—', `alvo até ${BRL(plano.cacAlvo)} · alerta ${BRL(plano.cacAlerta)}`, cac ? cor(cac <= plano.cacAlvo, cac <= plano.cacAlerta) : sem)}
+        ${cell('ROAS', roas ? roas.toFixed(1) + 'x' : '—', `alvo ${plano.roasAlvo}x ou mais`, roas ? cor(roas >= plano.roasAlvo, roas >= plano.roasAlvo * 0.85) : sem)}
+        ${cell('Margem líquida', d.faturamento ? margem.toFixed(0) + '%' : '—', 'lucro ÷ faturamento', d.faturamento ? (margem >= 0 ? 'var(--green)' : 'var(--red)') : sem)}
+        ${cell('Capacidade', d.pedidos ? cap.toFixed(0) + '%' : '—', `${(d.pedidos / diasConsiderados).toFixed(1)} de ${plano.capacidadeDia} pedidos/dia`, d.pedidos ? cor(cap <= 85, cap <= 100) : sem)}
+      </div>
+      ${ano === anoReal && !al.avaliavel ? '<p style="font-size:11.5px;color:var(--ink-muted);margin-top:6px;">O alerta de CAC diário precisa do gasto de tráfego lançado em cada um dos últimos 3 dias (Fluxo de Caixa, categoria marketing).</p>' : ''}`;
+  }
+
+  // Fechamento trimestral
+  const trims = [0, 1, 2, 3].map(q => {
+    const ms = [q * 3, q * 3 + 1, q * 3 + 2], ds = ms.map(m => dadosMeses[m]);
+    const fat = ds.reduce((s, x) => s + x.faturamento, 0), ped = ds.reduce((s, x) => s + x.pedidos, 0), luc = ds.reduce((s, x) => s + x.lucro, 0);
+    const mkt = ms.reduce((s, m) => s + mktDoMes(ano, m), 0), meta = ms.reduce((s, m) => s + (Number(plano.metasMensais[m]) || 0), 0);
+    return { q, ms, fat, ped, luc, mkt, meta, up: upsellTrimestre(ano, ms), n: plano.trimestres[q] || {} };
+  });
+  const campoNota = (q, c, rot, v) => `<label style="font-size:11px;color:var(--ink-muted);display:block;margin-top:6px;">${rot}</label><textarea rows="2" style="width:100%" onchange="salvarNotaTrim(${ano},${q},'${c}',this.value)">${escV(v || '')}</textarea>`;
+
+  // Checklist de partida
+  const lim60 = ymd(new Date(Date.now() - 60 * 864e5)), rec = vendas.filter(v => v.status !== 'cancelado' && (v.data || '') >= lim60);
+  const pctVinc = rec.length ? Math.round(rec.filter(v => v.modelo && v.fonte).length / rec.length * 100) : 0;
+  const lim30 = ymd(new Date(Date.now() - 30 * 864e5)), temTrafego = fluxo.some(f => f.categoria === 'marketing' && f.tipo === 'saida' && f.status !== 'agendado' && (f.data || '') >= lim30);
+  const auto = (ok, txt) => `<li style="list-style:none;font-size:13px;margin:4px 0;">${ok ? '✅' : '⬜'} ${txt} <span style="color:var(--ink-muted);font-size:11px;">(automático)</span></li>`;
+  const manual = (k, txt) => `<li style="list-style:none;font-size:13px;margin:4px 0;"><label><input type="checkbox" ${plano.checklist[k] ? 'checked' : ''} onchange="toggleChecklist(${ano},'${k}',this.checked)"> ${txt}</label></li>`;
+  const tabela = (cols, rows) => `<div class="table-wrap"><table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+
+  el.innerHTML = `<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px;"><span class="card-title">🎯 Meta Anual ${ano} — Livro de Guerra <span style="font-weight:400;font-size:12px;color:var(--ink-muted)">v${escV(plano.versao)}</span></span>
+      <button class="btn btn-ghost btn-sm" onclick="abrirEditarPlano(${ano})">✏️ Editar plano</button></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px;">
+        ${kpi('Meta anual', BRL(metaAnual), `ticket ${BRL(plano.ticketInicial)} → ${BRL(plano.ticketMeta)}`)}
+        ${kpi('Realizado', BRL(totalFat), pct.toFixed(1) + '% da meta')}
+        ${kpi(ano <= anoReal ? (dif >= 0 ? 'Adiantado' : 'Atrasado') : 'Situação', ano <= anoReal ? BRL(Math.abs(dif)) : '—', 'vs. alvo proporcional até hoje', ano <= anoReal ? (dif >= 0 ? 'var(--green)' : 'var(--red)') : '')}
+        ${kpi('Falta para a meta', BRL(falta), futuros ? `≈ ${BRL(falta / futuros)}/mês nos próximos ${futuros} mês(es)` : 'ano completo')}
+        ${kpi('No ritmo atual', ano === anoReal ? BRL(noRitmo) : '—', ano === anoReal ? `${((noRitmo / metaAnual) * 100).toFixed(0)}% da meta (média mensal)` : '')}
+      </div>
+      <div style="position:relative;height:14px;border-radius:7px;background:var(--border);overflow:hidden;margin-bottom:4px;">
+        <div style="position:absolute;inset:0 auto 0 0;width:${Math.min(pct, 100)}%;background:var(--rose);"></div>
+        <div style="position:absolute;top:0;bottom:0;left:${pctAlvo}%;width:2px;background:var(--ink);"></div></div>
+      <div style="font-size:11px;color:var(--ink-muted);margin-bottom:14px;">Barra = realizado · marca preta = onde deveria estar hoje. O livro pede não forçar metas mensais sacrificando margem: o que importa é o acumulado.</div>
+      <div style="height:220px;position:relative;margin-bottom:14px;"><canvas id="chartPlanoAcum"></canvas></div>
+      ${tabela(['Mês', 'Meta', 'Acum. alvo', 'Faturado', 'Acum. real', 'Lucro', 'Status', 'Observação'], linhas.map(l => `<tr>
+        <td>${MESES_PLANO[l.m]}</td><td>${BRL(l.meta)}</td><td>${BRL(l.acumAlvo)}</td><td>${l.f === 'futuro' ? '—' : BRL(l.fat)}</td><td>${l.acumReal === null ? '—' : BRL(l.acumReal)}</td>
+        <td>${l.f === 'futuro' ? '—' : BRL(l.lucro)}</td><td>${dot(l.st.cor, l.st.texto)}</td>
+        <td><input type="text" value="${escV(plano.obsMes[l.m] || '')}" style="min-width:150px" onchange="salvarObsMes(${ano},${l.m},this.value)"></td></tr>`))}
+      ${painel}
+      <div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin:16px 0 6px;">📋 Fechamento trimestral</div>
+      ${tabela(['Trimestre', 'Meta', 'Faturado', 'Invest. tráfego', 'CAC', 'ROAS', 'Ticket', 'Lucro líq.'], trims.map(t => `<tr><td>${t.q + 1}º tri</td><td>${BRL(t.meta)}</td><td>${BRL(t.fat)}</td><td>${BRL(t.mkt)}</td>
+        <td>${t.mkt && t.ped ? BRL(t.mkt / t.ped) : '—'}</td><td>${t.mkt ? (t.fat / t.mkt).toFixed(1) + 'x' : '—'}</td><td>${t.ped ? BRL(t.fat / t.ped) : '—'}</td><td>${BRL(t.luc)}</td></tr>`))}
+      ${trims.map(t => `<details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:600;">${t.q + 1}º trimestre — diagnóstico e ajustes</summary>
+        <div style="font-size:12px;margin:6px 0;">Combos e upsells: adesão ${t.up.adesao === null ? '—' : t.up.adesao + '% dos pedidos vinculados'} · adicional mais vendido: ${t.up.topAdicional ? escV(t.up.topAdicional) : '—'} <span style="color:var(--ink-muted)">(${t.up.vinculadas} de ${t.up.pedidos} pedidos vinculados a produto)</span></div>
+        ${campoNota(t.q, 'funcionou', 'O que funcionou melhor?', t.n.funcionou)}${campoNota(t.q, 'gargalo', 'Maior gargalo / onde perdemos vendas?', t.n.gargalo)}${campoNota(t.q, 'acao', 'Plano de ação corretiva / ajustes para o próximo trimestre', t.n.acao)}</details>`).join('')}
+      <details style="margin-top:14px;" ${Date.now() < new Date(2027, 0, 1) ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;font-weight:700;">✅ Checklist de partida operacional</summary>
+        <ul style="margin:8px 0 0 0;padding:0;">
+          ${auto(pctVinc >= 90, `Pedidos registrados com modelo, tema e origem — ${pctVinc}% das vendas dos últimos 60 dias`)}
+          ${auto(temTrafego, 'Métricas de tráfego (CAC/ROAS) alimentadas — gasto de marketing lançado nos últimos 30 dias')}
+          ${manual('combos', 'Tabela de combos e adicionais definida')}${manual('custos', 'Custos de produção de cada item mapeados')}
+          ${manual('script', 'Script de atendimento do WhatsApp padronizado')}${manual('planilha', 'Fechamento financeiro trimestral testado')}</ul>
+        ${Date.now() < new Date(2027, 0, 1) ? '<p style="font-size:12px;color:var(--ink-muted);margin-top:8px;"><strong>Pré-campanha:</strong> Outubro — validar faturamento, ticket, CAC, ROAS e margem. Novembro — testar combos e adicionais. Dezembro — fechar o balanço de 2026 e aprovar o orçamento de tráfego de janeiro.</p>' : ''}</details>
+    </div></div>`;
+
+  const cores = chartThemeColors();
+  const rotulos = MESES_PLANO;
+  const alvoSerie = linhas.map(l => l.acumAlvo), realSerie = linhas.map(l => l.acumReal);
+  const ritmoSerie = ano === anoReal ? linhas.map(l => l.f === 'futuro' ? totalFat + media * (l.m - mesReal) : (l.f === 'atual' ? totalFat : null)) : [];
+  mkChart('chartPlanoAcum', { type: 'line', data: { labels: rotulos, datasets: [
+    { label: 'Acumulado alvo', data: alvoSerie, borderColor: '#8a8a8a', borderDash: [6, 4], pointRadius: 2, tension: .2 },
+    { label: 'Acumulado real', data: realSerie, borderColor: '#e8546a', backgroundColor: '#e8546a', pointRadius: 3, tension: .2 },
+    ...(ritmoSerie.length ? [{ label: 'No ritmo atual', data: ritmoSerie, borderColor: '#4a7fc1', borderDash: [2, 3], pointRadius: 0, tension: .2 }] : []),
+  ] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: cores.text, boxWidth: 10, font: { size: 11 } } } },
+    scales: { x: { ticks: { color: cores.text, font: { size: 10 } }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: cores.text, font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }, grid: { color: cores.grid } } } } });
 }
 
 // ============================================================
