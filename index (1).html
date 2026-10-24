@@ -806,7 +806,7 @@
 
     <div class="card" id="cardDesempenho" style="margin-bottom:20px">
       <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-        <span class="card-title">📈 Desempenho dos Produtos</span>
+        <span class="card-title">📈 Desempenho: produtos, tráfego e contatos</span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span id="desempIndicador" style="font-size:12px;color:var(--ink-muted);"></span>
           <select id="desempPeriodo" onchange="setDesempPeriodo(this.value)" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);">
@@ -3742,7 +3742,8 @@ function renderDesempenhoProdutos() {
   const { cur, prev } = faixasDesemp();
   const lista = vendasDaFaixa(cur);
   _mapaRotulosDesemp = Object.fromEntries(catalogoComRotulos().map(p => [p.produto_id, p.rotulo]));
-  const A = agregarDesemp(lista), P = agregarDesemp(vendasDaFaixa(prev));
+  const listaPrev = vendasDaFaixa(prev);
+  const A = agregarDesemp(lista), P = agregarDesemp(listaPrev);
   document.getElementById('desempPeriodo').value = _desemp.periodo;
   document.getElementById('desempCustom').style.display = _desemp.periodo === 'custom' ? 'flex' : 'none';
   document.getElementById('desempIndicador').textContent = `${cur[0].split('-').reverse().join('/')} a ${cur[1].split('-').reverse().join('/')}`;
@@ -3771,7 +3772,8 @@ function renderDesempenhoProdutos() {
     </div>
     ${tabelaRankDesemp('Top 10 produtos', 'produto', A, P)}${tabelaRankDesemp('Top 10 modelos', 'modelo', A, P)}${tabelaRankDesemp('Top 10 temas', 'tema', A, P)}
     ${rankDesemp(A.adicional).length ? tabelaRankDesemp('Adicionais (não contam como convite)', 'adicional', A, P) : ''}
-    <div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px;">Evolução e comparação</div>
+    ${blocoTrafegoContatos(lista, listaPrev)}
+    <div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin:16px 0 6px;">Evolução e comparação</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
       ${['produto', 'modelo', 'tema'].map(d => `<button class="btn btn-sm ${_desemp.dim === d ? 'btn-primary' : 'btn-ghost'}" onclick="setDesempDim('${d}')">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}
       <span style="color:var(--ink-muted);font-size:12px;">· escolha até 5 para comparar:</span></div>
@@ -4098,6 +4100,78 @@ function renderPlanoAnual(ano, dadosMeses) {
     ...(ritmoSerie.length ? [{ label: 'No ritmo atual', data: ritmoSerie, borderColor: '#4a7fc1', borderDash: [2, 3], pointRadius: 0, tension: .2 }] : []),
   ] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: cores.text, boxWidth: 10, font: { size: 11 } } } },
     scales: { x: { ticks: { color: cores.text, font: { size: 10 } }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: cores.text, font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }, grid: { color: cores.grid } } } } });
+}
+
+// ============================================================
+// TRÁFEGO PAGO × REMARKETING e VENDAS POR QUANTIDADE DE CONTATOS (dentro do card de Desempenho)
+// Tráfego = fonte que contém "tráfego" (mesma regra do modal de venda). Remarketing = conjunto de anúncios "Remarketing".
+// ============================================================
+const ehTrafegoVenda = v => /trafego/.test(normBuscaVenda(v.fonte));
+const ehRemarketingVenda = v => /remarket/.test(normBuscaVenda(v.conjuntoOrigem));
+const FAIXAS_CONTATOS = ['1', '2', '3', '4+'];
+const pctDe = (a, b) => b ? Math.round(a / b * 100) : 0;
+
+function agregarTrafego(lista) {
+  const r = { pedidos: lista.length, trafego: { n: 0, receita: 0 }, remarketing: { n: 0, receita: 0 }, outros: { n: 0, receita: 0 }, semConjunto: { n: 0, receita: 0 }, conjuntos: {} };
+  lista.filter(ehTrafegoVenda).forEach(v => {
+    const valor = parseFloat(v.valorProd) || 0, conj = String(v.conjuntoOrigem || '').trim();
+    r.trafego.n++; r.trafego.receita += valor;
+    if (!conj) { r.semConjunto.n++; r.semConjunto.receita += valor; return; }
+    const o = r.conjuntos[conj] || (r.conjuntos[conj] = { nome: conj, n: 0, receita: 0 });
+    o.n++; o.receita += valor;
+    const alvo = ehRemarketingVenda(v) ? r.remarketing : r.outros;
+    alvo.n++; alvo.receita += valor;
+  });
+  return r;
+}
+
+function agregarContatos(lista) {
+  const r = { semInfo: { n: 0, receita: 0 } };
+  FAIXAS_CONTATOS.forEach(f => { r[f] = { n: 0, receita: 0 }; });
+  lista.forEach(v => {
+    const k = String(v.numContatos ?? '').trim(), alvo = r[FAIXAS_CONTATOS.includes(k) ? k : 'semInfo'];
+    alvo.n++; alvo.receita += parseFloat(v.valorProd) || 0;
+  });
+  return r;
+}
+
+function setContatosFiltro(v) { _desemp.contatosFiltro = v; renderDesempenhoProdutos(); }
+
+function blocoTrafegoContatos(lista, listaPrev) {
+  const T = agregarTrafego(lista), TP = agregarTrafego(listaPrev);
+  const card = (t, v, sub) => `<div class="card" style="padding:10px 12px;"><div style="font-size:10.5px;color:var(--ink-muted);text-transform:uppercase;font-weight:700;">${t}</div><div style="font-size:17px;font-weight:700;margin-top:3px;">${v}</div><div style="font-size:11.5px;color:var(--ink-muted)">${sub}</div></div>`;
+  const titulo = t => `<div style="font-size:12px;font-weight:700;color:var(--ink-muted);text-transform:uppercase;margin:16px 0 6px;">${t}</div>`;
+  const conjuntos = Object.values(T.conjuntos).sort((a, b) => b.n - a.n);
+
+  const trafego = `${titulo('📣 Tráfego pago e remarketing')}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px;">
+      ${card('Vendas de tráfego pago', T.trafego.n, `${pctDe(T.trafego.n, T.pedidos)}% dos pedidos · ${BRL(T.trafego.receita)}`)}
+      ${card('Vindas do remarketing', T.remarketing.n, `${pctDe(T.remarketing.n, T.trafego.n)}% do tráfego · ${BRL(T.remarketing.receita)} · ${desempDelta(T.remarketing.n, TP.remarketing.n)} vs anterior`)}
+      ${card('Outros conjuntos', T.outros.n, `${pctDe(T.outros.n, T.trafego.n)}% do tráfego · ${BRL(T.outros.receita)}`)}
+      ${card('Sem conjunto informado', T.semConjunto.n, `${pctDe(T.semConjunto.n, T.trafego.n)}% do tráfego`)}
+    </div>
+    ${T.semConjunto.n ? `<p style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;">${T.semConjunto.n} venda(s) de tráfego sem conjunto de anúncios informado: não dá para saber se vieram do remarketing. Preencha o "Conjunto de origem" ao lançar a venda.</p>` : ''}
+    ${conjuntos.length ? `<div class="table-wrap"><table><thead><tr><th>Conjunto de anúncios</th><th>Vendas</th><th>% do tráfego</th><th>Faturamento</th><th>Ticket</th><th>vs anterior</th></tr></thead><tbody>
+      ${conjuntos.map(c => `<tr><td>${escV(c.nome)}</td><td>${c.n}</td><td>${pctDe(c.n, T.trafego.n)}%</td><td>${BRL(c.receita)}</td><td>${BRL(c.receita / c.n)}</td><td>${desempDelta(c.n, TP.conjuntos[c.nome]?.n || 0)}</td></tr>`).join('')}
+    </tbody></table></div>` : '<p style="color:var(--ink-muted);font-size:13px;">Nenhuma venda de tráfego com conjunto informado neste período.</p>'}`;
+
+  const filtro = _desemp.contatosFiltro || 'todas';
+  const base = filtro === 'trafego' ? lista.filter(ehTrafegoVenda) : filtro === 'remarketing' ? lista.filter(v => ehTrafegoVenda(v) && ehRemarketingVenda(v)) : lista;
+  const C = agregarContatos(base), informadas = FAIXAS_CONTATOS.reduce((s, f) => s + C[f].n, 0);
+  const ate2 = C['1'].n + C['2'].n;
+  const contatos = `${titulo('📞 Vendas por quantidade de contatos')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+      <select onchange="setContatosFiltro(this.value)" style="font-size:13px;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);">
+        <option value="todas" ${filtro === 'todas' ? 'selected' : ''}>Todas as vendas</option><option value="trafego" ${filtro === 'trafego' ? 'selected' : ''}>Só tráfego pago</option><option value="remarketing" ${filtro === 'remarketing' ? 'selected' : ''}>Só remarketing</option></select>
+      <span style="font-size:12px;color:var(--ink-muted);">${base.length} venda(s) no filtro${informadas ? ` · ${pctDe(ate2, informadas)}% fecharam em até 2 contatos` : ''}</span></div>
+    ${informadas ? `<div class="table-wrap"><table><thead><tr><th>Contatos</th><th>Vendas</th><th>% das vendas</th><th></th><th>Faturamento</th><th>Ticket</th></tr></thead><tbody>
+      ${FAIXAS_CONTATOS.map(f => `<tr><td>${f}</td><td>${C[f].n}</td><td>${pctDe(C[f].n, informadas)}%</td>
+        <td style="min-width:90px;"><div style="height:8px;border-radius:4px;background:var(--border);overflow:hidden;"><div style="height:100%;width:${pctDe(C[f].n, informadas)}%;background:var(--rose);"></div></div></td>
+        <td>${BRL(C[f].receita)}</td><td>${C[f].n ? BRL(C[f].receita / C[f].n) : '—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${C.semInfo.n ? `<p style="font-size:12px;color:var(--ink-muted);margin-top:6px;">${C.semInfo.n} venda(s) sem quantidade de contatos informada ficam fora das porcentagens.</p>` : ''}`
+    : '<p style="color:var(--ink-muted);font-size:13px;">Nenhuma venda com quantidade de contatos informada neste filtro.</p>'}`;
+  return trafego + contatos;
 }
 
 // ============================================================
