@@ -3429,7 +3429,7 @@ function renderItensVenda() {
   const ref = c && c.produto_id ? catalogoComRotulos().find(x => x.produto_id === c.produto_id) : null;
   document.getElementById('vConviteInfo').innerHTML = c
     ? `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;">
-        ${ref?.foto ? `<img src="${escV(ref.foto)}" alt="" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">` : ''}
+        ${ref?.foto ? `<button type="button" class="btn btn-ghost btn-sm" onclick="verFotoConvite(this,'${escV(ref.foto)}')">👁 Ver foto</button>` : ''}
         <strong>${c.nome}${ref?.codigo ? ' #' + escV(ref.codigo) : ''}</strong><span style="color:var(--ink-muted)">Modelo: ${c.modelo || '—'} · Tema: ${c.tema || '—'} · ${BRL_RAW_plain(c.preco)}</span>
         <button type="button" class="btn btn-ghost btn-sm" onclick="limparConvite()">✕ Trocar</button></div>` : '';
   const opcoes = getAdicionaisDisponiveis();
@@ -3440,6 +3440,20 @@ function renderItensVenda() {
   document.getElementById('vAdicionalSelect').innerHTML = '<option value="">+ Adicionar adicional…</option>' +
     opcoes.map((o, i) => `<option value="${i}">${o.nome}${o.preco > 0 ? ' — ' + BRL_RAW_plain(o.preco) : ''}</option>`).join('');
   document.getElementById('vProduto').readOnly = !!c;
+}
+
+/** Nenhuma foto de produto é baixada sozinha no sistema de gestão: só quando você clica em 👁 */
+function verFotoSugestao(ev, btn) {
+  ev.preventDefault(); ev.stopPropagation();
+  const t = btn.parentElement.querySelector('.thumb-sug'), url = t?.dataset.foto;
+  if (!url) return;
+  t.innerHTML = `<img src="${escV(url)}" alt="" style="width:100%;height:100%;object-fit:cover">`;
+  btn.remove();
+}
+function verFotoConvite(btn, url) {
+  const img = document.createElement('img');
+  img.src = url; img.alt = ''; img.style.cssText = 'width:48px;height:48px;border-radius:8px;object-fit:cover;';
+  btn.replaceWith(img);
 }
 
 function onConviteInput() {
@@ -3453,7 +3467,7 @@ function onConviteInput() {
   _conviteSugestoes = getConvitesSite().filter(p => termos.every(t => normBuscaVenda(p.rotulo).includes(t))).slice(0, 30);
   el.innerHTML = _conviteSugestoes.length
     ? _conviteSugestoes.map((p, i) => `<div class="produto-sugestao-item" onmousedown="selecionarConvite(${i})" style="display:flex;align-items:center;gap:10px;">
-        <span style="width:40px;height:40px;border-radius:6px;overflow:hidden;background:var(--cream);flex:0 0 40px;display:flex;align-items:center;justify-content:center;">${p.foto ? `<img src="${escV(p.foto)}" alt="" style="width:100%;height:100%;object-fit:cover">` : '🎉'}</span>
+        <span class="thumb-sug" data-foto="${escV(p.foto || '')}" style="width:40px;height:40px;border-radius:6px;overflow:hidden;background:var(--cream);flex:0 0 40px;display:flex;align-items:center;justify-content:center;">🎉</span>${p.foto ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;" title="Carregar a foto" onmousedown="verFotoSugestao(event,this)">👁</button>` : ''}
         <span style="flex:1;min-width:0;">${escV(p.nome)}${p.codigo ? ` <span style="color:var(--ink-muted);font-size:11px;">#${escV(p.codigo)}</span>` : ''}</span>
         <span style="color:var(--ink-muted);font-size:11px;">${BRL_RAW_plain(p.preco)}</span></div>`).join('')
     : '<div class="produto-sugestao-item" style="color:var(--ink-muted)">Nenhum produto do catálogo encontrado</div>';
@@ -4247,6 +4261,12 @@ async function loadProdutosRemote() {
 // ── Render da aba Produtos ────────────────────────────────────────────────────
 const BRL_RAW_plain = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+/** Aba Produtos: a foto só é baixada quando você clica em "Ver foto" */
+function verFotoProdutoAdmin(btn, url) {
+  const box = btn.closest('.produto-admin-thumb'); if (!box) return;
+  box.innerHTML = `<img src="${escV(url)}" alt="">`;
+}
+
 function renderProdutos() {
   const grid = document.getElementById('produtosAdminGrid');
   if (!grid) return;
@@ -4259,7 +4279,10 @@ function renderProdutos() {
   grid.innerHTML = catalogoProdutos.map((p, idx) => `
     <div class="produto-admin-card">
       <div class="produto-admin-thumb">
-        ${p.foto ? `<img src="${p.foto}" alt="${p.nome}">` : '🎉'}
+        <div style="padding:8px;text-align:center;font-size:11px;line-height:1.35;color:var(--ink-light);">
+          <div style="font-size:22px;">🎉</div><b>${escV(p.nome)}</b><div>${escV(p.categoria || 'Sem categoria')}</div>
+          ${p.foto ? `<button type="button" class="btn btn-ghost btn-sm" style="margin-top:4px;" onclick="verFotoProdutoAdmin(this,'${escV(p.foto)}')">👁 Ver foto</button>` : ''}
+        </div>
       </div>
       <div class="produto-admin-info">
         <div class="produto-admin-nome">${p.nome}</div>
@@ -4306,7 +4329,7 @@ function abrirModalProduto(idx = null) {
     fotoInput.value = '';
   }
 
-  if (fotoInput.value) atualizarPreviewFoto(); else resetPreviewFoto();
+  if (fotoInput.value) mostrarPreviewSobDemanda(); else resetPreviewFoto();
 
   document.getElementById('modalProduto').classList.add('open');
   setTimeout(() => nomeInput.focus(), 100);
@@ -4326,6 +4349,13 @@ function atualizarPreviewFoto() {
     placeholder.innerHTML = '<span class="icon">⚠️</span>Não foi possível carregar essa imagem.<br>Confira se o link está correto.';
   };
   img.src = url;
+}
+
+/** Ao editar, a foto cadastrada não é baixada sozinha; digitar um novo link continua mostrando a prévia na hora */
+function mostrarPreviewSobDemanda() {
+  const img = document.getElementById('fotoPreviewImg'); img.style.display = 'none'; img.src = '';
+  const ph = document.getElementById('fotoPreviewPlaceholder'); ph.style.display = 'block';
+  ph.innerHTML = '<span class="icon">🖼️</span>Foto cadastrada<br><button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="atualizarPreviewFoto()">👁 Carregar prévia</button>';
 }
 
 function resetPreviewFoto() {
