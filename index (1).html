@@ -255,6 +255,11 @@
   .convite-editor-resize { position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; border:2px solid #fff; border-radius:4px; background:#7c3aed; box-shadow:0 1px 5px #0008; cursor:nwse-resize; touch-action:none; }
   .convite-editor-hotspot.selecionado { border-color:#fbbf24; box-shadow:0 0 0 2px #fbbf24aa; }
   .convite-list-card { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--border); }
+  .convite-search { width:100%; margin-bottom:10px; }
+  .convite-card-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .convite-status-badge { display:inline-flex; margin:6px 0; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+  .convite-status-badge.publicado { color:#167a48; background:#e8f7ee; }
+  .convite-status-badge.pausado { color:#9a5b00; background:#fff4d9; }
   .convite-public-link { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:7px; }
   .convite-public-link input { min-width:240px; flex:1; padding:7px 9px; font-size:11px; }
   .ajuda-foto-toggle { margin-top: 10px; font-size: 12.5px; font-weight: 600; color: var(--rose); cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -543,7 +548,8 @@
   .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
   /* Topbar mais compacta */
-  .topbar { padding: 12px 14px; flex-wrap: wrap; gap: 10px; }
+  :root { --topo-mobile: 22px; }
+  .topbar { padding: calc(env(safe-area-inset-top, 0px) + var(--topo-mobile)) 14px 12px; flex-wrap: wrap; gap: 10px; }
   .page-title { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar-right { gap: 6px; width: 100%; justify-content: flex-end; }
   .topbar-right .btn-sm { padding: 8px; font-size: 14px; min-width: 36px; justify-content: center; }
@@ -1179,7 +1185,7 @@
     </div>
     <div class="card">
       <div class="card-header"><span class="card-title">Convites salvos</span></div>
-      <div class="card-body" id="convitesDigitaisLista">Carregando...</div>
+      <div class="card-body"><input id="convitesDigitaisBusca" class="convite-search" type="search" placeholder="Buscar convite pelo nome ou aniversariante" oninput="renderListaConvitesDigitais()" aria-label="Buscar convites cinematográficos"><div id="convitesDigitaisLista">Carregando...</div></div>
     </div>
   </div>
 
@@ -1808,59 +1814,53 @@ async function loadFromFirebase() {
     db = firebase.firestore();
     setStatus('Conectando ao Firebase...');
 
-    const [vendasSnap, fluxoSnap, metasSnap] = await Promise.all([
-      db.collection('vendas').get(),
-      db.collection('config').doc('fluxo').get(),
-      db.collection('config').doc('metas').get(),
-    ]);
-
-    if (!vendasSnap.empty) { vendas = vendasSnap.docs.map(d=>{const data=d.data();vendaFirestoreDocRef.set(data,d.id);return data;}); vendaFirestoreIdPorId=new Map(vendasSnap.docs.map(d=>[String(d.data().id||d.id),d.id])); LS.set('vendas',vendas); }
-    if (fluxoSnap.exists) { fluxo = JSON.parse(fluxoSnap.data().data||'[]'); LS.set('fluxo',fluxo); }
-    if (metasSnap.exists) { metas = JSON.parse(metasSnap.data().data||'{}'); LS.set('metas',metas); }
-
-    await loadProdutosRemote();
-    await loadCatalogoModeloTemaVenda();
-    await loadListasConfigRemote();
-    await recalcularRankingSite();
-
-    db.collection('vendas').onSnapshot(snap => {
-      snap.docChanges().forEach(ch => {
-        if (ch.type==='added'||ch.type==='modified') {
-          const data=ch.doc.data(); vendaFirestoreDocRef.set(data,ch.doc.id); vendaFirestoreIdPorId.set(String(data.id||ch.doc.id),ch.doc.id);
-          const idx = vendas.findIndex(v=>v.id===data.id||v.id===ch.doc.id);
-          if (idx>=0) vendas[idx]=data; else vendas.unshift(data);
+    // A tela já está visível; a carga remota atualiza vendas/configurações em segundo plano.
+    let primeiraVendas=true, resolverVendas;
+    const vendasPronta=new Promise(resolve=>{resolverVendas=resolve;});
+    db.collection('vendas').onSnapshot(snap=>{
+      if(primeiraVendas){
+        primeiraVendas=false;
+        if(!snap.empty){
+          vendas=snap.docs.map(d=>{const data=d.data();vendaFirestoreDocRef.set(data,d.id);return data;});
+          vendaFirestoreIdPorId=new Map(snap.docs.map(d=>[String(d.data().id||d.id),d.id]));LS.set('vendas',vendas);
         }
-        if (ch.type==='removed') { vendas=vendas.filter(v=>v.id!==ch.doc.id); for (const [id,docId] of vendaFirestoreIdPorId) if(docId===ch.doc.id)vendaFirestoreIdPorId.delete(id); }
+        resolverVendas();updateTarefasBadge();return;
+      }
+      snap.docChanges().forEach(ch=>{
+        if(ch.type==='added'||ch.type==='modified'){
+          const data=ch.doc.data();vendaFirestoreDocRef.set(data,ch.doc.id);vendaFirestoreIdPorId.set(String(data.id||ch.doc.id),ch.doc.id);
+          const idx=vendas.findIndex(v=>v.id===data.id||v.id===ch.doc.id);if(idx>=0)vendas[idx]=data;else vendas.unshift(data);
+        }
+        if(ch.type==='removed'){vendas=vendas.filter(v=>v.id!==ch.doc.id);for(const [id,docId] of vendaFirestoreIdPorId)if(docId===ch.doc.id)vendaFirestoreIdPorId.delete(id);}
       });
       LS.set('vendas',vendas);
-      if (!snap.docChanges().some(ch => ch.doc.metadata.hasPendingWrites)) recalcularRankingSite();
-      // Só re-renderiza se NÃO for escrita local pendente (evita flickar status ao mudar)
-      const temPendingLocal = snap.docChanges().some(ch => ch.doc.metadata.hasPendingWrites);
-      if (!temPendingLocal && ['dashboard','vendas','tarefas'].includes(currentPage)) {
-        renderPage(currentPage);
-      }
+      if(!snap.docChanges().some(ch=>ch.doc.metadata.hasPendingWrites)&&['dashboard','vendas','tarefas'].includes(currentPage))renderPage(currentPage);
       updateTarefasBadge();
-    });
+    },err=>{console.warn('Listener de vendas:',err.message);resolverVendas();});
 
-    // Pedidos vindos do formulário externo — collection separada, NUNCA vira "venda"
-    // automaticamente. Segue o mesmo padrão seguro do listener de vendas acima:
-    // doc.id é sempre a chave de match, para não repetir o problema de IDs
-    // inconsistentes que já corrompeu dados no passado (extensão Chrome).
-    db.collection('pedidos_pendentes').where('status','==','pendente').onSnapshot(snap => {
-      pedidosPendentesForm = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
-      const temPendingLocal = snap.docChanges().some(ch => ch.doc.metadata.hasPendingWrites);
-      if (!temPendingLocal && currentPage === 'tarefas') renderTarefas();
-      updateTarefasBadge();
-    }, err => {
-      // Coleção pode não existir ainda (nenhum formulário preenchido até agora) — não é erro real
-      console.warn('Listener de pedidos_pendentes:', err.message);
-    });
+    const cargaConfiguracoes=Promise.all([
+      db.collection('config').doc('fluxo').get(),
+      db.collection('config').doc('metas').get()
+    ]);
+    const [configSnapshots]=await Promise.all([cargaConfiguracoes,Promise.race([vendasPronta,new Promise(resolve=>setTimeout(resolve,10000))])]);
+    const [fluxoSnap,metasSnap]=configSnapshots;
+    if(fluxoSnap.exists){fluxo=JSON.parse(fluxoSnap.data().data||'[]');LS.set('fluxo',fluxo);}
+    if(metasSnap.exists){metas=JSON.parse(metasSnap.data().data||'{}');LS.set('metas',metas);}
 
-    setStatus(''); hideLoading();
-  } catch(e) {
-    console.warn('Firebase falhou:', e);
-    setStatus('⚠️ Offline — dados locais'); hideLoading();
-  }
+    db.collection('pedidos_pendentes').where('status','==','pendente').onSnapshot(snap=>{
+      pedidosPendentesForm=snap.docs.map(d=>({...d.data(),_docId:d.id}));
+      const temPendingLocal=snap.docChanges().some(ch=>ch.doc.metadata.hasPendingWrites);
+      if(!temPendingLocal&&currentPage==='tarefas')renderTarefas();updateTarefasBadge();
+    },err=>console.warn('Listener de pedidos_pendentes:',err.message));
+
+    setStatus('');hideLoading();
+    // Produtos, modelos/temas e listas não bloqueiam a abertura da interface.
+    Promise.allSettled([loadProdutosRemote(),loadCatalogoModeloTemaVenda(),loadListasConfigRemote()]).then(()=>{
+      renderSeletoresModeloTemaVenda();
+      if(['dashboard','vendas','tarefas','produtos'].includes(currentPage))renderPage(currentPage);
+      recalcularRankingSite().catch(e=>console.warn('Não foi possível atualizar a ordem de mais vendidos:',e));
+    });
+  }catch(e){console.warn('Firebase falhou:',e);setStatus('⚠️ Offline — dados locais');hideLoading();}
 }
 
 function setStatus(msg) {
@@ -5467,24 +5467,18 @@ function confirmarEntregaFinal(id) {
 // INIT
 // ============================================================
 async function init() {
-  if (!metas['2026-05']) { metas['2026-05'] = { receita:14300, vendas:313, roi: 5, cac: 20, dias:31 }; }
+  if (!metas['2026-05']) metas['2026-05']={receita:14300,vendas:313,roi:5,cac:20,dias:31};
   saveLocal();
+  document.getElementById('fluxoData').value=today();
 
-  if (firebaseConfigured) {
-    await loadFromFirebase();
-  } else {
-    setStatus('Firebase não configurado — dados locais');
-    hideLoading();
-  }
+  // Desenha a estrutura com o cache local antes de iniciar qualquer leitura remota.
+  updateTarefasBadge();initOcultarValores();initTheme();initCorPersonalizada();renderDashboard();hideLoading();
+  if(firebaseConfigured){
+    loadFromFirebase().then(()=>{renderPage(currentPage);updateTarefasBadge();}).catch(e=>console.warn('Falha na atualização em segundo plano:',e));
+  }else setStatus('Firebase não configurado — dados locais');
 
-  document.getElementById('fluxoData').value = today();
-  
-  await verificarBackupDiario();
-  updateTarefasBadge();
-  initOcultarValores();
-  initTheme();
-  initCorPersonalizada();
-  renderDashboard();
+  // O backup diário também fica fora do caminho crítico da abertura.
+  setTimeout(()=>{verificarBackupDiario().catch(e=>console.warn('Falha no backup diário:',e));},4000);
 }
 
 // ============================================================
@@ -5522,7 +5516,10 @@ function closeSidebarMobile() {
   document.getElementById('sidebarOverlay').classList.remove('active');
 }
 
+let acessoGestaoLiberado = false;
 function liberarAcesso() {
+  if(acessoGestaoLiberado)return;
+  acessoGestaoLiberado=true;
   const overlay = document.getElementById('loginOverlay');
   overlay.style.opacity = '0';
   setTimeout(() => {
@@ -5921,18 +5918,49 @@ function escapeConvite(value) {
 function linkPublicoConvite(id) { return `${CONVITE_PUBLIC_BASE}convite-interativo.html?e=${encodeURIComponent(id)}`; }
 function linkPublicoSugestao(id) { return `${CONVITE_PUBLIC_BASE}sugestao-presente.html?e=${encodeURIComponent(id)}`; }
 function renderConvitesDigitais() {
-  const area = document.getElementById('convitesDigitaisLista');
-  if (!area) return;
-  if (!db) { area.textContent = 'Firebase indisponível.'; return; }
-  area.textContent = 'Carregando convites...';
-  return Promise.all([db.collection('convitesDigitais').orderBy('updatedAt','desc').get(),db.collection('events').orderBy('createdAt','desc').get()]).then(([snapshot,eventSnapshot]) => {
-    convitesDigitaisCache = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
-    eventosConviteCache = eventSnapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
+  const area=document.getElementById('convitesDigitaisLista');
+  if(!area)return;
+  if(!db){area.textContent='Firebase indisponível.';return;}
+  area.textContent='Carregando convites...';
+  return Promise.all([db.collection('convitesDigitais').orderBy('updatedAt','desc').get(),db.collection('events').orderBy('createdAt','desc').get()]).then(([snapshot,eventSnapshot])=>{
+    convitesDigitaisCache=snapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
+    eventosConviteCache=eventSnapshot.docs.map(doc=>({id:doc.id,...doc.data()}));
     const select=document.getElementById('conviteEventoSelect');
     if(select){const selected=select.value;select.innerHTML='<option value="">Convite independente (sem evento RSVP)</option>'+eventosConviteCache.map(ev=>`<option value="${escapeConvite(ev.id)}">${escapeConvite(ev.name||ev.id)}${ev.date?` · ${escapeConvite(ev.date)}`:''}</option>`).join('');if(eventosConviteCache.some(ev=>ev.id===selected))select.value=selected;}
-    if (!convitesDigitaisCache.length) { area.innerHTML = '<p class="muted">Nenhum convite criado ainda.</p>'; return; }
-    area.innerHTML = convitesDigitaisCache.map(item => `<article class="convite-list-card"><div><strong>${escapeConvite(item.nome || 'Convite sem nome')}</strong><div class="muted">${(item.links || []).length} link(s) interativo(s)</div><a class="convite-public-link" href="${escapeConvite(item.publicUrl||linkPublicoConvite(item.id))}" target="_blank" rel="noopener">Abrir convite público</a>${item.presentesUrl?`<a class="convite-public-link" href="${escapeConvite(item.suggestionUrl||linkPublicoSugestao(item.id))}" target="_blank" rel="noopener">Abrir sugestão de presentes</a>`:''}</div><div class="convite-card-actions"><button class="btn btn-ghost btn-sm" onclick="editarConviteDigital('${escapeConvite(item.id)}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="copiarConviteDigital('${escapeConvite(item.id)}')">Copiar link</button></div></article>`).join('');
-  }).catch(error => { console.error(error); area.textContent = 'Não foi possível carregar os convites. Verifique sua conexão e as regras do Firestore.'; });
+    renderListaConvitesDigitais();
+  }).catch(error=>{console.error(error);area.textContent='Não foi possível carregar os convites. Verifique sua conexão e as regras do Firestore.';});
+}
+function renderListaConvitesDigitais(){
+  const area=document.getElementById('convitesDigitaisLista');if(!area)return;
+  if(!convitesDigitaisCache.length){area.innerHTML='<p class="muted">Nenhum convite criado ainda.</p>';return;}
+  const termo=(document.getElementById('convitesDigitaisBusca')?.value||'').trim().toLocaleLowerCase('pt-BR');
+  const filtrados=convitesDigitaisCache.filter(item=>`${item.nome||''} ${item.aniversariante||''} ${item.local||''}`.toLocaleLowerCase('pt-BR').includes(termo));
+  if(!filtrados.length){area.innerHTML='<p class="muted">Nenhum convite encontrado para essa busca.</p>';return;}
+  area.innerHTML=filtrados.map(item=>{
+    const pausado=item.publicado===false;
+    const id=escapeConvite(item.id);
+    return `<article class="convite-list-card"><div><strong>${escapeConvite(item.nome||'Convite sem nome')}</strong><br><span class="convite-status-badge ${pausado?'pausado':'publicado'}">${pausado?'Pausado':'Publicado'}</span><div class="muted">${(item.links||[]).length} link(s) interativo(s)</div><a class="convite-public-link" href="${escapeConvite(item.publicUrl||linkPublicoConvite(item.id))}" target="_blank" rel="noopener">Abrir convite público</a>${item.presentesUrl?`<a class="convite-public-link" href="${escapeConvite(item.suggestionUrl||linkPublicoSugestao(item.id))}" target="_blank" rel="noopener">Abrir sugestão de presentes</a>`:''}</div><div class="convite-card-actions"><button class="btn btn-ghost btn-sm" onclick="editarConviteDigital('${id}')">Editar</button><button class="btn btn-ghost btn-sm" onclick="copiarConviteDigital('${id}')">Copiar link</button><button class="btn btn-ghost btn-sm" onclick="alterarPublicacaoConvite('${id}',${pausado?'true':'false'})">${pausado?'Republicar':'Pausar'}</button><button class="btn btn-danger btn-sm" onclick="excluirConviteDigital('${id}')">Excluir</button></div></article>`;
+  }).join('');
+}
+async function alterarPublicacaoConvite(id,publicar){
+  const item=convitesDigitaisCache.find(x=>x.id===id);if(!item||!db)return;
+  try{
+    await db.collection('convitesDigitais').doc(id).set({publicado:!!publicar,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    item.publicado=!!publicar;renderListaConvitesDigitais();
+  }catch(error){console.error(error);alert('Não foi possível '+(publicar?'republicar':'pausar')+' o convite. Verifique sua conexão e tente novamente.');}
+}
+async function excluirConviteDigital(id){
+  const item=convitesDigitaisCache.find(x=>x.id===id);if(!item||!db)return;
+  if(!confirm(`Excluir o convite “${item.nome||'Convite sem nome'}”? Essa ação não pode ser desfeita.`))return;
+  try{
+    const eventos=await db.collection('events').where('conviteId','==',id).get();
+    const batch=db.batch();batch.delete(db.collection('convitesDigitais').doc(id));
+    eventos.docs.forEach(doc=>batch.set(doc.ref,{conviteId:firebase.firestore.FieldValue.delete(),convitePublicUrl:firebase.firestore.FieldValue.delete(),suggestionUrl:firebase.firestore.FieldValue.delete(),conviteUpdatedAt:firebase.firestore.FieldValue.delete()},{merge:true}));
+    await batch.commit();
+    convitesDigitaisCache=convitesDigitaisCache.filter(x=>x.id!==id);
+    eventosConviteCache=eventosConviteCache.map(ev=>ev.conviteId===id?{...ev,conviteId:null,convitePublicUrl:null,suggestionUrl:null}:ev);
+    renderListaConvitesDigitais();
+  }catch(error){console.error(error);alert('Não foi possível excluir o convite. Verifique sua conexão e tente novamente.');}
 }
 function previewMidiaConvite(tipo) {
   const input = document.getElementById(`convite${tipo[0].toUpperCase()+tipo.slice(1)}File`);
@@ -6060,7 +6088,7 @@ async function salvarConviteDigital() {
     const anterior=convitesDigitaisCache.find(x=>x.id===id);
     const capaUrl=document.getElementById('conviteCapaUrl').value,videoUrl=document.getElementById('conviteVideoUrl').value,presentesUrl=document.getElementById('convitePresentesUrl').value;
     const conviteUrl=linkPublicoConvite(id),sugestaoUrl=presentesUrl?linkPublicoSugestao(id):'';
-    const dados={eventId:selectedEventId||anterior?.eventId||null,nome,eventName:nome,aniversariante:document.getElementById('conviteDigitalAniversariante').value.trim(),local:document.getElementById('conviteDigitalLocal').value.trim(),date:document.getElementById('conviteDigitalData').value,time:document.getElementById('conviteDigitalHora').value,info:document.getElementById('conviteDigitalInfo').value.trim(),capaUrl,videoUrl,presentesUrl,publicUrl:conviteUrl,suggestionUrl:sugestaoUrl,suggestionPosition:{...conviteSugestaoPosicao},suggestionPositionCapa:{...conviteSugestaoPosicaoCapa},suggestionOnde:conviteSugestaoOnde,links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),onde:l.onde==='capa'?'capa':'video',x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const dados={eventId:selectedEventId||anterior?.eventId||null,nome,eventName:nome,aniversariante:document.getElementById('conviteDigitalAniversariante').value.trim(),local:document.getElementById('conviteDigitalLocal').value.trim(),date:document.getElementById('conviteDigitalData').value,time:document.getElementById('conviteDigitalHora').value,info:document.getElementById('conviteDigitalInfo').value.trim(),capaUrl,videoUrl,presentesUrl,publicUrl:conviteUrl,suggestionUrl:sugestaoUrl,publicado:anterior?.publicado!==false,suggestionPosition:{...conviteSugestaoPosicao},suggestionPositionCapa:{...conviteSugestaoPosicaoCapa},suggestionOnde:conviteSugestaoOnde,links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),onde:l.onde==='capa'?'capa':'video',x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     const batch=db.batch();batch.set(db.collection('convitesDigitais').doc(id),dados,{merge:true});
     const eventId=dados.eventId,previousEventId=anterior?.eventId;
     const eventRefs=[...new Set([eventId,previousEventId].filter(Boolean))].map(value=>({id:value,ref:db.collection('events').doc(value)}));
