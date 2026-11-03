@@ -25,6 +25,8 @@
   .guest .top{display:flex;justify-content:space-between;align-items:center}
   .guest b{font-size:.95rem}
   .guest .detail{font-size:.8rem;color:var(--muted);margin-top:4px}
+  .guest-actions{display:flex;justify-content:flex-end;margin-top:9px}
+  .btn-delete{background:#fff;color:var(--danger);border:1px solid #efc5c1;border-radius:8px;padding:7px 10px;font-size:.78rem;font-weight:700;cursor:pointer}
   .badge{padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap}
   .badge.confirmado{background:#fff4e0;color:var(--warn)}
   .badge.entrada_realizada{background:#e6f8ea;color:var(--ok)}
@@ -36,6 +38,8 @@
   .scan-result.error{background:#fdecea;color:var(--danger)}
   .scan-result h3{margin:.2em 0}
   .btn{background:var(--p);color:#fff;border:none;padding:12px 18px;border-radius:10px;font-weight:700;cursor:pointer;font-size:.9rem}
+  .toolbar{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+  .toolbar .btn{padding:9px 12px;font-size:.82rem}
   .recent{margin-top:18px}
   .recent h4{color:var(--muted);font-size:.8rem;text-transform:uppercase;margin-bottom:8px}
   #access-denied,#loading{padding:80px 20px;text-align:center;color:var(--muted)}
@@ -67,6 +71,7 @@
         <div class="stat"><b id="st-pessoas">0</b><span>pessoas</span></div>
         <div class="stat"><b id="st-checkin">0</b><span>já entraram</span></div>
       </div>
+      <div class="toolbar"><button class="btn" onclick="baixarListaConfirmacoes()">⬇ Baixar lista de confirmações</button></div>
       <input id="search" placeholder="Buscar convidado...">
       <div id="guest-list"></div>
     </div>
@@ -161,22 +166,59 @@ function statusLabel(s) {
 function renderList() {
   const term = (document.getElementById("search").value || "").toLowerCase();
   const list = document.getElementById("guest-list");
-  const filtered = allGuests.filter(g => (g.responsavelNome || "").toLowerCase().includes(term));
+  const filtered = allGuests.filter(g => g.status !== "cancelado" && (g.responsavelNome || "").toLowerCase().includes(term));
   if (!filtered.length) { list.innerHTML = "<p style='color:var(--muted)'>Nenhum convidado encontrado.</p>"; return; }
 
   list.innerHTML = filtered.map(g => {
-    const acomp = (g.acompanhantes || []).map(a => a.nome).join(", ");
-    const crianca = (g.criancas || []).map(c => `${c.nome}${c.idade ? " (" + c.idade + "a)" : ""}`).join(", ");
+    const acomp = (g.acompanhantes || []).map(a => escapeHtml(a.nome)).join(", ");
+    const crianca = (g.criancas || []).map(c => `${escapeHtml(c.nome)}${c.idade ? " (" + escapeHtml(c.idade) + "a)" : ""}`).join(", ");
     return `<div class="guest">
       <div class="top">
-        <b>${g.responsavelNome}</b>
-        <span class="badge ${g.status}">${statusLabel(g.status)}</span>
+        <b>${escapeHtml(g.responsavelNome)}</b>
+        <span class="badge ${escapeHtml(g.status)}">${escapeHtml(statusLabel(g.status))}</span>
       </div>
-      <div class="detail">${g.totalPessoas} pessoa(s)${acomp ? " · Acomp: " + acomp : ""}${crianca ? " · Crianças: " + crianca : ""}</div>
+      <div class="detail">${Number(g.totalPessoas) || 1} pessoa(s)${acomp ? " · Acomp: " + acomp : ""}${crianca ? " · Crianças: " + crianca : ""}</div>
+      ${g.status !== "cancelado" ? `<div class="guest-actions"><button class="btn-delete" onclick="cancelarConfirmacao('${escapeHtml(g.id)}')">Excluir confirmação</button></div>` : ""}
     </div>`;
   }).join("");
 }
 document.getElementById("search")?.addEventListener("input", renderList);
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+window.cancelarConfirmacao = async function (guestId) {
+  const guest = allGuests.find(g => g.id === guestId);
+  if (!guest || guest.status === "cancelado") return;
+  if (!confirm(`Excluir a confirmação de ${guest.responsavelNome || "este convidado"}? O registro será preservado como cancelado.`)) return;
+  try {
+    await updateDoc(doc(db, "events", eventId, "guests", guestId), { status: "cancelado", canceladoEm: Date.now() });
+  } catch (e) {
+    alert("Não foi possível excluir a confirmação. Verifique as regras de segurança do Firestore e tente novamente.");
+    console.error("Falha ao cancelar confirmação:", e);
+  }
+};
+
+function csvCell(value) { return '"' + String(value ?? '').replace(/"/g, '""') + '"'; }
+
+window.baixarListaConfirmacoes = function () {
+  const rows = [["Responsável", "WhatsApp", "Acompanhantes", "Crianças", "Total de pessoas", "Status", "Data da confirmação", "Check-in"]];
+  allGuests.filter(g => g.status !== "cancelado").forEach(g => {
+    const acompanhantes = (g.acompanhantes || []).map(a => a.nome).filter(Boolean).join("; ");
+    const criancas = (g.criancas || []).map(c => `${c.nome || ""}${c.idade ? ` (${c.idade} anos)` : ""}`).join("; ");
+    const confirmadoEm = g.confirmadoEm ? new Date(g.confirmadoEm).toLocaleString("pt-BR") : "";
+    const checkin = g.status === "entrada_realizada" ? (g.checkin?.data && g.checkin?.hora ? `${g.checkin.data} ${g.checkin.hora}` : "Sim") : "Não";
+    rows.push([g.responsavelNome, g.telefone, acompanhantes, criancas, Number(g.totalPessoas) || 1, statusLabel(g.status), confirmadoEm, checkin]);
+  });
+  const csv = "\uFEFF" + rows.map(row => row.map(csvCell).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `confirmacoes-${(document.getElementById("ev-name").textContent || "evento").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 function renderRecentCheckins() {
   const el = document.getElementById("recent-list");
