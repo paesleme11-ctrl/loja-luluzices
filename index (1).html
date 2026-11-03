@@ -1164,6 +1164,7 @@
           <section>
             <h3 style="font-size:16px;margin:0 0 6px">Editor de posição</h3>
             <p class="muted" style="margin:0 0 10px">Escolha Capa ou Vídeo e arraste os marcadores no quadro. No vídeo, use os controles para escolher o trecho de referência.</p>
+            <label style="display:block;margin:0 0 10px">Sugestão de presentes aparece em<select id="conviteSugestaoOnde" onchange="alterarSugestaoOnde()"><option value="video">Vídeo</option><option value="capa">Capa</option><option value="ambos">Capa e vídeo</option></select></label>
             <div style="display:flex;gap:8px;justify-content:center;margin:0 0 10px"><button type="button" id="btnModoConviteCapa" class="btn btn-sm btn-ghost" onclick="setModoEditorConvite('capa')">Ver capa</button><button type="button" id="btnModoConviteVideo" class="btn btn-sm btn-primary" onclick="setModoEditorConvite('video')">Ver vídeo</button></div>
             <div id="conviteEditorStage" class="convite-editor-stage"><div class="muted">Envie a capa ou o vídeo para posicionar os links.</div></div>
           </section>
@@ -5910,6 +5911,8 @@ let conviteDigitalLinks = [];
 let conviteArraste = null;
 let conviteEditorModo = 'video';
 let conviteSugestaoPosicao = { x:38, y:76, w:35, h:10 };
+let conviteSugestaoPosicaoCapa = { x:38, y:80, w:35, h:10 };
+let conviteSugestaoOnde = 'video';
 const CONVITE_PUBLIC_BASE = RSVP_BASE;
 
 function escapeConvite(value) {
@@ -5945,7 +5948,7 @@ function novoConviteDigital() {
   ['conviteDigitalAniversariante','conviteDigitalLocal','conviteDigitalData','conviteDigitalHora','conviteDigitalInfo'].forEach(id => document.getElementById(id).value='');
   document.getElementById('conviteEventoSelect').value='';
   ['conviteCapaFile','conviteVideoFile','convitePresentesFile'].forEach(id => document.getElementById(id).value='');
-  conviteDigitalLinks=[]; conviteArraste=null; conviteEditorModo='video'; conviteSugestaoPosicao={x:38,y:76,w:35,h:10};
+  conviteDigitalLinks=[]; conviteArraste=null; conviteEditorModo='video'; conviteSugestaoPosicao={x:38,y:76,w:35,h:10}; conviteSugestaoPosicaoCapa={x:38,y:80,w:35,h:10}; conviteSugestaoOnde='video'; sincronizarExtrasConvite();
   document.getElementById('conviteDigitalFormTitle').textContent='💌 Novo convite interativo';
   document.getElementById('conviteDigitalMsg').textContent='';
   document.getElementById('conviteDigitalUploadStatus').textContent='';
@@ -5970,6 +5973,9 @@ function adicionarLinkConvite(link={}) {
 }
 function atualizarLinkConvite(index,key,value) { if (conviteDigitalLinks[index]) conviteDigitalLinks[index][key]=value; renderEditorConvite(); }
 function removerLinkConvite(index) { conviteDigitalLinks.splice(index,1); renderLinksConvite(); }
+function sincronizarExtrasConvite() { const select=document.getElementById('conviteSugestaoOnde'); if(select)select.value=conviteSugestaoOnde; }
+function alterarSugestaoOnde() { conviteSugestaoOnde=document.getElementById('conviteSugestaoOnde')?.value||'video'; renderEditorConvite(); }
+function posicaoSugestaoAtual() { return conviteEditorModo==='capa'?conviteSugestaoPosicaoCapa:conviteSugestaoPosicao; }
 function atualizarToggleModoConvite() {
   const capa=document.getElementById('btnModoConviteCapa'),video=document.getElementById('btnModoConviteVideo');
   if(capa)capa.className='btn btn-sm '+(conviteEditorModo==='capa'?'btn-primary':'btn-ghost');
@@ -5995,16 +6001,16 @@ function renderEditorConvite() {
   const capaSrc=capaFile ? URL.createObjectURL(capaFile) : document.getElementById('conviteCapaUrl')?.value;
   const giftFile=document.getElementById('convitePresentesFile')?.files?.[0];
   const giftUrl=giftFile?URL.createObjectURL(giftFile):document.getElementById('convitePresentesUrl')?.value;
-  const pos=conviteSugestaoPosicao, modo=conviteEditorModo; atualizarToggleModoConvite();
+  const pos=posicaoSugestaoAtual(), modo=conviteEditorModo; atualizarToggleModoConvite();
   const hotspot=(link,index)=>`<div class="convite-editor-hotspot" role="button" tabindex="0" data-index="${index}" style="left:${Math.min(100,Math.max(0,link.x))}%;top:${Math.min(100,Math.max(0,link.y))}%;width:${Math.min(70,Math.max(8,link.w))}%;height:${Math.min(30,Math.max(5,link.h))}%" title="Arraste para mover; use o puxador para redimensionar"><span>${escapeConvite(link.label||`Link ${index+1}`)}</span><i class="convite-editor-resize" data-resize-handle aria-hidden="true"></i></div>`;
   const mediaMarkup=modo==='capa'?(capaSrc?'<img class="convite-stage-capa" src="'+escapeConvite(capaSrc)+'" alt="Capa do convite">':'<div class="muted">Envie a capa para posicionar os links.</div>'):videoSrc?'<video class="convite-stage-video" src="'+escapeConvite(videoSrc)+'" controls muted playsinline></video>':'<div class="muted">Envie o vídeo para posicionar os links.</div>';
   const linksMarkup=conviteDigitalLinks.map((l,i)=>(l.onde||'video')===modo?hotspot(l,i):'').join('');
-  const suggestionMarkup=modo==='video'&&giftUrl?'<div class="convite-editor-hotspot convite-editor-sugestao" role="button" tabindex="0" data-suggestion-hotspot="true" style="left:'+Math.min(100,Math.max(0,pos.x))+'%;top:'+Math.min(100,Math.max(0,pos.y))+'%;width:'+Math.min(70,Math.max(8,pos.w))+'%;height:'+Math.min(30,Math.max(5,pos.h))+'%" title="Arraste para mover; use o puxador para redimensionar"><span>🎁 Sugestão de presentes</span><i class="convite-editor-resize" data-resize-handle aria-hidden="true"></i></div>':'';
+  const suggestionMarkup=giftUrl&&(conviteSugestaoOnde==='ambos'||conviteSugestaoOnde===modo)?'<div class="convite-editor-hotspot convite-editor-sugestao" role="button" tabindex="0" data-suggestion-hotspot="true" style="left:'+Math.min(100,Math.max(0,pos.x))+'%;top:'+Math.min(100,Math.max(0,pos.y))+'%;width:'+Math.min(70,Math.max(8,pos.w))+'%;height:'+Math.min(30,Math.max(5,pos.h))+'%" title="Arraste para mover; use o puxador para redimensionar"><span>🎁 Sugestão de presentes</span><i class="convite-editor-resize" data-resize-handle aria-hidden="true"></i></div>':'';
   stage.innerHTML=mediaMarkup+linksMarkup+suggestionMarkup;
   stage.querySelectorAll('.convite-editor-hotspot').forEach(box=>box.addEventListener('pointerdown',event=>{
     event.preventDefault();box.setPointerCapture(event.pointerId);
     const bounds=box.getBoundingClientRect(),isSuggestion=box.hasAttribute('data-suggestion-hotspot');
-    const position=isSuggestion?conviteSugestaoPosicao:conviteDigitalLinks[+box.dataset.index];
+    const position=isSuggestion?posicaoSugestaoAtual():conviteDigitalLinks[+box.dataset.index];
     conviteArraste={kind:isSuggestion?'suggestion':'link',index:+box.dataset.index,mode:event.target.closest('[data-resize-handle]')?'resize':'move',offsetX:event.clientX-bounds.left,offsetY:event.clientY-bounds.top,startX:event.clientX,startY:event.clientY,startW:position.w,startH:position.h};
   }));
   stage.onpointermove=event=>{
@@ -6013,7 +6019,7 @@ function renderEditorConvite() {
     if(conviteArraste.frame)cancelAnimationFrame(conviteArraste.frame);
     conviteArraste.frame=requestAnimationFrame(()=>{
       const drag=conviteArraste;if(!drag)return;
-      const rect=stage.getBoundingClientRect(),position=drag.kind==='suggestion'?conviteSugestaoPosicao:conviteDigitalLinks[drag.index];if(!position)return;
+      const rect=stage.getBoundingClientRect(),position=drag.kind==='suggestion'?posicaoSugestaoAtual():conviteDigitalLinks[drag.index];if(!position)return;
       if(drag.mode==='resize'){
         position.w=Math.max(8,Math.min(70,drag.startW+(pointerX-drag.startX)/rect.width*100));
         position.h=Math.max(5,Math.min(30,drag.startH+(pointerY-drag.startY)/rect.height*100));
@@ -6054,7 +6060,7 @@ async function salvarConviteDigital() {
     const anterior=convitesDigitaisCache.find(x=>x.id===id);
     const capaUrl=document.getElementById('conviteCapaUrl').value,videoUrl=document.getElementById('conviteVideoUrl').value,presentesUrl=document.getElementById('convitePresentesUrl').value;
     const conviteUrl=linkPublicoConvite(id),sugestaoUrl=presentesUrl?linkPublicoSugestao(id):'';
-    const dados={eventId:selectedEventId||anterior?.eventId||null,nome,eventName:nome,aniversariante:document.getElementById('conviteDigitalAniversariante').value.trim(),local:document.getElementById('conviteDigitalLocal').value.trim(),date:document.getElementById('conviteDigitalData').value,time:document.getElementById('conviteDigitalHora').value,info:document.getElementById('conviteDigitalInfo').value.trim(),capaUrl,videoUrl,presentesUrl,publicUrl:conviteUrl,suggestionUrl:sugestaoUrl,suggestionPosition:{...conviteSugestaoPosicao},links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),onde:l.onde==='capa'?'capa':'video',x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const dados={eventId:selectedEventId||anterior?.eventId||null,nome,eventName:nome,aniversariante:document.getElementById('conviteDigitalAniversariante').value.trim(),local:document.getElementById('conviteDigitalLocal').value.trim(),date:document.getElementById('conviteDigitalData').value,time:document.getElementById('conviteDigitalHora').value,info:document.getElementById('conviteDigitalInfo').value.trim(),capaUrl,videoUrl,presentesUrl,publicUrl:conviteUrl,suggestionUrl:sugestaoUrl,suggestionPosition:{...conviteSugestaoPosicao},suggestionPositionCapa:{...conviteSugestaoPosicaoCapa},suggestionOnde:conviteSugestaoOnde,links:conviteDigitalLinks.map(l=>({label:l.label.trim(),url:l.url.trim(),onde:l.onde==='capa'?'capa':'video',x:+l.x,y:+l.y,w:+l.w,h:+l.h})),createdAt:anterior?.createdAt||firebase.firestore.FieldValue.serverTimestamp(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     const batch=db.batch();batch.set(db.collection('convitesDigitais').doc(id),dados,{merge:true});
     const eventId=dados.eventId,previousEventId=anterior?.eventId;
     const eventRefs=[...new Set([eventId,previousEventId].filter(Boolean))].map(value=>({id:value,ref:db.collection('events').doc(value)}));
@@ -6074,7 +6080,10 @@ async function editarConviteDigital(id) {
   [['capa',item.capaUrl],['video',item.videoUrl],['presentes',item.presentesUrl]].forEach(([tipo,url])=>{const key=tipo[0].toUpperCase()+tipo.slice(1);document.getElementById(`convite${key}Url`).value=url||'';document.getElementById(`convite${key}File`).value='';});
   conviteDigitalLinks=(item.links||[]).map(l=>({...l,onde:l.onde==='capa'?'capa':'video',id:`link-${Math.random().toString(36).slice(2)}`}));
   conviteEditorModo='video';
+  conviteSugestaoOnde=['capa','ambos'].includes(item.suggestionOnde)?item.suggestionOnde:'video';
+  const suggestionPositionCapa=item.suggestionPositionCapa||{};conviteSugestaoPosicaoCapa={x:Number.isFinite(+suggestionPositionCapa.x)?+suggestionPositionCapa.x:38,y:Number.isFinite(+suggestionPositionCapa.y)?+suggestionPositionCapa.y:80,w:+suggestionPositionCapa.w||35,h:+suggestionPositionCapa.h||10};
   conviteSugestaoPosicao=item.suggestionPosition&&Number.isFinite(+item.suggestionPosition.x)&&Number.isFinite(+item.suggestionPosition.y)?{x:+item.suggestionPosition.x,y:+item.suggestionPosition.y,w:+item.suggestionPosition.w||35,h:+item.suggestionPosition.h||10}:{x:38,y:76,w:35,h:10};
+  sincronizarExtrasConvite();
   document.getElementById('conviteDigitalFormTitle').textContent=`💌 Editar: ${item.nome||'Convite'}`;document.getElementById('btnAbrirConviteDigital').style.display='';document.getElementById('conviteDigitalMsg').textContent='';
   ['capa','video','presentes'].forEach(previewMidiaConvite);renderLinksConvite();document.getElementById('page-convitesdigitais').scrollIntoView({behavior:'smooth'});
 }
