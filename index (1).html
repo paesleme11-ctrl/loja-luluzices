@@ -255,6 +255,11 @@
   .convite-editor-resize { position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; border:2px solid #fff; border-radius:4px; background:#7c3aed; box-shadow:0 1px 5px #0008; cursor:nwse-resize; touch-action:none; }
   .convite-editor-hotspot.selecionado { border-color:#fbbf24; box-shadow:0 0 0 2px #fbbf24aa; }
   .convite-list-card { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; border-bottom:1px solid var(--border); }
+  .modelo-tema-picker { position:relative; }
+  .modelo-tema-opcoes { position:absolute; z-index:200; top:calc(100% + 4px); left:0; right:0; max-height:260px; overflow:auto; padding:5px; border:1px solid var(--border); border-radius:10px; background:var(--surface,#fff); box-shadow:0 8px 24px #0002; }
+  .modelo-tema-opcoes button { display:block; width:100%; padding:9px 10px; border:0; border-radius:6px; background:transparent; color:var(--ink); text-align:left; cursor:pointer; font:inherit; }
+  .modelo-tema-opcoes button:hover,.modelo-tema-opcoes button[aria-selected="true"] { background:var(--cream); }
+  .modelo-tema-opcoes .muted { padding:8px 10px; }
   .convite-search { width:100%; margin-bottom:10px; }
   .convite-card-actions { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .convite-status-badge { display:inline-flex; margin:6px 0; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; }
@@ -1352,8 +1357,8 @@
         <div class="form-group"><label>Contato (DDD + número)</label><input type="text" id="vContato" placeholder="Ex: 11 99999-0000"></div>
       </div>
       <div class="form-row cols-2">
-        <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><input id="vModeloBusca" list="vModelosDisponiveis" placeholder="Digite para buscar um modelo" autocomplete="off" oninput="sincronizarBuscaModeloTemaVenda('modelo')"><datalist id="vModelosDisponiveis"></datalist><select id="vModelo" onchange="aoAlterarModeloTemaVenda('modelo')" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Selecione o modelo</option></select></div>
-        <div class="form-group"><label for="vTemaBusca">Tema <span class="muted">(opcional)</span></label><input id="vTemaBusca" list="vTemasDisponiveis" placeholder="Digite para buscar ou deixe em branco" autocomplete="off" oninput="sincronizarBuscaModeloTemaVenda('tema')"><datalist id="vTemasDisponiveis"></datalist><select id="vTema" onchange="aoAlterarModeloTemaVenda('tema')" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Sem tema</option></select></div>
+        <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><div class="modelo-tema-picker"><input id="vModeloBusca" placeholder="Digite ou escolha um modelo" autocomplete="off" aria-controls="vModeloOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('modelo')" oninput="sincronizarBuscaModeloTemaVenda('modelo')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'modelo')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('modelo'),160)"><div id="vModeloOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vModelo" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Selecione o modelo</option></select></div></div>
+        <div class="form-group"><label for="vTemaBusca">Tema <span class="muted">(opcional)</span></label><div class="modelo-tema-picker"><input id="vTemaBusca" placeholder="Digite ou escolha um tema" autocomplete="off" aria-controls="vTemaOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('tema')" oninput="sincronizarBuscaModeloTemaVenda('tema')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'tema')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('tema'),160)"><div id="vTemaOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vTema" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Sem tema</option></select></div></div>
       </div>
       <div class="form-row"><div class="form-group"><small id="vProdutoDetalhesEstruturados" style="display:block;color:var(--ink-muted)">A venda será vinculada ao modelo e tema escolhidos, sem selecionar um convite específico.</small></div></div>
       <div class="form-row"><div class="form-group" style="position:relative;">
@@ -1674,13 +1679,11 @@ function renderSeletoresModeloTemaVenda(modeloId='',temaId=''){
   const temas=[...temasVenda];vendas.forEach(v=>{if(v.temaId&&v.tema&&!temas.some(t=>t.id===v.temaId))temas.push({id:v.temaId,nome:v.tema,inativo:true});});
   ms.innerHTML='<option value="">Selecione o modelo</option>'+modelos.map(m=>'<option value="'+escapeConvite(m.id)+'" '+(m.inativo||m.ativo===false?'disabled':'')+'>'+escapeConvite(m.nome||'')+(m.inativo?' (histórico)':'')+'</option>').join('');
   ts.innerHTML='<option value="">Sem tema</option>'+temas.map(t=>'<option value="'+escapeConvite(t.id)+'" '+(t.inativo||t.ativo===false?'disabled':'')+'>'+escapeConvite(t.nome||'')+(t.inativo?' (histórico)':'')+'</option>').join('');
-  const modelosLista=document.getElementById('vModelosDisponiveis'),temasLista=document.getElementById('vTemasDisponiveis');
-  if(modelosLista)modelosLista.innerHTML=modelos.filter(m=>!m.inativo&&m.ativo!==false).map(m=>'<option value="'+escapeConvite(m.nome||'')+'"></option>').join('');
-  if(temasLista)temasLista.innerHTML=temas.filter(t=>!t.inativo&&t.ativo!==false).map(t=>'<option value="'+escapeConvite(t.nome||'')+'"></option>').join('');
   ms.value=modeloId||'';ts.value=temaId||'';
   const modelInput=document.getElementById('vModeloBusca'),themeInput=document.getElementById('vTemaBusca');
   if(modelInput)modelInput.value=ms.selectedOptions[0]?.textContent.replace(/ \(histórico\)$/,'')||'';
   if(themeInput)themeInput.value=ts.selectedOptions[0]?.textContent.replace(/ \(histórico\)$/,'')||'';
+  renderOpcoesModeloTemaVenda('modelo');renderOpcoesModeloTemaVenda('tema');
 }
 function atualizarSeletoresModeloTemaPreservandoBusca(){
   const modelInput=document.getElementById('vModeloBusca'),themeInput=document.getElementById('vTemaBusca'),ms=document.getElementById('vModelo'),ts=document.getElementById('vTema');
@@ -1689,12 +1692,29 @@ function atualizarSeletoresModeloTemaPreservandoBusca(){
   if(modelInput&&!modelId&&modelText){modelInput.value=modelText;sincronizarBuscaModeloTemaVenda('modelo');}
   if(themeInput&&!themeId&&themeText){themeInput.value=themeText;sincronizarBuscaModeloTemaVenda('tema');}
 }
+function idOpcaoModeloTemaVenda(tipo){return tipo==='modelo'?'vModeloOpcoes':'vTemaOpcoes';}
+function idInputModeloTemaVenda(tipo){return tipo==='modelo'?'vModeloBusca':'vTemaBusca';}
+function idSelectModeloTemaVenda(tipo){return tipo==='modelo'?'vModelo':'vTema';}
+function renderOpcoesModeloTemaVenda(tipo){
+  const input=document.getElementById(idInputModeloTemaVenda(tipo)),select=document.getElementById(idSelectModeloTemaVenda(tipo)),lista=document.getElementById(idOpcaoModeloTemaVenda(tipo));if(!input||!select||!lista)return;
+  const termo=chaveRankingSite(input.value),opcoes=[...select.options].filter(o=>o.value&&!o.disabled&&(!termo||chaveRankingSite(o.textContent).includes(termo)));
+  lista.innerHTML=opcoes.length?opcoes.map(o=>'<button type="button" data-value="'+escapeConvite(o.value)+'" aria-selected="'+(select.value===o.value)+'">'+escapeConvite(o.textContent)+'</button>').join(''):'<div class="muted">Nenhuma opção encontrada.</div>';
+  lista.querySelectorAll('button[data-value]').forEach(button=>{button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>selecionarOpcaoModeloTemaVenda(tipo,button.dataset.value));});
+}
+function abrirOpcoesModeloTemaVenda(tipo){renderOpcoesModeloTemaVenda(tipo);const box=document.getElementById(idOpcaoModeloTemaVenda(tipo)),input=document.getElementById(idInputModeloTemaVenda(tipo));if(box)box.hidden=false;if(input)input.setAttribute('aria-expanded','true');}
+function fecharOpcoesModeloTemaVenda(tipo){const box=document.getElementById(idOpcaoModeloTemaVenda(tipo)),input=document.getElementById(idInputModeloTemaVenda(tipo));if(box)box.hidden=true;if(input)input.setAttribute('aria-expanded','false');}
+function selecionarOpcaoModeloTemaVenda(tipo,id){
+  const select=document.getElementById(idSelectModeloTemaVenda(tipo)),input=document.getElementById(idInputModeloTemaVenda(tipo));if(!select||!input)return;
+  const option=[...select.options].find(o=>o.value===id&&!o.disabled);if(!option)return;
+  select.value=id;input.value=option.textContent.replace(/ \(histórico\)$/,'');fecharOpcoesModeloTemaVenda(tipo);aoAlterarModeloTemaVenda(tipo);
+}
 function sincronizarBuscaModeloTemaVenda(tipo){
-  const isModelo=tipo==='modelo',input=document.getElementById(isModelo?'vModeloBusca':'vTemaBusca'),select=document.getElementById(isModelo?'vModelo':'vTema');if(!input||!select)return;
-  const termo=chaveRankingSite(input.value);
-  const option=termo?[...select.options].find(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo):null;
-  select.value=option?.value||'';
-  aoAlterarModeloTemaVenda(tipo);
+  const input=document.getElementById(idInputModeloTemaVenda(tipo)),select=document.getElementById(idSelectModeloTemaVenda(tipo));if(!input||!select)return;
+  const termo=chaveRankingSite(input.value),option=termo?[...select.options].find(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo):null;
+  select.value=option?.value||'';renderOpcoesModeloTemaVenda(tipo);abrirOpcoesModeloTemaVenda(tipo);aoAlterarModeloTemaVenda(tipo);
+}
+function tecladoOpcoesModeloTemaVenda(event,tipo){
+  const list=document.getElementById(idOpcaoModeloTemaVenda(tipo));if(event.key==='Escape'){fecharOpcoesModeloTemaVenda(tipo);return;}if(event.key==='ArrowDown'){event.preventDefault();list?.querySelector('button')?.focus();return;}if(event.key==='Enter'){const first=list?.querySelector('button[data-value]');if(first){event.preventDefault();selecionarOpcaoModeloTemaVenda(tipo,first.dataset.value);}}
 }
 function aoAlterarModeloTemaVenda(interacao=true) {
   const adicionalEl=document.getElementById('vProduto');if(interacao && adicionalEl?.dataset.legacyUnlinked==='true'){adicionalEl.value='';adicionalEl.dataset.legacyUnlinked='false';}
@@ -4076,7 +4096,15 @@ function encontrarVendaDuplicada(v, ignorarId) {
   );
 }
 
+function sincronizarSelecaoVendaDigitada(tipo){
+  const input=document.getElementById(idInputModeloTemaVenda(tipo)),select=document.getElementById(idSelectModeloTemaVenda(tipo));if(!input||!select)return;
+  const atual=select.selectedOptions[0],nomeAtual=(atual?.textContent||'').replace(/ \(histórico\)$/,'');
+  if(atual?.value&&chaveRankingSite(input.value)===chaveRankingSite(nomeAtual))return;
+  const termo=chaveRankingSite(input.value),opcao=termo?[...select.options].find(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo):null;
+  select.value=opcao?.value||'';
+}
 function saveVenda(forcarSalvar=false) {
+  sincronizarSelecaoVendaDigitada('modelo');sincronizarSelecaoVendaDigitada('tema');aoAlterarModeloTemaVenda(false);
   const status = document.getElementById('vStatus').value;
   const valorProd = parseFloat(document.getElementById('vValorProd').value)||0;
   const modeloVendaAtual = modeloVendaPorId(document.getElementById('vModelo')?.value) || null;
