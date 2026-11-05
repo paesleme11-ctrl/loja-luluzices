@@ -1444,10 +1444,11 @@
       <div class="form-row">
         <div class="form-group"><label>Observações</label><textarea id="vObs" placeholder="Detalhes, pedido personalizado, etc..."></textarea></div>
       </div>
+      <div id="vSaveMessage" role="status" aria-live="polite" style="min-height:18px;margin-top:8px;font-size:12px"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal('modalVenda')">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveVenda()">Salvar Venda</button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal('modalVenda')">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnSalvarVenda" onclick="onSalvarVendaClick()">Salvar Venda</button>
     </div>
   </div>
 </div>
@@ -1781,8 +1782,14 @@ function saveLocal() {
 function save() { saveLocal(); }
 
 async function saveVendaRemote(v) {
-  if (!db) return;
-  try { const docId=vendaFirestoreIdPorId.get(String(v.id))||vendaFirestoreDocRef.get(v)||v.id; await db.collection('vendas').doc(docId).set(v); vendaFirestoreIdPorId.set(String(v.id),String(docId)); await recalcularRankingSite(); } catch(e) { console.warn('Firebase write error:',e); }
+  if(!db)return {ok:false,error:new Error('Firebase não está conectado.')};
+  try{
+    const docId=vendaFirestoreIdPorId.get(String(v.id))||vendaFirestoreDocRef.get(v)||v.id;
+    await db.collection('vendas').doc(docId).set(v);
+    vendaFirestoreIdPorId.set(String(v.id),String(docId));
+    recalcularRankingSite().catch(e=>console.warn('Não foi possível atualizar o ranking:',e));
+    return {ok:true};
+  }catch(error){console.warn('Firebase write error:',error);return {ok:false,error};}
 }
 
 async function deleteVendaRemote(id) {
@@ -4103,7 +4110,16 @@ function sincronizarSelecaoVendaDigitada(tipo){
   const termo=chaveRankingSite(input.value),opcao=termo?[...select.options].find(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo):null;
   select.value=opcao?.value||'';
 }
-function saveVenda(forcarSalvar=false) {
+function mostrarMensagemSalvarVenda(mensagem,erro=false){const area=document.getElementById('vSaveMessage');if(area){area.textContent=mensagem||'';area.style.color=erro?'var(--red)':'var(--green,#16834b)';}if(mensagem)showToast(mensagem,erro?'error':'success');}
+async function onSalvarVendaClick(){
+  const botao=document.getElementById('btnSalvarVenda');if(botao?.disabled)return;
+  if(botao){botao.disabled=true;botao.textContent='Salvando...';}
+  try{await saveVenda();}
+  catch(error){console.error('Erro ao salvar venda:',error);mostrarMensagemSalvarVenda('Não foi possível salvar: '+(error?.message||'erro inesperado.'),true);}
+  finally{if(botao){botao.disabled=false;botao.textContent='Salvar Venda';}}
+}
+async function saveVenda(forcarSalvar=false) {
+  const mensagem=document.getElementById('vSaveMessage');if(mensagem)mensagem.textContent='';
   sincronizarSelecaoVendaDigitada('modelo');sincronizarSelecaoVendaDigitada('tema');aoAlterarModeloTemaVenda(false);
   const status = document.getElementById('vStatus').value;
   const valorProd = parseFloat(document.getElementById('vValorProd').value)||0;
@@ -4147,9 +4163,9 @@ function saveVenda(forcarSalvar=false) {
     numContatos: document.querySelector('input[name="vNumContatos"]:checked')?.value || null,
     ...(dataFinalizacao ? { dataFinalizacao } : {}),
   };
-  if (!v.contato) { showToast('Preencha o contato','error'); return; }
-  if ((!existing || modeloVendaAtual || temaVendaAtual) && !modeloVendaAtual) { showToast('Selecione o modelo do convite. O tema é opcional.','error'); return; }
-  if (!v.data) { showToast('Preencha a data','error'); return; }
+  if (!v.contato) { mostrarMensagemSalvarVenda('Preencha o contato.',true); return; }
+  if ((!existing || modeloVendaAtual || temaVendaAtual) && !modeloVendaAtual) { mostrarMensagemSalvarVenda('Selecione o modelo do convite. O tema é opcional.',true); return; }
+  if (!v.data) { mostrarMensagemSalvarVenda('Preencha a data.',true); return; }
 
   // Detecção de duplicata (pula se já confirmou)
   if (!forcarSalvar) {
@@ -4160,9 +4176,12 @@ function saveVenda(forcarSalvar=false) {
     }
   }
 
-  if (vendaEditId) { vendas[vendas.findIndex(x=>x.id===vendaEditId)] = v; showToast('Venda atualizada ✓','success'); }
-  else { vendas.unshift(v); showToast('Venda salva ✓','success'); }
-  save(); saveVendaRemote(v);
+  if (vendaEditId) { vendas[vendas.findIndex(x=>x.id===vendaEditId)] = v; }
+  else { vendas.unshift(v); }
+  save();
+  const resultadoRemoto=await saveVendaRemote(v);
+  if(resultadoRemoto.ok)mostrarMensagemSalvarVenda(vendaEditId?'Venda atualizada ✓':'Venda salva ✓');
+  else mostrarMensagemSalvarVenda('Venda salva neste dispositivo, mas não sincronizou com o Firebase: '+(resultadoRemoto.error?.message||'verifique conexão e login.'),true);
 
   // Captura ANTES de fechar o modal — closeModal('modalVenda') zera essa variável
   const pedidoFormPendente = _pedidoFormAguardandoConfirmacao;
@@ -4185,9 +4204,9 @@ function abrirAvisoDuplicada(duplicada, novaVenda) {
   document.getElementById('modalDuplicada').classList.add('open');
 }
 
-function confirmarSalvarDuplicada() {
+async function confirmarSalvarDuplicada() {
   document.getElementById('modalDuplicada').classList.remove('open');
-  saveVenda(true);
+  try{await saveVenda(true);}catch(error){console.error('Erro ao salvar venda duplicada:',error);mostrarMensagemSalvarVenda('Não foi possível salvar: '+(error?.message||'erro inesperado.'),true);}
   _vendaPendenteDuplicada = null;
 }
 
