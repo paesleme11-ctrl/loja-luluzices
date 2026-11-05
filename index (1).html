@@ -1352,8 +1352,8 @@
         <div class="form-group"><label>Contato (DDD + número)</label><input type="text" id="vContato" placeholder="Ex: 11 99999-0000"></div>
       </div>
       <div class="form-row cols-2">
-        <div class="form-group"><label>Modelo do convite</label><select id="vModelo" onchange="aoAlterarModeloTemaVenda('modelo')"><option value="">Selecione o modelo</option></select></div>
-        <div class="form-group"><label>Tema</label><select id="vTema" onchange="aoAlterarModeloTemaVenda('tema')"><option value="">Selecione o tema</option></select></div>
+        <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><input id="vModeloBusca" list="vModelosDisponiveis" placeholder="Digite para buscar um modelo" autocomplete="off" oninput="sincronizarBuscaModeloTemaVenda('modelo')"><datalist id="vModelosDisponiveis"></datalist><select id="vModelo" onchange="aoAlterarModeloTemaVenda('modelo')" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Selecione o modelo</option></select></div>
+        <div class="form-group"><label for="vTemaBusca">Tema <span class="muted">(opcional)</span></label><input id="vTemaBusca" list="vTemasDisponiveis" placeholder="Digite para buscar ou deixe em branco" autocomplete="off" oninput="sincronizarBuscaModeloTemaVenda('tema')"><datalist id="vTemasDisponiveis"></datalist><select id="vTema" onchange="aoAlterarModeloTemaVenda('tema')" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Sem tema</option></select></div>
       </div>
       <div class="form-row"><div class="form-group"><small id="vProdutoDetalhesEstruturados" style="display:block;color:var(--ink-muted)">A venda será vinculada ao modelo e tema escolhidos, sem selecionar um convite específico.</small></div></div>
       <div class="form-row"><div class="form-group" style="position:relative;">
@@ -1644,7 +1644,7 @@ const MODELOS_VENDA_BASE = [
 let modelosVenda = LS.get('modelosVenda', MODELOS_VENDA_BASE);
 let temasVenda = LS.get('temasVenda', []);
 
-function idCompostoConvite(modeloId, temaId) { return modeloId && temaId ? 'convite:' + modeloId + ':' + temaId : null; }
+function idCompostoConvite(modeloId, temaId) { return modeloId ? (temaId ? 'convite:' + modeloId + ':' + temaId : 'convite:modelo:' + modeloId) : null; }
 function modeloVendaPorId(id) { const atual=modelosVenda.find(m=>m.id===id); if(atual)return atual; const antigo=vendas.find(v=>v.modeloId===id&&v.modelo); return antigo?{id,nome:antigo.modelo,preco:0}:null; }
 function temaVendaPorId(id) { const atual=temasVenda.find(t=>t.id===id); if(atual)return atual; const antigo=vendas.find(v=>v.temaId===id&&v.tema); return antigo?{id,nome:antigo.tema}:null; }
 function valorModeloVenda(modeloId) { const modelo=modeloVendaPorId(modeloId); const precoGestao=catalogoProdutos?.find(p=>chaveRankingSite(p.nome)===chaveRankingSite(modelo?.nome))?.preco; return Number(precoGestao ?? modelo?.preco) || 0; }
@@ -1663,36 +1663,52 @@ async function loadCatalogoModeloTemaVenda() {
     if (temaSnap.exists) temasVenda = JSON.parse(temaSnap.data().data || '[]');
     temasVenda = [...new Map(temasVenda.filter(t => t.id).map(t => [t.id, t])).values()].sort((a,b) => String(a.nome).localeCompare(String(b.nome),'pt-BR'));
     LS.set('modelosVenda', modelosVenda); LS.set('temasVenda', temasVenda);
-    renderSeletoresModeloTemaVenda();
+    atualizarSeletoresModeloTemaPreservandoBusca();
     migrarVendasLegadasSeguras().catch(e=>console.warn('Falha ao vincular histórico de vendas:',e));
-  } catch (e) { console.warn('Não foi possível carregar modelos/temas do catálogo:', e); renderSeletoresModeloTemaVenda(); }
+  } catch (e) { console.warn('Não foi possível carregar modelos/temas do catálogo:', e); atualizarSeletoresModeloTemaPreservandoBusca(); }
 }
 
-function renderSeletoresModeloTemaVenda(modeloId='', temaId='') {
-  const ms=document.getElementById('vModelo'), ts=document.getElementById('vTema');
-  if (!ms || !ts) return;
-  const modelos = [...modelosVenda];
-  vendas.forEach(v => { if (v.modeloId && v.modelo && !modelos.some(m=>m.id===v.modeloId)) modelos.push({id:v.modeloId,nome:v.modelo,preco:0,inativo:true}); });
-  const temas = [...temasVenda];
-  vendas.forEach(v => { if (v.temaId && v.tema && !temas.some(t=>t.id===v.temaId)) temas.push({id:v.temaId,nome:v.tema,inativo:true}); });
-  ms.innerHTML='<option value="">Selecione o modelo</option>'+modelos.map(m=>'<option value="'+String(m.id).replace(/"/g,'&quot;')+'" '+(m.inativo||m.ativo===false?'disabled':'')+'>'+String(m.nome||'').replace(/</g,'&lt;')+(m.inativo?' (histórico)':'')+'</option>').join('');
-  ts.innerHTML='<option value="">Selecione o tema</option>'+temas.map(t=>'<option value="'+String(t.id).replace(/"/g,'&quot;')+'" '+(t.inativo||t.ativo===false?'disabled':'')+'>'+String(t.nome||'').replace(/</g,'&lt;')+(t.inativo?' (histórico)':'')+'</option>').join('');
-  ms.value=modeloId||''; ts.value=temaId||'';
+function renderSeletoresModeloTemaVenda(modeloId='',temaId=''){
+  const ms=document.getElementById('vModelo'),ts=document.getElementById('vTema');if(!ms||!ts)return;
+  const modelos=[...modelosVenda];vendas.forEach(v=>{if(v.modeloId&&v.modelo&&!modelos.some(m=>m.id===v.modeloId))modelos.push({id:v.modeloId,nome:v.modelo,preco:0,inativo:true});});
+  const temas=[...temasVenda];vendas.forEach(v=>{if(v.temaId&&v.tema&&!temas.some(t=>t.id===v.temaId))temas.push({id:v.temaId,nome:v.tema,inativo:true});});
+  ms.innerHTML='<option value="">Selecione o modelo</option>'+modelos.map(m=>'<option value="'+escapeConvite(m.id)+'" '+(m.inativo||m.ativo===false?'disabled':'')+'>'+escapeConvite(m.nome||'')+(m.inativo?' (histórico)':'')+'</option>').join('');
+  ts.innerHTML='<option value="">Sem tema</option>'+temas.map(t=>'<option value="'+escapeConvite(t.id)+'" '+(t.inativo||t.ativo===false?'disabled':'')+'>'+escapeConvite(t.nome||'')+(t.inativo?' (histórico)':'')+'</option>').join('');
+  const modelosLista=document.getElementById('vModelosDisponiveis'),temasLista=document.getElementById('vTemasDisponiveis');
+  if(modelosLista)modelosLista.innerHTML=modelos.filter(m=>!m.inativo&&m.ativo!==false).map(m=>'<option value="'+escapeConvite(m.nome||'')+'"></option>').join('');
+  if(temasLista)temasLista.innerHTML=temas.filter(t=>!t.inativo&&t.ativo!==false).map(t=>'<option value="'+escapeConvite(t.nome||'')+'"></option>').join('');
+  ms.value=modeloId||'';ts.value=temaId||'';
+  const modelInput=document.getElementById('vModeloBusca'),themeInput=document.getElementById('vTemaBusca');
+  if(modelInput)modelInput.value=ms.selectedOptions[0]?.textContent.replace(/ \(histórico\)$/,'')||'';
+  if(themeInput)themeInput.value=ts.selectedOptions[0]?.textContent.replace(/ \(histórico\)$/,'')||'';
 }
-
+function atualizarSeletoresModeloTemaPreservandoBusca(){
+  const modelInput=document.getElementById('vModeloBusca'),themeInput=document.getElementById('vTemaBusca'),ms=document.getElementById('vModelo'),ts=document.getElementById('vTema');
+  const modelText=modelInput?.value||'',themeText=themeInput?.value||'',modelId=ms?.value||'',themeId=ts?.value||'';
+  renderSeletoresModeloTemaVenda(modelId,themeId);
+  if(modelInput&&!modelId&&modelText){modelInput.value=modelText;sincronizarBuscaModeloTemaVenda('modelo');}
+  if(themeInput&&!themeId&&themeText){themeInput.value=themeText;sincronizarBuscaModeloTemaVenda('tema');}
+}
+function sincronizarBuscaModeloTemaVenda(tipo){
+  const isModelo=tipo==='modelo',input=document.getElementById(isModelo?'vModeloBusca':'vTemaBusca'),select=document.getElementById(isModelo?'vModelo':'vTema');if(!input||!select)return;
+  const termo=chaveRankingSite(input.value);
+  const option=termo?[...select.options].find(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo):null;
+  select.value=option?.value||'';
+  aoAlterarModeloTemaVenda(tipo);
+}
 function aoAlterarModeloTemaVenda(interacao=true) {
   const adicionalEl=document.getElementById('vProduto');if(interacao && adicionalEl?.dataset.legacyUnlinked==='true'){adicionalEl.value='';adicionalEl.dataset.legacyUnlinked='false';}
   const modelo = modeloVendaPorId(document.getElementById('vModelo')?.value);
   const tema = temaVendaPorId(document.getElementById('vTema')?.value);
   const resumo = document.getElementById('vProdutoDetalhesEstruturados');
-  if (resumo) resumo.textContent = modelo && tema ? 'Convite registrado como ' + modelo.nome + ' — ' + tema.nome + '. O catálogo não exige a escolha de uma arte específica.' : 'A venda será vinculada ao modelo e tema escolhidos, sem selecionar um convite específico.';
+  if (resumo) resumo.textContent = modelo ? 'Convite registrado como ' + modelo.nome + (tema ? ' — ' + tema.nome : ' (sem tema)') + '. O tema é opcional.' : 'Selecione o modelo; o tema é opcional.';
   const valor=document.getElementById('vValorProd');
   if (valor?.dataset.autoPreco==='true' || !valor?.value) recalcularValorProdutos();
 }
 
 function montarItensComerciais(modeloId, temaId, adicionalNomes, total) {
   const modelo=modeloVendaPorId(modeloId), tema=temaVendaPorId(temaId);
-  const principals= modelo && tema ? [{tipo:'convite',produtoId:idCompostoConvite(modeloId,temaId),produtoNome:modelo.nome+' — '+tema.nome,modeloId,modelo:modelo.nome,temaId,tema:tema.nome,quantidade:1,valorUnitario:valorModeloVenda(modeloId)}] : [];
+  const principals= modelo ? [{tipo:'convite',produtoId:idCompostoConvite(modeloId,temaId),produtoNome:modelo.nome+(tema?' — '+tema.nome:''),modeloId,modelo:modelo.nome,temaId:tema?.id||null,tema:tema?.nome||null,quantidade:1,valorUnitario:valorModeloVenda(modeloId)}] : [];
   const adicionais=(adicionalNomes||[]).map(nome=>catalogoProdutos.find(p=>chaveRankingSite(p.nome)===chaveRankingSite(nome))).filter(Boolean).map(p=>({tipo:'adicional',produtoId:'adicional:'+p.id,adicionalId:p.id,produtoNome:p.nome,modeloId:null,modelo:null,temaId:null,tema:null,quantidade:1,valorUnitario:Number(p.preco)||0}));
   const linhas=[...principals,...adicionais];
   const tabela=linhas.reduce((sum,item)=>sum+item.valorUnitario,0), alvo=Math.max(0,Number(total)||0);
@@ -2628,7 +2644,7 @@ function calcLucroCiclo() {
 function textoHTMLProduto(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function linhasEstruturadasVenda(v){
   if(Array.isArray(v.itensComerciais))return v.itensComerciais;
-  if(v.modeloId&&v.temaId&&v.modelo&&v.tema)return[{tipo:'convite',produtoId:idCompostoConvite(v.modeloId,v.temaId),produtoNome:v.produtoNome||v.modelo+' — '+v.tema,modeloId:v.modeloId,modelo:v.modelo,temaId:v.temaId,tema:v.tema,quantidade:Number(v.quantidade)||1,valorTotal:Number(v.valorProd)||0}];
+  if(v.modeloId&&v.modelo)return[{tipo:'convite',produtoId:idCompostoConvite(v.modeloId,v.temaId),produtoNome:v.produtoNome||v.modelo+(v.tema?' — '+v.tema:''),modeloId:v.modeloId,modelo:v.modelo,temaId:v.temaId||null,tema:v.tema||null,quantidade:Number(v.quantidade)||1,valorTotal:Number(v.valorProd)||0}];
   const p=identificarModeloTemaLegado(v.produto||'');return p?linhasHistoricasVenda(p,v):[];
 }
 function dataLocalVenda(d){const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,10);}
@@ -2642,7 +2658,7 @@ function renderDesempenhoProdutos(){
   const from=document.getElementById('prodPerfInicio'),to=document.getElementById('prodPerfFim');if(from&&to){from.style.display=to.style.display=type==='personalizado'?'':'none';if(type==='personalizado'){start=from.value||todayStr;end=to.value||todayStr;}}
   const periodSales=vendas.filter(v=>v.status!=='cancelado'&&v.data&&v.data>=start&&v.data<=end),maps={produto:new Map(),modelo:new Map(),tema:new Map()}, principals=[];let addQty=0,addRev=0,unlinked=0,unallocated=0;
   const add=(map,id,name,qty,rev)=>{if(!id||!name)return;const o=map.get(id)||{id,name,qty:0,rev:0};o.qty+=qty;o.rev+=rev;map.set(id,o);};
-  periodSales.forEach(v=>{const lines=linhasEstruturadasVenda(v);if(!lines.length){unlinked++;return;}lines.forEach(i=>{const q=Math.max(1,Number(i.quantidade)||1),rev=Number(i.valorTotal)||0;if(i.receitaHistoricaNaoAlocada)unallocated++;if(i.tipo==='adicional'){addQty+=q;addRev+=rev;return;}if(!i.modeloId||!i.temaId)return;principals.push({v,i,q,rev});add(maps.produto,i.produtoId||idCompostoConvite(i.modeloId,i.temaId),i.produtoNome||i.modelo+' — '+i.tema,q,rev);add(maps.modelo,i.modeloId,i.modelo,q,rev);add(maps.tema,i.temaId,i.tema,q,rev);});});
+  periodSales.forEach(v=>{const lines=linhasEstruturadasVenda(v);if(!lines.length){unlinked++;return;}lines.forEach(i=>{const q=Math.max(1,Number(i.quantidade)||1),rev=Number(i.valorTotal)||0;if(i.receitaHistoricaNaoAlocada)unallocated++;if(i.tipo==='adicional'){addQty+=q;addRev+=rev;return;}if(!i.modeloId||!i.modelo)return;principals.push({v,i,q,rev});add(maps.produto,i.produtoId||idCompostoConvite(i.modeloId,i.temaId),i.produtoNome||i.modelo+(i.tema?' — '+i.tema:''),q,rev);add(maps.modelo,i.modeloId,i.modelo,q,rev);if(i.temaId)add(maps.tema,i.temaId,i.tema,q,rev);});});
   const units=principals.reduce((n,x)=>n+x.q,0),revenue=principals.reduce((n,x)=>n+x.rev,0);const top=(map,field)=>[...map.values()].sort((a,b)=>b[field]-a[field])[0];
   const k=[['Convites vendidos',units],['Adicionais vendidos',addQty],['Pedidos',periodSales.length],['Faturamento dos convites',BRL_RAW(revenue)],['Ticket médio do convite',BRL_RAW(units?revenue/units:0)],['Mais vendido',top(maps.produto,'qty')?.name||'—'],['Modelo líder',top(maps.modelo,'qty')?.name||'—'],['Tema líder',top(maps.tema,'qty')?.name||'—'],['Produto que mais faturou',top(maps.produto,'rev')?.name||'—'],['Modelo que mais faturou',top(maps.modelo,'rev')?.name||'—'],['Tema que mais faturou',top(maps.tema,'rev')?.name||'—'],['Faturamento de adicionais',BRL_RAW(addRev)]];
   root.innerHTML=k.map((x,i)=>'<div class="kpi-card" style="--kpi-color:'+(i%2?'var(--blue)':'var(--rose)')+'"><div class="kpi-label">'+textoHTMLProduto(x[0])+'</div><div class="kpi-value" style="font-size:'+(String(x[1]).length>24?'15px':'21px')+'">'+textoHTMLProduto(x[1])+'</div></div>').join('');
@@ -4083,18 +4099,18 @@ function saveVenda(forcarSalvar=false) {
     : null;
 
   const vendaAnterior = existing || {};
-  const estruturaSelecionada = modeloVendaAtual && temaVendaAtual;
-  const nomeConviteEstruturado = estruturaSelecionada ? modeloVendaAtual.nome + ' — ' + temaVendaAtual.nome : '';
+  const estruturaSelecionada = !!modeloVendaAtual;
+  const nomeConviteEstruturado = estruturaSelecionada ? modeloVendaAtual.nome + (temaVendaAtual ? ' — ' + temaVendaAtual.nome : '') : '';
   const textoProdutosVenda = estruturaSelecionada ? [nomeConviteEstruturado, ...adicionaisVendaNomes].filter(Boolean).join(', ') : (vendaAnterior.produto || document.getElementById('vProduto').value.trim());
   const antigosAdicionais = (Array.isArray(vendaAnterior.itensComerciais) ? vendaAnterior.itensComerciais.filter(i=>i.tipo==='adicional').map(i=>i.produtoNome) : (identificarModeloTemaLegado(vendaAnterior.produto||'')?.restante||'').split(',').map(x=>x.trim()).filter(Boolean));
   const adicionaisIguais = antigosAdicionais.map(chaveRankingSite).join('|') === adicionaisVendaNomes.map(chaveRankingSite).join('|');
   const produtoNaoMudou = !!existing && vendaAnterior.modeloId===modeloVendaAtual?.id && vendaAnterior.temaId===temaVendaAtual?.id && Number(vendaAnterior.valorProd||0)===valorProd && adicionaisIguais;
-  const linhasComerciaisVenda = estruturaSelecionada ? (produtoNaoMudou && Array.isArray(vendaAnterior.itensComerciais) && vendaAnterior.itensComerciais.length ? vendaAnterior.itensComerciais : produtoNaoMudou && identificarModeloTemaLegado(vendaAnterior.produto||'') ? linhasHistoricasVenda(identificarModeloTemaLegado(vendaAnterior.produto||''),vendaAnterior) : montarItensComerciais(modeloVendaAtual.id, temaVendaAtual.id, adicionaisVendaNomes, valorProd)) : (vendaAnterior.itensComerciais || null);
+  const linhasComerciaisVenda = estruturaSelecionada ? (produtoNaoMudou && Array.isArray(vendaAnterior.itensComerciais) && vendaAnterior.itensComerciais.length ? vendaAnterior.itensComerciais : produtoNaoMudou && identificarModeloTemaLegado(vendaAnterior.produto||'') ? linhasHistoricasVenda(identificarModeloTemaLegado(vendaAnterior.produto||''),vendaAnterior) : montarItensComerciais(modeloVendaAtual.id, temaVendaAtual?.id||null, adicionaisVendaNomes, valorProd)) : (vendaAnterior.itensComerciais || null);
   const v = {
     ...vendaAnterior,
     id: vendaEditId || Date.now().toString(), status: statusFinal, data: document.getElementById('vData').value,
     contato: document.getElementById('vContato').value.trim(), fonte: document.getElementById('vFonte').value,
-    valorProd, produto: textoProdutosVenda, produtoLegado: estruturaSelecionada && vendaAnterior.produto && (!vendaAnterior.produtoId || vendaAnterior.modeloId!==modeloVendaAtual.id || vendaAnterior.temaId!==temaVendaAtual.id) ? (vendaAnterior.produtoLegado || vendaAnterior.produto) : vendaAnterior.produtoLegado, produtoId: estruturaSelecionada ? idCompostoConvite(modeloVendaAtual.id, temaVendaAtual.id) : (vendaAnterior.produtoId ?? null), produtoNome: estruturaSelecionada ? nomeConviteEstruturado : (vendaAnterior.produtoNome || null), modeloId: estruturaSelecionada ? modeloVendaAtual.id : (vendaAnterior.modeloId || null), modelo: estruturaSelecionada ? modeloVendaAtual.nome : (vendaAnterior.modelo || null), temaId: estruturaSelecionada ? temaVendaAtual.id : (vendaAnterior.temaId || null), tema: estruturaSelecionada ? temaVendaAtual.nome : (vendaAnterior.tema || null), quantidade: estruturaSelecionada ? 1 : (vendaAnterior.quantidade || null), itensComerciais: estruturaSelecionada ? linhasComerciaisVenda : (vendaAnterior.itensComerciais || null), vinculoProduto: estruturaSelecionada ? 'selecionado-modelo-tema' : (vendaAnterior.vinculoProduto || 'revisar'), sinal: parseFloat(document.getElementById('vSinal').value)||0,
+    valorProd, produto: textoProdutosVenda, produtoLegado: estruturaSelecionada && vendaAnterior.produto && (!vendaAnterior.produtoId || vendaAnterior.modeloId!==modeloVendaAtual.id || vendaAnterior.temaId!==temaVendaAtual?.id) ? (vendaAnterior.produtoLegado || vendaAnterior.produto) : vendaAnterior.produtoLegado, produtoId: estruturaSelecionada ? idCompostoConvite(modeloVendaAtual.id, temaVendaAtual.id) : (vendaAnterior.produtoId ?? null), produtoNome: estruturaSelecionada ? nomeConviteEstruturado : (vendaAnterior.produtoNome || null), modeloId: estruturaSelecionada ? modeloVendaAtual.id : (vendaAnterior.modeloId || null), modelo: estruturaSelecionada ? modeloVendaAtual.nome : (vendaAnterior.modelo || null), temaId: estruturaSelecionada ? (temaVendaAtual?.id||null) : (vendaAnterior.temaId || null), tema: estruturaSelecionada ? (temaVendaAtual?.nome||null) : (vendaAnterior.tema || null), quantidade: estruturaSelecionada ? 1 : (vendaAnterior.quantidade || null), itensComerciais: estruturaSelecionada ? linhasComerciaisVenda : (vendaAnterior.itensComerciais || null), vinculoProduto: estruturaSelecionada ? (temaVendaAtual?'selecionado-modelo-tema':'selecionado-modelo') : (vendaAnterior.vinculoProduto || 'revisar'), sinal: parseFloat(document.getElementById('vSinal').value)||0,
     valorPago, obs: document.getElementById('vObs').value.trim(),
     prazo: document.getElementById('vPrazo')?.value || null,
     pagamento: document.querySelector('input[name="vPagamento"]:checked')?.value || null,
@@ -4104,7 +4120,7 @@ function saveVenda(forcarSalvar=false) {
     ...(dataFinalizacao ? { dataFinalizacao } : {}),
   };
   if (!v.contato) { showToast('Preencha o contato','error'); return; }
-  if ((!existing || modeloVendaAtual || temaVendaAtual) && (!modeloVendaAtual || !temaVendaAtual)) { showToast('Selecione o modelo e o tema do convite','error'); return; }
+  if ((!existing || modeloVendaAtual || temaVendaAtual) && !modeloVendaAtual) { showToast('Selecione o modelo do convite. O tema é opcional.','error'); return; }
   if (!v.data) { showToast('Preencha a data','error'); return; }
 
   // Detecção de duplicata (pula se já confirmou)
