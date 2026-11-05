@@ -1781,11 +1781,18 @@ function saveLocal() {
 
 function save() { saveLocal(); }
 
+function limparUndefinedFirestore(valor){
+  if(Array.isArray(valor))return valor.map(item=>item===undefined?null:limparUndefinedFirestore(item));
+  if(valor&&Object.getPrototypeOf(valor)===Object.prototype){
+    return Object.fromEntries(Object.entries(valor).filter(([,item])=>item!==undefined).map(([chave,item])=>[chave,limparUndefinedFirestore(item)]));
+  }
+  return valor;
+}
 async function saveVendaRemote(v) {
   if(!db)return {ok:false,error:new Error('Firebase não está conectado.')};
   try{
     const docId=vendaFirestoreIdPorId.get(String(v.id))||vendaFirestoreDocRef.get(v)||v.id;
-    await db.collection('vendas').doc(docId).set(v);
+    await db.collection('vendas').doc(docId).set(limparUndefinedFirestore(v));
     vendaFirestoreIdPorId.set(String(v.id),String(docId));
     recalcularRankingSite().catch(e=>console.warn('Não foi possível atualizar o ranking:',e));
     return {ok:true};
@@ -4154,7 +4161,7 @@ async function saveVenda(forcarSalvar=false) {
     ...vendaAnterior,
     id: vendaEditId || Date.now().toString(), status: statusFinal, data: document.getElementById('vData').value,
     contato: document.getElementById('vContato').value.trim(), fonte: document.getElementById('vFonte').value,
-    valorProd, produto: textoProdutosVenda, produtoLegado: estruturaSelecionada && vendaAnterior.produto && (!vendaAnterior.produtoId || vendaAnterior.modeloId!==modeloVendaAtual.id || vendaAnterior.temaId!==temaVendaAtual?.id) ? (vendaAnterior.produtoLegado || vendaAnterior.produto) : vendaAnterior.produtoLegado, produtoId: estruturaSelecionada ? idCompostoConvite(modeloVendaAtual.id, temaVendaAtual?.id||null) : (vendaAnterior.produtoId ?? null), produtoNome: estruturaSelecionada ? nomeConviteEstruturado : (vendaAnterior.produtoNome || null), modeloId: estruturaSelecionada ? modeloVendaAtual.id : (vendaAnterior.modeloId || null), modelo: estruturaSelecionada ? modeloVendaAtual.nome : (vendaAnterior.modelo || null), temaId: estruturaSelecionada ? (temaVendaAtual?.id||null) : (vendaAnterior.temaId || null), tema: estruturaSelecionada ? (temaVendaAtual?.nome||null) : (vendaAnterior.tema || null), quantidade: estruturaSelecionada ? 1 : (vendaAnterior.quantidade || null), itensComerciais: estruturaSelecionada ? linhasComerciaisVenda : (vendaAnterior.itensComerciais || null), vinculoProduto: estruturaSelecionada ? (temaVendaAtual?'selecionado-modelo-tema':'selecionado-modelo') : (vendaAnterior.vinculoProduto || 'revisar'), sinal: parseFloat(document.getElementById('vSinal').value)||0,
+    valorProd, produto: textoProdutosVenda, produtoLegado: estruturaSelecionada && vendaAnterior.produto && (!vendaAnterior.produtoId || vendaAnterior.modeloId!==modeloVendaAtual.id || vendaAnterior.temaId!==temaVendaAtual?.id) ? (vendaAnterior.produtoLegado || vendaAnterior.produto) : (vendaAnterior.produtoLegado ?? null), produtoId: estruturaSelecionada ? idCompostoConvite(modeloVendaAtual.id, temaVendaAtual?.id||null) : (vendaAnterior.produtoId ?? null), produtoNome: estruturaSelecionada ? nomeConviteEstruturado : (vendaAnterior.produtoNome || null), modeloId: estruturaSelecionada ? modeloVendaAtual.id : (vendaAnterior.modeloId || null), modelo: estruturaSelecionada ? modeloVendaAtual.nome : (vendaAnterior.modelo || null), temaId: estruturaSelecionada ? (temaVendaAtual?.id||null) : (vendaAnterior.temaId || null), tema: estruturaSelecionada ? (temaVendaAtual?.nome||null) : (vendaAnterior.tema || null), quantidade: estruturaSelecionada ? 1 : (vendaAnterior.quantidade || null), itensComerciais: estruturaSelecionada ? linhasComerciaisVenda : (vendaAnterior.itensComerciais || null), vinculoProduto: estruturaSelecionada ? (temaVendaAtual?'selecionado-modelo-tema':'selecionado-modelo') : (vendaAnterior.vinculoProduto || 'revisar'), sinal: parseFloat(document.getElementById('vSinal').value)||0,
     valorPago, obs: document.getElementById('vObs').value.trim(),
     prazo: document.getElementById('vPrazo')?.value || null,
     pagamento: document.querySelector('input[name="vPagamento"]:checked')?.value || null,
