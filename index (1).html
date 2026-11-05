@@ -1357,10 +1357,10 @@
         <div class="form-group"><label>Contato (DDD + número)</label><input type="text" id="vContato" placeholder="Ex: 11 99999-0000"></div>
       </div>
       <div class="form-row cols-2">
-        <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><div class="modelo-tema-picker"><input id="vModeloBusca" placeholder="Digite ou escolha um modelo" autocomplete="off" aria-controls="vModeloOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('modelo')" oninput="sincronizarBuscaModeloTemaVenda('modelo')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'modelo')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('modelo'),160)"><div id="vModeloOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vModelo" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Selecione o modelo</option></select></div></div>
-        <div class="form-group"><label for="vTemaBusca">Tema <span class="muted">(opcional)</span></label><div class="modelo-tema-picker"><input id="vTemaBusca" placeholder="Digite ou escolha um tema" autocomplete="off" aria-controls="vTemaOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('tema')" oninput="sincronizarBuscaModeloTemaVenda('tema')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'tema')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('tema'),160)"><div id="vTemaOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vTema" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Sem tema</option></select></div></div>
+        <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><div class="modelo-tema-picker"><input id="vModeloBusca" autocomplete="off" aria-controls="vModeloOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('modelo')" oninput="sincronizarBuscaModeloTemaVenda('modelo')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'modelo')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('modelo'),160)"><div id="vModeloOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vModelo" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Selecione o modelo</option></select></div></div>
+        <div class="form-group"><label for="vTemaBusca">Tema <span class="muted">(opcional)</span></label><div class="modelo-tema-picker"><input id="vTemaBusca" autocomplete="off" aria-controls="vTemaOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('tema')" oninput="sincronizarBuscaModeloTemaVenda('tema')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'tema')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('tema'),160)"><div id="vTemaOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vTema" style="display:none" aria-hidden="true" tabindex="-1"><option value="">Sem tema</option></select></div></div>
       </div>
-      <div class="form-row"><div class="form-group"><small id="vProdutoDetalhesEstruturados" style="display:block;color:var(--ink-muted)">A venda será vinculada ao modelo e tema escolhidos, sem selecionar um convite específico.</small></div></div>
+      <div class="form-row"><div class="form-group"><small id="vProdutoDetalhesEstruturados" aria-live="polite" style="display:block;color:var(--ink-muted)"></small></div></div>
       <div class="form-row"><div class="form-group" style="position:relative;">
           <label>Adicionais</label>
           <input type="text" id="vProduto" placeholder="Busque adicionais — ex: filtro, personalização" autocomplete="off"
@@ -1699,8 +1699,29 @@ function idSelectModeloTemaVenda(tipo){return tipo==='modelo'?'vModelo':'vTema';
 function renderOpcoesModeloTemaVenda(tipo){
   const input=document.getElementById(idInputModeloTemaVenda(tipo)),select=document.getElementById(idSelectModeloTemaVenda(tipo)),lista=document.getElementById(idOpcaoModeloTemaVenda(tipo));if(!input||!select||!lista)return;
   const termo=chaveRankingSite(input.value),opcoes=[...select.options].filter(o=>o.value&&!o.disabled&&(!termo||chaveRankingSite(o.textContent).includes(termo)));
-  lista.innerHTML=opcoes.length?opcoes.map(o=>'<button type="button" data-value="'+escapeConvite(o.value)+'" aria-selected="'+(select.value===o.value)+'">'+escapeConvite(o.textContent)+'</button>').join(''):'<div class="muted">Nenhuma opção encontrada.</div>';
-  lista.querySelectorAll('button[data-value]').forEach(button=>{button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>selecionarOpcaoModeloTemaVenda(tipo,button.dataset.value));});
+  const existeExato=[...select.options].some(o=>o.value&&!o.disabled&&chaveRankingSite(o.textContent.replace(/ \(histórico\)$/,''))===termo);
+  const listaHtml=opcoes.map(o=>'<button type="button" data-value="'+escapeConvite(o.value)+'" aria-selected="'+(select.value===o.value)+'">'+escapeConvite(o.textContent)+'</button>').join('');
+  const criarHtml=termo&&!existeExato?'<button type="button" data-create-name="'+escapeConvite(input.value.trim())+'">＋ Criar '+(tipo==='modelo'?'modelo':'tema')+': “'+escapeConvite(input.value.trim())+'”</button>':'';
+  lista.innerHTML=listaHtml+criarHtml||'<div class="muted">Nenhuma opção encontrada.</div>';
+  lista.querySelectorAll('button').forEach(button=>button.addEventListener('mousedown',event=>event.preventDefault()));
+  lista.querySelectorAll('button[data-value]').forEach(button=>button.addEventListener('click',()=>selecionarOpcaoModeloTemaVenda(tipo,button.dataset.value)));
+  lista.querySelectorAll('button[data-create-name]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await criarOpcaoModeloTemaVenda(tipo,button.dataset.createName);}catch(error){console.error(error);mostrarMensagemSalvarVenda('Não foi possível criar a opção: '+(error.message||'erro no Firebase.'),true);button.disabled=false;}}));
+}
+function idNovoItemVenda(prefixo){return prefixo+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);}
+async function criarOpcaoModeloTemaVenda(tipo,nome,selecionar=true){
+  nome=String(nome||'').trim();if(!nome)return null;
+  if(!db||!firebase.auth().currentUser)throw new Error('Faça login no painel para cadastrar esta opção.');
+  const modelo=tipo==='modelo',campo=modelo?'modelosVenda':'temasVenda',docId=modelo?'modelosSite':'temasSite',ref=db.collection('config').doc(docId);
+  const snap=await ref.get(),lista=snap.exists?JSON.parse(snap.data().data||'[]'):[...(modelo?modelosVenda:temasVenda)];
+  let item=lista.find(x=>chaveRankingSite(x.nome)===chaveRankingSite(nome));
+  if(item){if(item.ativo===false||item.inativo){item={...item,ativo:true,inativo:false};lista[lista.findIndex(x=>x.id===item.id)]=item;await ref.set({data:JSON.stringify(lista)},{merge:true});}}
+  else{item=modelo?{id:idNovoItemVenda('modelo'),nome,preco:0,descricao:'',ativo:true,promoAtiva:false,promoPreco:0}:{id:idNovoItemVenda('tema'),nome,ativo:true};lista.push(item);await ref.set({data:JSON.stringify(lista)},{merge:true});}
+  if(modelo){modelosVenda=lista;LS.set('modelosVenda',modelosVenda);}else{temasVenda=lista;LS.set('temasVenda',temasVenda);}
+  const modelId=document.getElementById('vModelo')?.value||'',themeId=document.getElementById('vTema')?.value||'';
+  renderSeletoresModeloTemaVenda(modelo?item.id:modelId,modelo?themeId:item.id);
+  aoAlterarModeloTemaVenda(false);
+  if(selecionar)mostrarMensagemSalvarVenda(modelo?'Modelo criado e salvo com preço inicial de R$ 0,00.':'Tema criado e salvo.');
+  return item;
 }
 function abrirOpcoesModeloTemaVenda(tipo){renderOpcoesModeloTemaVenda(tipo);const box=document.getElementById(idOpcaoModeloTemaVenda(tipo)),input=document.getElementById(idInputModeloTemaVenda(tipo));if(box)box.hidden=false;if(input)input.setAttribute('aria-expanded','true');}
 function fecharOpcoesModeloTemaVenda(tipo){const box=document.getElementById(idOpcaoModeloTemaVenda(tipo)),input=document.getElementById(idInputModeloTemaVenda(tipo));if(box)box.hidden=true;if(input)input.setAttribute('aria-expanded','false');}
@@ -1722,7 +1743,7 @@ function aoAlterarModeloTemaVenda(interacao=true) {
   const modelo = modeloVendaPorId(document.getElementById('vModelo')?.value);
   const tema = temaVendaPorId(document.getElementById('vTema')?.value);
   const resumo = document.getElementById('vProdutoDetalhesEstruturados');
-  if (resumo) resumo.textContent = modelo ? 'Convite registrado como ' + modelo.nome + (tema ? ' — ' + tema.nome : ' (sem tema)') + '. O tema é opcional.' : 'Selecione o modelo; o tema é opcional.';
+  if (resumo) resumo.textContent = modelo ? 'Convite registrado como ' + modelo.nome + (tema ? ' — ' + tema.nome : ' (sem tema)') + '. O tema é opcional.' : '';
   const valor=document.getElementById('vValorProd');
   if (valor?.dataset.autoPreco==='true' || !valor?.value) recalcularValorProdutos();
 }
@@ -3755,37 +3776,28 @@ function getTermoAtualProduto() {
   return partes[partes.length - 1].trim();
 }
 
-function onProdutoInput() {
-  const termo = getTermoAtualProduto().toLowerCase();
-  const sugestoesEl = document.getElementById('produtoSugestoes');
-  const nomes = getNomesProdutos();
-
-  if (!termo) {
-    // Mostra todos ao focar campo vazio
-    sugestoesEl.innerHTML = nomes.map(p => {
-      const preco = getPrecoProduto(p);
-      const precoLabel = preco > 0 ? `<span style="color:var(--ink-muted);font-size:11px;margin-left:6px;">${BRL_RAW_plain(preco)}</span>` : '';
-      return `<div class="produto-sugestao-item" onmousedown="selecionarProdutoSugerido('${p.replace(/'/g,"\\'")}')">${p}${precoLabel}</div>`;
-    }).join('');
-    sugestoesEl.classList.add('open');
-    return;
-  }
-
-  const matches = nomes.filter(p => p.toLowerCase().includes(termo));
-  if (matches.length === 0) { sugestoesEl.innerHTML = ''; sugestoesEl.classList.remove('open'); return; }
-
-  sugestoesEl.innerHTML = matches.map(p => {
-    const idx = p.toLowerCase().indexOf(termo);
-    const antes = p.slice(0, idx);
-    const meio = p.slice(idx, idx + termo.length);
-    const depois = p.slice(idx + termo.length);
-    const preco = getPrecoProduto(p);
-    const precoLabel = preco > 0 ? `<span style="color:var(--ink-muted);font-size:11px;margin-left:6px;">${BRL_RAW_plain(preco)}</span>` : '';
-    return `<div class="produto-sugestao-item" onmousedown="selecionarProdutoSugerido('${p.replace(/'/g,"\\'")}')">${antes}<strong>${meio}</strong>${depois}${precoLabel}</div>`;
-  }).join('');
+function onProdutoInput(){
+  const termo=getTermoAtualProduto().trim(),normalizado=chaveRankingSite(termo),sugestoesEl=document.getElementById('produtoSugestoes'),nomes=getNomesProdutos();
+  const matches=normalizado?nomes.filter(nome=>chaveRankingSite(nome).includes(normalizado)):nomes;
+  const html=matches.map(nome=>{const index=nomes.indexOf(nome),preco=getPrecoProduto(nome),precoLabel=preco>0?'<span style="color:var(--ink-muted);font-size:11px;margin-left:6px">'+BRL_RAW_plain(preco)+'</span>':'';return '<div class="produto-sugestao-item" role="option" data-produto-index="'+index+'">'+escapeConvite(nome)+precoLabel+'</div>';}).join('');
+  const existeExato=normalizado&&catalogoProdutos.some(prod=>chaveRankingSite(prod.nome)===normalizado);
+  const criarHtml=termo&&!existeExato?'<div class="produto-sugestao-item" role="option" data-criar-adicional="'+escapeConvite(termo)+'">＋ Criar adicional: “'+escapeConvite(termo)+'”</div>':'';
+  sugestoesEl.innerHTML=html+criarHtml;
+  if(!html&&!criarHtml){sugestoesEl.classList.remove('open');return;}
   sugestoesEl.classList.add('open');
+  sugestoesEl.querySelectorAll('[data-produto-index]').forEach(el=>el.addEventListener('mousedown',e=>e.preventDefault()));
+  sugestoesEl.querySelectorAll('[data-produto-index]').forEach(el=>el.addEventListener('click',()=>selecionarProdutoSugerido(nomes[Number(el.dataset.produtoIndex)])));
+  sugestoesEl.querySelectorAll('[data-criar-adicional]').forEach(el=>{el.addEventListener('mousedown',e=>e.preventDefault());el.addEventListener('click',async()=>{el.style.pointerEvents='none';el.textContent='Criando adicional…';try{const novo=await criarAdicionalVenda(el.dataset.criarAdicional);selecionarProdutoSugerido(novo.nome);mostrarMensagemSalvarVenda('Adicional criado e salvo com preço inicial de R$ 0,00.');}catch(error){console.error(error);showToast('Não foi possível criar o adicional: '+(error.message||'erro no Firebase.'),'error');onProdutoInput();}});});
 }
-
+async function criarAdicionalVenda(nome){
+  nome=String(nome||'').trim();if(!nome)throw new Error('Informe o nome do adicional.');
+  if(modelosVenda.some(m=>chaveRankingSite(m.nome)===chaveRankingSite(nome)))throw new Error('Esse nome já está cadastrado como modelo.');
+  if(!db||!firebase.auth().currentUser)throw new Error('Faça login no painel para cadastrar este adicional.');
+  const ref=db.collection('config').doc('produtos'),snap=await ref.get();let lista=snap.exists?JSON.parse(snap.data().data||'[]'):[...catalogoProdutos];
+  let item=lista.find(p=>chaveRankingSite(p.nome)===chaveRankingSite(nome));
+  if(!item){item={id:idNovoItemVenda('adicional'),nome,preco:0,categoria:'Adicional',descricao:'',foto:'',adicionais:[]};lista.push(item);await ref.set({data:JSON.stringify(lista)},{merge:true});}
+  catalogoProdutos=lista;saveProdutosLocal();return item;
+}
 function selecionarProdutoSugerido(produto) {
   const campo = document.getElementById('vProduto');
   const valor = campo.value;
@@ -4127,6 +4139,14 @@ async function onSalvarVendaClick(){
 }
 async function saveVenda(forcarSalvar=false) {
   const mensagem=document.getElementById('vSaveMessage');if(mensagem)mensagem.textContent='';
+  if(!document.getElementById('vContato').value.trim()){mostrarMensagemSalvarVenda('Preencha o contato.',true);return;}
+  if(!document.getElementById('vData').value){mostrarMensagemSalvarVenda('Preencha a data.',true);return;}
+  const modelText=document.getElementById('vModeloBusca')?.value.trim()||'',themeText=document.getElementById('vTemaBusca')?.value.trim()||'';
+  if(!modelText&&!document.getElementById('vModelo')?.value&&!vendaEditId){mostrarMensagemSalvarVenda('Selecione ou digite um modelo. O tema é opcional.',true);return;}
+  if(modelText&&!document.getElementById('vModelo')?.value)await criarOpcaoModeloTemaVenda('modelo',modelText,false);
+  if(themeText&&!document.getElementById('vTema')?.value)await criarOpcaoModeloTemaVenda('tema',themeText,false);
+  const nomesAdicionaisDigitados=document.getElementById('vProduto').value.split(',').map(x=>x.trim()).filter(Boolean);
+  for(const nomeAdicional of nomesAdicionaisDigitados)if(!catalogoProdutos.some(p=>chaveRankingSite(p.nome)===chaveRankingSite(nomeAdicional)))await criarAdicionalVenda(nomeAdicional);
   sincronizarSelecaoVendaDigitada('modelo');sincronizarSelecaoVendaDigitada('tema');aoAlterarModeloTemaVenda(false);
   const status = document.getElementById('vStatus').value;
   const valorProd = parseFloat(document.getElementById('vValorProd').value)||0;
