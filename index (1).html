@@ -1354,7 +1354,7 @@
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Contato (DDD + número)</label><input type="text" id="vContato" placeholder="Ex: 11 99999-0000"></div>
+        <div class="form-group"><label>Contato (DDD + número)</label><input type="text" id="vContato" placeholder="Ex: 11 99999-0000" oninput="atualizarSugestoesVendasRelacionadas()"><input type="hidden" id="vVendaRelacionadaId"><div id="vVendaRelacionadaSelecionada" style="display:none;margin-top:7px"></div><div id="vVendaRelacionadaSugestoes" style="display:none;max-height:190px;overflow:auto;border:1px solid var(--border);border-radius:9px;margin-top:5px;background:var(--surface,#fff)"></div><small style="display:block;color:var(--ink-muted);margin-top:5px">Se este cliente já comprou antes, digite o contato e vincule a nova venda a uma compra anterior.</small></div>
       </div>
       <div class="form-row cols-2">
         <div class="form-group"><label for="vModeloBusca">Modelo do convite</label><div class="modelo-tema-picker"><input id="vModeloBusca" autocomplete="off" aria-controls="vModeloOpcoes" aria-expanded="false" onfocus="abrirOpcoesModeloTemaVenda('modelo')" oninput="sincronizarBuscaModeloTemaVenda('modelo')" onkeydown="tecladoOpcoesModeloTemaVenda(event,'modelo')" onblur="setTimeout(()=>fecharOpcoesModeloTemaVenda('modelo'),160)"><div id="vModeloOpcoes" class="modelo-tema-opcoes" hidden></div><select id="vModelo" style="display:none" aria-hidden="true" tabindex="-1"><option value=""></option></select></div></div>
@@ -3388,6 +3388,8 @@ function cardVendaLista(v) {
   }
 
   const camposForm = parseObsFormulario(v.obs);
+  const vendaRelacionada=vendaRelacionadaPorId(v.vendaRelacionadaId);
+  const vinculoTag=v.vendaRelacionadaId?'<span class="tarefa-chip" style="background:#eef0ff;color:#5141a3">↪ Retorno de '+escapeConvite(vendaRelacionada?.produto||'compra anterior')+(vendaRelacionada?.data?' · '+escapeConvite(vendaRelacionada.data.split('-').reverse().join('/')):'')+'</span>':'';
   let formChip = '';
   if (camposForm) {
     const nomeAniv = buscarCampo(camposForm, 'nome');
@@ -3413,6 +3415,7 @@ function cardVendaLista(v) {
           <span class="tarefa-chip" style="background:var(--green-light,#d4f0e4);color:var(--green)">Sinal ${BRL(v.sinal)}</span>
           ${restante > 0.01 ? `<span class="tarefa-chip" style="background:#fdeaea;color:var(--red)">Falta ${BRL(restante)}</span>` : ''}
           ${prazoTag}
+          ${vinculoTag}
           ${formChip}
         </div>
       </div>
@@ -3475,6 +3478,25 @@ function setFilter(el) {
   currentPageV = 1; renderVendas();
 }
 
+function normalizarContatoVinculoVenda(contato){return String(contato||'').replace(/\D/g,'');}
+function vendaRelacionadaPorId(id){return id?vendas.find(v=>String(v.id)===String(id)):null;}
+function renderVendaRelacionadaSelecionada(){
+  const box=document.getElementById('vVendaRelacionadaSelecionada'),id=document.getElementById('vVendaRelacionadaId')?.value;if(!box)return;
+  const venda=vendaRelacionadaPorId(id);if(!id){box.style.display='none';box.innerHTML='';return;}
+  box.style.display='block';box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:8px;background:var(--green-light,#e8f5ee);color:var(--green,#28724b);font-size:12px"><span>Vinculada à compra anterior: <strong>'+escapeConvite(venda?.produto||'Venda anterior')+'</strong>'+(venda?.data?' · '+escapeConvite(venda.data.split('-').reverse().join('/')):'')+'</span><button type="button" class="btn btn-ghost btn-sm" onclick="limparVendaRelacionada()" aria-label="Remover vínculo">Remover</button></div>';
+}
+function limparVendaRelacionada(){const id=document.getElementById('vVendaRelacionadaId'),lista=document.getElementById('vVendaRelacionadaSugestoes');if(id)id.value='';if(lista){lista.style.display='none';lista.innerHTML='';}renderVendaRelacionadaSelecionada();}
+function atualizarSugestoesVendasRelacionadas(){
+  const contato=document.getElementById('vContato')?.value||'',id=document.getElementById('vVendaRelacionadaId'),lista=document.getElementById('vVendaRelacionadaSugestoes');if(!lista||!id)return;
+  const chave=normalizarContatoVinculoVenda(contato),selecionada=vendaRelacionadaPorId(id.value);
+  if(selecionada&&normalizarContatoVinculoVenda(selecionada.contato)!==chave)limparVendaRelacionada();
+  const atuais=vendas.filter(v=>String(v.id)!==String(vendaEditId||'')&&v.status!=='cancelado'&&normalizarContatoVinculoVenda(v.contato)===chave).sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  if(chave.length<7||!atuais.length){lista.style.display=chave.length>=7?'block':'none';lista.innerHTML=chave.length>=7?'<div style="padding:9px 11px;color:var(--ink-muted);font-size:12px">Nenhuma compra anterior encontrada para este contato.</div>':'';return;}
+  lista.innerHTML='<div style="padding:7px 10px;color:var(--ink-muted);font-size:11px">Selecione a compra anterior para vincular:</div>'+atuais.slice(0,8).map(v=>'<button type="button" data-venda-relacionada="'+escapeConvite(v.id)+'" style="display:block;width:100%;text-align:left;padding:9px 11px;border:0;border-top:1px solid var(--border);background:transparent;color:var(--ink);cursor:pointer"><strong>'+escapeConvite(v.produto||'Venda')+'</strong><span style="display:block;color:var(--ink-muted);font-size:11px;margin-top:2px">'+escapeConvite((v.data||'').split('-').reverse().join('/'))+' · '+escapeConvite(v.status||'')+'</span></button>').join('');
+  lista.style.display='block';lista.querySelectorAll('[data-venda-relacionada]').forEach(btn=>{btn.addEventListener('mousedown',e=>e.preventDefault());btn.addEventListener('click',()=>selecionarVendaRelacionada(btn.dataset.vendaRelacionada));});
+}
+function selecionarVendaRelacionada(id){const hidden=document.getElementById('vVendaRelacionadaId'),lista=document.getElementById('vVendaRelacionadaSugestoes');if(hidden)hidden.value=id||'';if(lista){lista.style.display='none';lista.innerHTML='';}renderVendaRelacionadaSelecionada();}
+
 function openModalVenda(v=null) {
   vendaEditId = v ? v.id : null;
   document.getElementById('modalVendaTitle').textContent = v ? 'Editar Venda' : 'Nova Venda';
@@ -3485,6 +3507,8 @@ function openModalVenda(v=null) {
   document.getElementById('vData').value = v?.data || defaultDate;
 
   document.getElementById('vContato').value = v?.contato || '';
+  document.getElementById('vVendaRelacionadaId').value=v?.vendaRelacionadaId||'';
+  const vinculos=document.getElementById('vVendaRelacionadaSugestoes');if(vinculos){vinculos.style.display='none';vinculos.innerHTML='';}renderVendaRelacionadaSelecionada();
   const fonteSelect = document.getElementById('vFonte');
   const fonteInicial = v?.fonte || 'tráfego pago';
   if (![...fonteSelect.options].some(o => o.value === fonteInicial)) {
@@ -4181,6 +4205,7 @@ async function saveVenda(forcarSalvar=false) {
     ...vendaAnterior,
     id: vendaEditId || Date.now().toString(), status: statusFinal, data: document.getElementById('vData').value,
     contato: document.getElementById('vContato').value.trim(), fonte: document.getElementById('vFonte').value,
+    vendaRelacionadaId: document.getElementById('vVendaRelacionadaId')?.value || null,
     valorProd, produto: textoProdutosVenda, produtoLegado: estruturaSelecionada && vendaAnterior.produto && (!vendaAnterior.produtoId || vendaAnterior.modeloId!==modeloVendaAtual.id || vendaAnterior.temaId!==temaVendaAtual?.id) ? (vendaAnterior.produtoLegado || vendaAnterior.produto) : (vendaAnterior.produtoLegado ?? null), produtoId: estruturaSelecionada ? idCompostoConvite(modeloVendaAtual.id, temaVendaAtual?.id||null) : (vendaAnterior.produtoId ?? null), produtoNome: estruturaSelecionada ? nomeConviteEstruturado : (vendaAnterior.produtoNome || null), modeloId: estruturaSelecionada ? modeloVendaAtual.id : (vendaAnterior.modeloId || null), modelo: estruturaSelecionada ? modeloVendaAtual.nome : (vendaAnterior.modelo || null), temaId: estruturaSelecionada ? (temaVendaAtual?.id||null) : (vendaAnterior.temaId || null), tema: estruturaSelecionada ? (temaVendaAtual?.nome||null) : (vendaAnterior.tema || null), quantidade: estruturaSelecionada ? 1 : (vendaAnterior.quantidade || null), itensComerciais: estruturaSelecionada ? linhasComerciaisVenda : (vendaAnterior.itensComerciais || null), vinculoProduto: estruturaSelecionada ? (temaVendaAtual?'selecionado-modelo-tema':'selecionado-modelo') : (vendaAnterior.vinculoProduto || 'revisar'), sinal: parseFloat(document.getElementById('vSinal').value)||0,
     valorPago, obs: document.getElementById('vObs').value.trim(),
     prazo: document.getElementById('vPrazo')?.value || null,
