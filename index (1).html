@@ -1387,7 +1387,7 @@
       </div>
       <div class="form-row cols-2">
         <div class="form-group"><label>Valor Pago Total (R$)</label>
-          <input type="number" id="vValorPago" step="0.01" min="0" placeholder="0,00">
+          <input type="number" id="vValorPago" step="0.01" min="0" placeholder="0,00" oninput="marcarValorPagoManual()">
         </div>
         <div class="form-group" style="position:relative;">
           <label>Fonte do Lead</label>
@@ -3534,6 +3534,7 @@ function openModalVenda(v=null) {
   aoAlterarModeloTemaVenda(false);
   document.getElementById('vSinal').value = v?.sinal || '';
   document.getElementById('vValorPago').value = v?.valorPago || '';
+  _valorPagoManualEditado = !!v && v.valorPago !== null && v.valorPago !== undefined;
   document.getElementById('vObs').value = v?.obs || '';
 
   // Meio de pagamento, avaliação, conjunto de origem, nº de contatos
@@ -3560,7 +3561,7 @@ function onStatusChange() {
   const status = document.getElementById('vStatus').value;
   if (status === 'finalizado') {
     const vp = parseFloat(document.getElementById('vValorProd').value) || 0;
-    if (vp > 0) document.getElementById('vValorPago').value = vp.toFixed(2);
+    if (vp > 0) { document.getElementById('vValorPago').value = vp.toFixed(2); _valorPagoManualEditado=true; }
   }
 }
 
@@ -4038,10 +4039,12 @@ function onFonteKeydown(e) {
 
 function autoValorPago() {
   const status = document.getElementById('vStatus').value;
-  if (status !== 'finalizado') { document.getElementById('vValorPago').value = document.getElementById('vSinal').value; }
+  if (status !== 'finalizado' && !_valorPagoManualEditado) { document.getElementById('vValorPago').value = document.getElementById('vSinal').value; }
 }
 
 let _sinalAutoPreenchido = true; // controla se o sinal ainda está sob controle automático
+let _valorPagoManualEditado = false; // preserva o total quando ele foi informado manualmente
+function marcarValorPagoManual(){_valorPagoManualEditado=true;}
 // ── Prazo editável no modal ───────────────────────────────────────────────────
 function autoPreenchePrazo() {
   const data = document.getElementById('vData').value;
@@ -4086,9 +4089,9 @@ function autoSinal() {
   if (_sinalAutoPreenchido && v > 0) {
     const calc = (v/2).toFixed(2);
     sinalEl.value = calc;
-    if (status !== 'finalizado') document.getElementById('vValorPago').value = calc;
+    if (status !== 'finalizado' && !_valorPagoManualEditado) document.getElementById('vValorPago').value = calc;
   }
-  if (status === 'finalizado' && v > 0) { document.getElementById('vValorPago').value = v.toFixed(2); }
+  if (status === 'finalizado' && v > 0 && !_valorPagoManualEditado) { document.getElementById('vValorPago').value = v.toFixed(2); }
 }
 
 // Quando o usuário edita o Sinal manualmente, para de recalcular automático
@@ -4105,6 +4108,7 @@ function marcarPagamentoCompleto() {
   if (valorProd <= 0) { showToast('Preencha o Valor do Produto primeiro', 'error'); return; }
   document.getElementById('vSinal').value = valorProd.toFixed(2);
   document.getElementById('vValorPago').value = valorProd.toFixed(2);
+  _valorPagoManualEditado = true;
   _sinalAutoPreenchido = false;
   showToast('Pagamento completo preenchido ✓', 'success');
 }
