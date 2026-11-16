@@ -3859,7 +3859,8 @@ function recalcularValorProdutos() {
     valorEl.value = soma.toFixed(2);
     valorEl.dataset.autoPreco = 'true';
     if (autoTag) { autoTag.style.display = 'block'; autoTag.title = `Auto: ${produtos.map(p=>{ const pr=getPrecoProduto(p); return pr>0?BRL_RAW_plain(pr):'?'; }).join(' + ')}`; }
-    _sinalAutoPreenchido = true;
+    // Não religa o sinal automático aqui: se o usuário editou o sinal ou
+    // clicou em "PG Completo", essa escolha precisa ser respeitada.
     autoSinal();
   }
 }
@@ -4043,6 +4044,7 @@ function autoValorPago() {
 }
 
 let _sinalAutoPreenchido = true; // controla se o sinal ainda está sob controle automático
+let _pgCompleto = false; // true após clicar em "PG Completo" (sinal acompanha o valor total)
 let _valorPagoManualEditado = false; // preserva o total quando ele foi informado manualmente
 function marcarValorPagoManual(){_valorPagoManualEditado=true;}
 // ── Prazo editável no modal ───────────────────────────────────────────────────
@@ -4086,7 +4088,11 @@ function autoSinal() {
 
   // Recalcula o sinal enquanto ele ainda estiver "sob controle automático"
   // (ou seja, o usuário não editou manualmente o campo Sinal)
-  if (_sinalAutoPreenchido && v > 0) {
+  if (_pgCompleto && v > 0) {
+    // PG Completo: sinal e valor pago acompanham o valor total do produto
+    sinalEl.value = v.toFixed(2);
+    document.getElementById('vValorPago').value = v.toFixed(2);
+  } else if (_sinalAutoPreenchido && v > 0) {
     const calc = (v/2).toFixed(2);
     sinalEl.value = calc;
     if (status !== 'finalizado' && !_valorPagoManualEditado) document.getElementById('vValorPago').value = calc;
@@ -4097,6 +4103,8 @@ function autoSinal() {
 // Quando o usuário edita o Sinal manualmente, para de recalcular automático
 function onSinalManualEdit() {
   _sinalAutoPreenchido = false;
+  // Se vinha de "PG Completo", o valor pago deixa de ser o total e passa a acompanhar o sinal
+  if (_pgCompleto) { _pgCompleto = false; _valorPagoManualEditado = false; }
   autoValorPago();
 }
 
@@ -4110,12 +4118,14 @@ function marcarPagamentoCompleto() {
   document.getElementById('vValorPago').value = valorProd.toFixed(2);
   _valorPagoManualEditado = true;
   _sinalAutoPreenchido = false;
+  _pgCompleto = true;
   showToast('Pagamento completo preenchido ✓', 'success');
 }
 
 // Reseta o controle automático ao abrir o modal (nova venda ou edição)
 function resetSinalAuto(valorJaPreenchido) {
   _sinalAutoPreenchido = !valorJaPreenchido;
+  _pgCompleto = false;
 }
 
 function editVenda(id) {
@@ -4175,7 +4185,10 @@ async function saveVenda(forcarSalvar=false) {
   if(themeText&&!document.getElementById('vTema')?.value)await criarOpcaoModeloTemaVenda('tema',themeText,false);
   const nomesAdicionaisDigitados=document.getElementById('vProduto').value.split(',').map(x=>x.trim()).filter(Boolean);
   for(const nomeAdicional of nomesAdicionaisDigitados)if(!catalogoProdutos.some(p=>chaveRankingSite(p.nome)===chaveRankingSite(nomeAdicional)))await criarAdicionalVenda(nomeAdicional);
+  const _sinalDigitado=document.getElementById('vSinal').value,_valorPagoDigitado=document.getElementById('vValorPago').value;
   sincronizarSelecaoVendaDigitada('modelo');sincronizarSelecaoVendaDigitada('tema');aoAlterarModeloTemaVenda(false);
+  // O recálculo automático de preço NÃO pode sobrescrever o que foi digitado/definido no modal
+  document.getElementById('vSinal').value=_sinalDigitado;document.getElementById('vValorPago').value=_valorPagoDigitado;
   const status = document.getElementById('vStatus').value;
   const valorProd = parseFloat(document.getElementById('vValorProd').value)||0;
   const modeloVendaAtual = modeloVendaPorId(document.getElementById('vModelo')?.value) || null;
