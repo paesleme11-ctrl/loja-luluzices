@@ -3,78 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Grupo de Achadinhos de Beleza e Autocuidado</title>
-<meta name="description" content="Entre no grupo grátis e receba ofertas de skincare, maquiagem, cabelo e perfumes direto no WhatsApp.">
-<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
-<style>
-:root{
-  --bg:#fdf5f8; --surface:#f6e6f0; --card:#ffffff; --ink:#2a1030; --muted:#6d5470;
-  --orchid:#a3267f; --orchid-ink:#ffffff; --peach:#ffb59c; --lilac:#d9c2f0; --rose:#f7a8c8; --line:#ecd3e2;
-  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){--bg:#1a0c1d;--surface:#26122a;--card:#2f1a34;--ink:#fbeff6;--muted:#c9aecb;--orchid:#ff8fd0;--orchid-ink:#2a0c26;--line:#43264a;color-scheme:dark}
-}
-:root[data-theme="dark"]{--bg:#1a0c1d;--surface:#26122a;--card:#2f1a34;--ink:#fbeff6;--muted:#c9aecb;--orchid:#ff8fd0;--orchid-ink:#2a0c26;--line:#43264a;color-scheme:dark}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 Figtree,system-ui,sans-serif}
-h1,h2,h3{font-family:"Young Serif",Georgia,serif;font-weight:400;margin:0;line-height:1.08}
-.wrap{max-width:980px;margin:0 auto;padding:0 22px}
-section{padding:60px 0}
-.alt{background:var(--surface)}
-.hero{padding:44px 0 64px;overflow:hidden}
-.hero .wrap{display:grid;gap:40px;align-items:center}
-@media(min-width:840px){.hero .wrap{grid-template-columns:1.1fr .9fr}}
-h1{font-size:clamp(38px,7.4vw,64px);letter-spacing:-.01em}
-.lead{color:var(--muted);font-size:19px;max-width:44ch;margin:18px 0 28px}
-.btn{display:inline-flex;align-items:center;gap:10px;background:var(--orchid);color:var(--orchid-ink);font:700 18px Figtree,sans-serif;padding:17px 30px;border-radius:999px;text-decoration:none;transition:transform .15s,box-shadow .15s;box-shadow:0 8px 22px rgba(163,38,127,.28)}
-.btn:hover{transform:translateY(-2px)}
-.btn:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--peach);outline-offset:3px}
-.btn svg{width:22px;height:22px;fill:currentColor}
-.fine{font-size:14px;color:var(--muted);margin-top:14px}
-.members{display:none;font-weight:700;margin-bottom:14px;color:var(--orchid)}
-/* prateleira de arcos */
-.shelf{position:relative;height:340px;max-width:380px;width:100%;justify-self:center;display:flex;align-items:flex-end;justify-content:center;gap:14px;border-bottom:6px solid var(--ink)}
-.arch{border-radius:999px 999px 18px 18px;position:relative}
-.a1{width:96px;height:210px;background:var(--lilac)}
-.a2{width:120px;height:290px;background:var(--rose)}
-.a3{width:88px;height:170px;background:var(--peach)}
-.a1::before,.a3::before{content:"";position:absolute;left:50%;top:-22px;width:34px;height:26px;margin-left:-17px;background:var(--ink);border-radius:8px 8px 3px 3px}
-.a2::before{content:"";position:absolute;left:50%;top:44px;width:56px;height:96px;margin-left:-28px;background:rgba(255,255,255,.55);border-radius:999px 999px 10px 10px}
-.sticker{position:absolute;right:-4px;top:6px;background:var(--ink);color:var(--bg);font:400 22px "Young Serif",serif;width:104px;height:104px;border-radius:50%;display:grid;place-content:center;text-align:center;line-height:1.05;transform:rotate(10deg)}
-.sticker small{font:600 12px Figtree,sans-serif;display:block}
-h2{font-size:clamp(28px,5vw,42px);margin-bottom:28px}
-.cats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0;margin:0;list-style:none}
-@media(min-width:700px){.cats{grid-template-columns:repeat(4,1fr)}}
-.cats li{background:var(--card);border:1.5px solid var(--line);border-radius:22px;padding:20px 16px;font-weight:700;text-align:center}
-.cats li:nth-child(3n+1){border-radius:60px 60px 22px 22px}
-.steps{display:grid;gap:22px;padding:0;margin:0;list-style:none;counter-reset:s}
-@media(min-width:840px){.steps{grid-template-columns:repeat(3,1fr)}}
-.steps li{counter-increment:s;background:var(--card);border-radius:24px;padding:24px;border:1.5px solid var(--line)}
-.steps li::before{content:counter(s);display:grid;place-content:center;width:40px;height:40px;border-radius:50%;background:var(--peach);color:#2a1030;font:400 20px "Young Serif",serif;margin-bottom:12px}
-.steps h3{font-size:22px;margin-bottom:6px}
-.steps p{margin:0;color:var(--muted)}
-.offers{display:grid;gap:14px}
-@media(min-width:760px){.offers{grid-template-columns:repeat(3,1fr)}}
-.msg{background:#e2f7d0;color:#1d2b14;border-radius:4px 18px 18px 18px;padding:15px 17px;font-size:15.5px;line-height:1.45;box-shadow:0 1px 2px rgba(0,0,0,.15)}
-.msg b{display:block;margin-bottom:4px}
-.note{color:var(--muted);font-size:14px;margin-top:14px}
-details{border-bottom:1.5px solid var(--line);padding:18px 0}
-summary{cursor:pointer;font:400 20px "Young Serif",serif;list-style:none;display:flex;justify-content:space-between;gap:14px}
-summary::after{content:"+";font:700 24px Figtree,sans-serif;color:var(--orchid);line-height:1}
-details[open] summary::after{content:"–"}
-details p{margin:10px 0 0;color:var(--muted);max-width:60ch}
-.final{text-align:center}
-.final h2{margin-bottom:14px}
-.final p{color:var(--muted);margin:0 auto 26px;max-width:42ch}
-footer{padding:28px 0 96px;color:var(--muted);font-size:13px;text-align:center}
-.sticky{position:fixed;left:0;right:0;bottom:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line);display:flex;z-index:20}
-.sticky .btn{width:100%;justify-content:center;padding:14px}
-@media(min-width:840px){.sticky{display:none}footer{padding-bottom:28px}}
-@media(prefers-reduced-motion:reduce){.btn{transition:none}}
-</style>
+<title>Promos da Lu: Grupo VIP de Achadinhos de Beleza</title>
+<meta name="description" content="Entre no grupo VIP gratuito e receba todo dia achadinhos de beleza, cupons e ofertas relâmpago no WhatsApp.">
+<meta name="theme-color" content="#c0305a">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
 <!-- Meta Pixel Code -->
 <script>
 !function(f,b,e,v,n,t,s)
@@ -92,98 +24,122 @@ fbq('track', 'PageView');
 src="https://www.facebook.com/tr?id=1427423462787968&ev=PageView&noscript=1"
 /></noscript>
 <!-- End Meta Pixel Code -->
+<style>
+:root{--bg:#fde6ee;--card:#fff;--ink:#4a1626;--muted:#85525f;--rose:#c0305a;--soft:#fbd3e0;--line:#f4c3d3;--wa:#12b32a;color-scheme:light}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 Karla,system-ui,sans-serif;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+.top{background:var(--rose);color:#fff;text-align:center;padding:14px 16px;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;display:flex;gap:8px;justify-content:center;align-items:center}
+.top svg{width:18px;height:18px}
+main{max-width:520px;margin:28px auto 0;padding:0 16px}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:36px;padding:34px 22px 28px;text-align:center;box-shadow:0 10px 40px rgba(192,48,90,.12)}
+/* espaço da foto */
+.avatar{width:210px;height:210px;margin:0 auto 20px;border-radius:50%;background:var(--soft);box-shadow:0 8px 24px rgba(192,48,90,.22);position:relative;overflow:hidden;display:grid;place-items:center}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.avatar .ph{width:56px;height:56px;stroke:var(--rose);fill:none;stroke-width:1.6}
+h1{font:500 clamp(34px,9vw,44px)/1.08 "Cormorant Garamond",Georgia,serif;margin:0 0 16px}
+h1 em{color:var(--rose);font-weight:600}
+.lead{color:var(--muted);margin:0 auto 24px;max-width:36ch}
+.lead b{color:var(--ink)}
+.cta{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--wa);color:#fff;text-decoration:none;font:700 17px Karla,sans-serif;letter-spacing:.03em;text-transform:uppercase;padding:19px 18px;border-radius:999px;border:7px solid #d9f4de;background-clip:padding-box;transition:transform .15s}
+.cta:hover{transform:translateY(-2px)}
+.cta:focus-visible{outline:3px solid var(--rose);outline-offset:3px}
+.cta svg{width:26px;height:26px;fill:#fff;flex:none}
+.safe{display:flex;gap:8px;justify-content:center;align-items:center;margin:14px 0 0;color:var(--muted);font-weight:500;font-size:15px}
+.safe svg{width:20px;height:20px;stroke:var(--rose);fill:none;stroke-width:1.8}
+.spots{display:none;border:1.5px dashed var(--line);border-radius:20px;padding:16px 18px;margin:26px 0 0;text-align:left}
+.spots .row{display:flex;justify-content:space-between;font-weight:700}
+.spots .row span:last-child{color:var(--rose)}
+.bar{height:12px;background:var(--soft);border-radius:99px;margin:10px 0 8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--rose);border-radius:99px;width:0}
+.spots p{margin:0;text-align:right;font-size:14px;color:var(--muted)}
+.today{display:none;margin:16px 0 0;font-weight:700;color:var(--ink);font-size:15.5px}
+.today::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--wa);margin-right:8px}
+h2{font:700 14px Karla,sans-serif;letter-spacing:.08em;text-transform:uppercase;margin:34px 0 16px}
+.list{display:grid;gap:12px;text-align:left}
+.item{display:flex;gap:16px;align-items:flex-start;border:1.5px solid var(--line);border-radius:24px;padding:16px 18px}
+.ico{flex:none;width:48px;height:48px;border-radius:50%;background:var(--soft);display:grid;place-items:center}
+.ico svg{width:24px;height:24px;stroke:var(--rose);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.item h3{margin:0 0 2px;font:700 18px Karla,sans-serif}
+.item p{margin:0;color:var(--muted);font-size:15.5px;line-height:1.5}
+.again{margin-top:26px}
+.legal{text-align:center;color:var(--muted);font-size:13px;max-width:520px;margin:22px auto 40px;padding:0 20px}
+@media(prefers-reduced-motion:reduce){.cta{transition:none}}
+</style>
 </head>
 <body>
 
-<header class="hero">
-  <div class="wrap">
-    <div>
-      <p class="members" id="members"></p>
-      <h1>Seu autocuidado custa menos aqui.</h1>
-      <p class="lead">Entre no grupo gratuito e receba todo dia ofertas de skincare, maquiagem, cabelo e perfumes, já com o link para comprar.</p>
-      <a class="btn js-join" href="#" rel="noopener">
-        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C9 3 3.3 8.6 3.3 15.5c0 2.4.7 4.7 1.9 6.600L3 29l7.100-2.100c1.800 1 3.800 1.500 5.900 1.500 7 0 12.700-5.600 12.700-12.500S23 3 16 3zm0 22.800c-1.900 0-3.700-.5-5.300-1.500l-.4-.2-4.200 1.200 1.300-4-.3-.4a10 10 0 0 1-1.600-5.400C5.500 10 10.200 5.500 16 5.500S26.500 10 26.500 15.500 21.800 25.800 16 25.800zm5.800-7.600c-.3-.2-1.900-.9-2.200-1s-.5-.2-.7.200-.8 1-1 1.200-.4.200-.7.100a8.400 8.400 0 0 1-4.200-3.700c-.3-.6.300-.5.900-1.700.1-.2 0-.4 0-.5l-1-2.300c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.6.100-.9.400s-1.200 1.200-1.200 2.800 1.200 3.300 1.400 3.500c.2.200 2.400 3.700 5.800 5.100 2.100.9 2.900.9 3.900.8.600-.1 1.900-.8 2.200-1.600s.3-1.400.2-1.600-.3-.2-.6-.4z"/></svg>
-        Entrar no grupo grátis
-      </a>
-      <p class="fine">É grátis e você sai quando quiser.</p>
+<div class="top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+  Grupo VIP Promos da Lu
+</div>
+
+<main>
+  <div class="card">
+
+    <div class="avatar">
+      <svg class="ph" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.600 8 7"/></svg>
+      <img src="https://raw.githubusercontent.com/paesleme11-ctrl/loja-luluzices/main/WhatsApp%20Image%202026-11-17%20at%2020.45.50.jpeg" alt="Promos da Lu" width="420" height="420" fetchpriority="high" onerror="this.remove()">
     </div>
-    <div class="shelf" aria-hidden="true">
-      <div class="arch a1"></div><div class="arch a2"></div><div class="arch a3"></div>
-      <div class="sticker"><span>até 60%<small>de desconto</small></span></div>
+
+    <h1>Os achadinhos de beleza que <em>cabem no seu bolso</em></h1>
+    <p class="lead">Entre no <b>Grupo VIP da Lu</b> e receba todos os dias as melhores promoções de skincare, maquiagem, cabelo e perfumes, com cupons que funcionam.</p>
+
+    <a class="cta js-join" href="#" rel="noopener">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C9 3 3.3 8.6 3.3 15.5c0 2.4.7 4.7 1.9 6.600L3 29l7.100-2.100c1.800 1 3.800 1.500 5.900 1.500 7 0 12.700-5.600 12.700-12.500S23 3 16 3zm0 22.800c-1.900 0-3.700-.5-5.300-1.500l-.4-.2-4.200 1.200 1.300-4-.3-.4a10 10 0 0 1-1.600-5.400C5.500 10 10.200 5.500 16 5.500S26.500 10 26.500 15.500 21.800 25.800 16 25.800zm5.800-7.600c-.3-.2-1.900-.9-2.200-1s-.5-.2-.7.200-.8 1-1 1.200-.4.200-.7.100a8.400 8.400 0 0 1-4.200-3.700c-.3-.6.300-.5.900-1.700.1-.2 0-.4 0-.5l-1-2.300c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.6.100-.9.400s-1.200 1.200-1.200 2.800 1.200 3.300 1.400 3.500c.2.200 2.400 3.700 5.800 5.100 2.100.9 2.900.9 3.900.8.600-.1 1.900-.8 2.200-1.600s.3-1.400.2-1.600-.3-.2-.6-.4z"/></svg>
+      Quero entrar agora
+    </a>
+    <p class="safe">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.500 12.500l2.500 2.500 4.500-5"/></svg>
+      Grupo silencioso: só a administradora posta
+    </p>
+
+    <!-- Barra de vagas: só aparece se você preencher MEMBERS_NOW no script (números reais) -->
+    <div class="spots" id="spots">
+      <div class="row"><span>Vagas preenchidas</span><span id="pct"></span></div>
+      <div class="bar"><i id="fill"></i></div>
+      <p id="left"></p>
     </div>
-  </div>
-</header>
 
-<section class="alt">
-  <div class="wrap">
-    <h2>O que você recebe no grupo</h2>
-    <ul class="cats">
-      <li>Skincare</li><li>Maquiagem</li><li>Cabelo</li><li>Perfumes</li>
-      <li>Corpo e banho</li><li>Unhas</li><li>Acessórios de beleza</li><li>Cupons e frete grátis</li>
-    </ul>
-  </div>
-</section>
+    <p class="today" id="today"></p>
 
-<section>
-  <div class="wrap">
-    <h2>Como funciona</h2>
-    <ol class="steps">
-      <li><h3>Entre no grupo</h3><p>Toque no botão e confirme no WhatsApp. Leva menos de 10 segundos.</p></li>
-      <li><h3>Receba as ofertas</h3><p>Todo dia postamos achadinhos de beleza selecionados, com preço e link direto.</p></li>
-      <li><h3>Compre com desconto</h3><p>Gostou de algo? Toque no link e finalize a compra na loja oficial.</p></li>
-    </ol>
-  </div>
-</section>
-
-<section class="alt">
-  <div class="wrap">
-    <h2>Assim são as mensagens</h2>
-    <div class="offers">
-      <div class="msg"><b>✨ Sérum de vitamina C 30ml</b>De R$ 129 por R$ 59,90. Frete grátis.</div>
-      <div class="msg"><b>💄 Kit de 12 pincéis de maquiagem</b>De R$ 89 por R$ 34,90. Estoque limitado.</div>
-      <div class="msg"><b>🌸 Perfume feminino 100ml</b>De R$ 249 por R$ 149. Cupom aplicado no link.</div>
+    <h2>O que você encontra aqui:</h2>
+    <div class="list">
+      <div class="item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M20.600 13.400l-7.200 7.200a2 2 0 0 1-2.800 0L3 13V3h10l7.600 7.600a2 2 0 0 1 0 2.800z"/><circle cx="7.500" cy="7.500" r="1.200"/></svg></div><div><h3>Cupons que funcionam</h3><p>Cupons atualizados para você economizar na hora de finalizar a compra.</p></div></div>
+      <div class="item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M11 3l1.800 5.200L18 10l-5.200 1.800L11 17l-1.800-5.200L4 10l5.200-1.800z"/><path d="M19 15l.8 2.200L22 18l-2.200.8L19 21l-.8-2.200L16 18l2.200-.8z"/></svg></div><div><h3>Skincare e maquiagem</h3><p>Os produtos mais desejados do momento com preço de promoção.</p></div></div>
+      <div class="item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.500-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.500-9 9-9 9z"/></svg></div><div><h3>Cabelo, perfumes e corpo</h3><p>Achadinhos para cuidar de você da cabeça aos pés gastando menos.</p></div></div>
+      <div class="item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><div><h3>Ofertas relâmpago</h3><p>Avisamos quando o preço cai, para você não perder a promoção.</p></div></div>
+      <div class="item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.500 8-8 9-4.500-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><div><h3>Links diretos das lojas</h3><p>Você toca no link e compra no site da própria loja.</p></div></div>
     </div>
-    <p class="note">Mensagens de exemplo. Produtos e preços mudam todos os dias.</p>
+
+    <a class="cta js-join again" href="#" rel="noopener">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C9 3 3.3 8.6 3.3 15.5c0 2.4.7 4.7 1.9 6.600L3 29l7.100-2.100c1.800 1 3.800 1.500 5.900 1.500 7 0 12.700-5.600 12.700-12.500S23 3 16 3zm0 22.800c-1.900 0-3.700-.5-5.300-1.500l-.4-.2-4.200 1.200 1.300-4-.3-.4a10 10 0 0 1-1.600-5.400C5.500 10 10.200 5.500 16 5.500S26.500 10 26.500 15.500 21.800 25.800 16 25.800zm5.800-7.600c-.3-.2-1.900-.9-2.200-1s-.5-.2-.7.200-.8 1-1 1.200-.4.200-.7.100a8.400 8.400 0 0 1-4.200-3.700c-.3-.6.300-.5.900-1.700.1-.2 0-.4 0-.5l-1-2.300c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.6.100-.9.400s-1.200 1.200-1.200 2.800 1.200 3.300 1.400 3.500c.2.200 2.400 3.700 5.800 5.100 2.100.9 2.900.9 3.900.8.600-.1 1.900-.8 2.200-1.600s.3-1.400.2-1.600-.3-.2-.6-.4z"/></svg>
+      Quero entrar agora
+    </a>
   </div>
-</section>
+</main>
 
-<section>
-  <div class="wrap">
-    <h2>Perguntas rápidas</h2>
-    <details><summary>Precisa pagar para entrar?</summary><p>Não. Entrar e receber as ofertas é grátis. Você só paga se decidir comprar um produto, direto na loja.</p></details>
-    <details><summary>Os outros participantes veem meu número?</summary><p>Não. Os participantes ficam ocultos para os outros membros. Só os administradores veem os contatos.</p></details>
-    <details><summary>Vou receber spam?</summary><p>Só postamos ofertas de beleza e autocuidado. Sem correntes e sem conversa paralela.</p></details>
-    <details><summary>Como saio do grupo?</summary><p>Quando quiser, é só tocar em “Sair do grupo” no WhatsApp.</p></details>
-    <details><summary>Os preços são garantidos?</summary><p>Os preços são os que estavam ativos no momento da postagem. Promoções podem acabar rápido, então vale pegar logo.</p></details>
-  </div>
-</section>
-
-<section class="alt final">
-  <div class="wrap">
-    <h2>Cuide de você gastando menos.</h2>
-    <p>Entre agora e receba a próxima oferta ainda hoje.</p>
-    <a class="btn js-join" href="#" rel="noopener">Entrar no grupo grátis</a>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap">Alguns links podem ser de afiliados: podemos receber uma comissão, sem custo extra para você.</div>
-</footer>
-
-<div class="sticky"><a class="btn js-join" href="#" rel="noopener">Entrar no grupo grátis</a></div>
+<p class="legal">Alguns links podem ser de afiliados: podemos receber uma comissão, sem custo extra para você. Preços e estoques mudam rápido e são os do momento da postagem.</p>
 
 <script>
 // ====== CONFIGURE AQUI ======
-var GROUP_LINK = "https://chat.whatsapp.com/Cf4nJ6wFLMcKrKVIeFK5tv"; // link de convite do grupo
-var MEMBERS    = "";                                         // ex.: "Mais de 1.200 mulheres já estão no grupo" (vazio = oculto)
+var GROUP_LINK  = "https://chat.whatsapp.com/Cf4nJ6wFLMcKrKVIeFK5tv";
+var MEMBERS_NOW = 717;   // número REAL de pessoas no grupo (0 = esconde a barra de vagas)
+var CAPACITY    = 1024;  // limite de participantes do grupo no WhatsApp (ajuste se mudar)
+var JOINED_TODAY = 10;    // quantas pessoas REALMENTE entraram hoje (0 = esconde a linha)
 // ============================
 document.querySelectorAll(".js-join").forEach(function(a){
   a.href = GROUP_LINK; a.target = "_blank";
-  a.addEventListener("click", function(){
-    try{ if(window.fbq) fbq("track","Lead"); }catch(e){}
-  });
+  a.addEventListener("click", function(){ try{ if(window.fbq) fbq("track","Lead"); }catch(e){} });
 });
-if(MEMBERS){var m=document.getElementById("members");m.textContent=MEMBERS;m.style.display="block"}
+if(JOINED_TODAY > 0){var t=document.getElementById("today");t.textContent=JOINED_TODAY+(JOINED_TODAY===1?" pessoa entrou hoje":" pessoas entraram hoje");t.style.display="block"}
+if(MEMBERS_NOW > 0 && CAPACITY > MEMBERS_NOW){
+  var p = Math.round(MEMBERS_NOW / CAPACITY * 100);
+  document.getElementById("pct").textContent = p + "%";
+  document.getElementById("fill").style.width = p + "%";
+  document.getElementById("left").textContent = "Restam " + (CAPACITY - MEMBERS_NOW) + " vagas";
+  document.getElementById("spots").style.display = "block";
+}
 </script>
 </body>
 </html>
