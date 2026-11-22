@@ -658,6 +658,48 @@
   .topbar-right .btn-secundario { display: none; }
   .tarefas-count { font-size: 30px; }
 }
+
+/* IC-ABA-INICIO */
+/* ===== Inteligência Comercial (aba nova; classes com prefixo ic-) ===== */
+.ic-wrap{display:flex;flex-direction:column;gap:16px}
+.ic-banner{background:var(--amber-light);border:1px solid var(--amber);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--ink)}
+.ic-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.ic-tab{padding:8px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--ink-light);font-size:13px;font-weight:600;cursor:pointer}
+.ic-tab.active{background:var(--rose);border-color:var(--rose);color:#fff}
+.ic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.ic-muted{color:var(--ink-muted);font-size:12px}
+.ic-badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--warm);color:var(--ink-light)}
+.ic-b-NOVO_CONTATO{background:var(--blue-light);color:var(--blue)}
+.ic-b-EM_ATENDIMENTO{background:var(--blue-light);color:var(--blue)}
+.ic-b-ORCAMENTO_ENVIADO{background:var(--amber-light);color:var(--amber)}
+.ic-b-AGUARDANDO_CLIENTE{background:var(--purple-light);color:var(--purple)}
+.ic-b-AGUARDANDO_EMPRESA{background:var(--rose-light);color:var(--rose-dark)}
+.ic-b-VENDA_CONCLUIDA{background:var(--green-light);color:var(--green)}
+.ic-b-PERDIDO{background:var(--warm);color:var(--ink-muted)}
+.ic-b-EM_ANALISE{background:var(--amber-light);color:var(--red)}
+.ic-funil-row{display:grid;grid-template-columns:150px 1fr 34px;gap:10px;align-items:center;margin:6px 0;font-size:13px}
+.ic-bar{height:10px;border-radius:6px;background:var(--rose);min-width:2px}
+.ic-bar-wrap{background:var(--warm);border-radius:6px;overflow:hidden}
+.ic-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.ic-row:last-child{border-bottom:none}
+.ic-filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ic-filtros input,.ic-filtros select,.ic-form input,.ic-form select{padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:13px}
+.ic-tr{cursor:pointer}
+.ic-tr:hover td{background:var(--surface-2)}
+.ic-flag{display:inline-block;margin:2px 4px 2px 0;padding:2px 7px;border-radius:6px;font-size:11px;background:var(--amber-light);color:var(--ink)}
+.ic-pre{white-space:pre-wrap;font:13px/1.55 inherit;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px}
+.ic-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px}
+.ic-modal{background:var(--surface);color:var(--ink);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:min(720px,100%);padding:20px}
+.ic-modal h3{margin:0 0 4px;font-size:18px}
+.ic-sec{margin-top:16px}
+.ic-sec h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--ink-muted)}
+.ic-msg{padding:6px 10px;margin:4px 0;border-radius:10px;font-size:13px;max-width:92%}
+.ic-msg.cliente{background:var(--warm)}
+.ic-msg.empresa{background:var(--rose-light);margin-left:auto}
+.ic-msg small{display:block;color:var(--ink-muted);font-size:10px}
+.ic-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+@media(max-width:600px){.ic-funil-row{grid-template-columns:110px 1fr 28px}}
+
 </style>
 </head>
 <body>
@@ -689,6 +731,7 @@
   <div class="nav-item" onclick="goTo('fluxo')"><span class="nav-icon">💰</span> Fluxo de Caixa</div>
   <div class="nav-item" onclick="goTo('confirmacao')"><span class="nav-icon">📲</span> Confirmação Presença</div>
   <div class="nav-item" onclick="goTo('clientes')"><span class="nav-icon">👥</span> Clientes</div>
+  <div class="nav-item" onclick="goTo('inteligencia')"><span class="nav-icon">🧠</span> Inteligência Comercial</div>
   <div class="nav-section">Ferramentas</div>
   <div class="nav-item" onclick="goTo('eventosrsvp')"><span class="nav-icon">📲</span> Eventos & QR Code</div>
   <div class="nav-item" onclick="goTo('convitesdigitais')"><span class="nav-icon">💌</span> Convites Digitais</div>
@@ -1213,6 +1256,10 @@
         <div id="listas-list" style="margin-top:16px"></div>
       </div>
     </div>
+  </div>
+
+  <div class="page" id="page-inteligencia">
+    <div id="ic-root"><p class="ic-muted">Carregando…</p></div>
   </div>
 
   <div class="page" id="page-metas">
@@ -1958,8 +2005,8 @@ setTimeout(() => {
 // ============================================================
 // NAVIGATION
 // ============================================================
-const PAGES = ['dashboard','anual','tarefas','vendas','fluxo','confirmacao','clientes','produtos','metas','eventosrsvp','convitesdigitais','presentes'];
-const PAGE_TITLES = { dashboard:'Dashboard', anual:'Dashboard Anual', tarefas:'Tarefas do Dia', vendas:'Vendas', fluxo:'Fluxo de Caixa', confirmacao:'Confirmação de Presença', clientes:'Clientes', produtos:'Produtos', metas:'Configurações', eventosrsvp:'Eventos & QR Code', convitesdigitais:'Convites Interativos', presentes:'Lista de Presentes' };
+const PAGES = ['dashboard','anual','tarefas','vendas','fluxo','confirmacao','clientes','produtos','metas','eventosrsvp','convitesdigitais','presentes','inteligencia'];
+const PAGE_TITLES = { dashboard:'Dashboard', anual:'Dashboard Anual', tarefas:'Tarefas do Dia', vendas:'Vendas', fluxo:'Fluxo de Caixa', confirmacao:'Confirmação de Presença', clientes:'Clientes', produtos:'Produtos', metas:'Configurações', eventosrsvp:'Eventos & QR Code', convitesdigitais:'Convites Interativos', presentes:'Lista de Presentes', inteligencia:'Inteligência Comercial' };
 let currentPage = 'dashboard';
 
 function goTo(page) {
@@ -1971,7 +2018,7 @@ function goTo(page) {
   });
   document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
   const btn = document.getElementById('topbarAction');
-  if (page === 'metas' || page === 'tarefas' || page === 'confirmacao' || page === 'anual' || page === 'produtos' || page === 'clientes' || page === 'eventosrsvp' || page === 'convitesdigitais' || page === 'presentes') { btn.style.display = 'none'; }
+  if (page === 'metas' || page === 'tarefas' || page === 'confirmacao' || page === 'anual' || page === 'produtos' || page === 'clientes' || page === 'eventosrsvp' || page === 'convitesdigitais' || page === 'presentes' || page === 'inteligencia') { btn.style.display = 'none'; }
   else { btn.style.display = ''; btn.textContent = page === 'fluxo' ? '+ Transação' : '+ Nova Venda'; btn.onclick = page === 'fluxo' ? () => document.getElementById('fluxoDesc').focus() : openModalVenda; }
   renderPage(page);
 }
@@ -1989,6 +2036,7 @@ function renderPage(p) {
   if (p === 'eventosrsvp') renderEventosRsvp();
   if (p === 'convitesdigitais') renderConvitesDigitais();
   if (p === 'presentes') renderPresentes();
+  if (p === 'inteligencia' && window.IC) window.IC.render();
 }
 
 // ============================================================
@@ -6251,6 +6299,358 @@ async function editarConviteDigital(id) {
 }
 function abrirConviteDigitalAtual(){const id=document.getElementById('conviteDigitalId').value;if(id)window.open(linkPublicoConvite(id),'_blank','noopener');}
 async function copiarConviteDigital(id){const link=new URL(linkPublicoConvite(id),location.href).href;try{await navigator.clipboard.writeText(link);alert('Link do convite copiado!');}catch{prompt('Copie o link do convite:',link);}}
+
+</script>
+<script>
+/* IC-ABA-JS */
+/* ===== Inteligência Comercial — aba da gestão (modo observação) =====
+   Lê as coleções ic_* do Firestore (só o admin acessa, pelas regras publicadas).
+   NUNCA escreve em "vendas". Escreve só em ic_* (correção manual e dados de demonstração). */
+(function () {
+  'use strict';
+  const E = { NOVO_CONTATO: 'NOVO_CONTATO', EM_ATENDIMENTO: 'EM_ATENDIMENTO', ORCAMENTO_ENVIADO: 'ORCAMENTO_ENVIADO',
+    AGUARDANDO_CLIENTE: 'AGUARDANDO_CLIENTE', AGUARDANDO_EMPRESA: 'AGUARDANDO_EMPRESA', VENDA_CONCLUIDA: 'VENDA_CONCLUIDA',
+    PERDIDO: 'PERDIDO', EM_ANALISE: 'EM_ANALISE' };
+  const CONFIG = { atencaoHoras: 24 };
+  const NOME = { NOVO_CONTATO: 'Novo contato', EM_ATENDIMENTO: 'Em atendimento', ORCAMENTO_ENVIADO: 'Orçamento enviado',
+    AGUARDANDO_CLIENTE: 'Aguardando cliente', AGUARDANDO_EMPRESA: 'Aguardando empresa', VENDA_CONCLUIDA: 'Venda concluída',
+    PERDIDO: 'Perdido', EM_ANALISE: 'Em análise' };
+  const FLAGS = {
+    venda_sem_comprovante: 'Aceitou comprar, mas sem comprovante',
+    comprovante_nao_verificado: 'Comprovante em imagem — conferir',
+    perdido_trecho_fraco: 'Desistência não ficou clara',
+    perdido_sem_prova: 'Desistência sem prova',
+    venda_sem_prova: 'Venda sem prova',
+    confianca_baixa: 'Confiança baixa — revisar',
+    valor_nao_encontrado_nas_mensagens: 'Valor não confirmado nas mensagens',
+    possivel_regressao_requer_revisao: 'Cliente já comprou — revisar',
+    etapa_manual_preservada: 'Etapa manual mantida',
+    orcamento_sem_valor: 'Orçamento sem valor',
+    evidencia_inexistente: 'Evidência inválida da IA',
+  };
+
+  // ---- Relatório: cópia GERADA de src/relatorio.js (não editar aqui) ----
+  
+
+
+const FMT_DIA = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' });
+// Dia (AAAA-MM-DD) no horário de Brasília.
+const diaKey = (ts) => FMT_DIA.format(new Date(ts));
+
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+// Tudo é CONTADO a partir dos registros (contatos e histórico). Nada é estimado.
+function calcularRelatorio({ contatos, historico, dia, agora, cfg = CONFIG }) {
+  const noDia = (iso) => iso && diaKey(iso) === dia;
+  const unicos = (lista) => new Set(lista.map((h) => h.telefone)).size;
+
+  const conversasRecebidas = contatos.filter((c) => c.diasClienteEscreveu?.includes(dia)).length;
+  const novosContatos = contatos.filter((c) => noDia(c.primeiroContatoEm)).length;
+  const orcamentosEnviados = contatos.filter((c) => noDia(c.orcamentoEnviadoEm)).length;
+  const vendasConcluidas = unicos(historico.filter((h) => h.para === E.VENDA_CONCLUIDA && noDia(h.em)));
+  const perdidos = unicos(historico.filter((h) => h.para === E.PERDIDO && noDia(h.em)));
+
+  const porEtapa = Object.fromEntries(Object.values(E).map((e) => [e, 0]));
+  for (const c of contatos) if (c.etapa && porEtapa[c.etapa] !== undefined) porEtapa[c.etapa]++;
+
+  const horasDesde = (iso) => (agora - new Date(iso).getTime()) / 3600000;
+  const orcamentoSemResposta = contatos.filter(
+    (c) => c.etapa === E.ORCAMENTO_ENVIADO && c.ultimaInteracaoEm && horasDesde(c.ultimaInteracaoEm) >= cfg.atencaoHoras,
+  ).length;
+  const prometeramRetornar = contatos.filter((c) => c.etapa === E.AGUARDANDO_CLIENTE && c.ia?.cliente_prometeu_retornar).length;
+  const aguardandoEquipe = porEtapa[E.AGUARDANDO_EMPRESA];
+  const emAnalise = porEtapa[E.EM_ANALISE];
+
+  // Conversão: contatos que chegaram nos últimos 30 dias, e quantos chegaram em cada etapa.
+  const limite = agora - 30 * 86400000;
+  const recentes = contatos.filter((c) => c.primeiroContatoEm && new Date(c.primeiroContatoEm).getTime() >= limite);
+  const venderam = new Set(historico.filter((h) => h.para === E.VENDA_CONCLUIDA).map((h) => h.telefone));
+  const comOrc = recentes.filter((c) => c.orcamentoEnviadoEm).length;
+  const comVenda = recentes.filter((c) => venderam.has(c.telefone)).length;
+  const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : null);
+  const conversao = {
+    janelaDias: 30,
+    contatos: recentes.length,
+    comOrcamento: comOrc,
+    comVenda,
+    contatoParaOrcamentoPct: pct(comOrc, recentes.length),
+    orcamentoParaVendaPct: pct(comVenda, comOrc),
+    contatoParaVendaPct: pct(comVenda, recentes.length),
+  };
+
+  const numeros = {
+    dia, conversasRecebidas, novosContatos, orcamentosEnviados, vendasConcluidas, perdidos,
+    aguardandoCliente: porEtapa[E.AGUARDANDO_CLIENTE], aguardandoEmpresa: aguardandoEquipe,
+    porEtapa, atencao: { orcamentoSemResposta, prometeramRetornar, aguardandoEquipe, emAnalise }, conversao,
+  };
+  return { ...numeros, texto: textoRelatorio(numeros) };
+}
+
+function textoRelatorio(n) {
+  const [a, m, d] = n.dia.split('-');
+  const linhas = [`RELATÓRIO COMERCIAL — ${d}/${m}`, ''];
+  linhas.push(`${plural(n.conversasRecebidas, 'conversa recebida', 'conversas recebidas')}.`);
+  linhas.push(`${plural(n.orcamentosEnviados, 'orçamento enviado', 'orçamentos enviados')}.`);
+  linhas.push(`${plural(n.aguardandoCliente, 'cliente aguardando retorno', 'clientes aguardando retorno')}.`);
+  linhas.push(`${plural(n.vendasConcluidas, 'venda identificada', 'vendas identificadas')}.`);
+  const pontos = [];
+  const x = n.atencao;
+  if (x.orcamentoSemResposta) pontos.push(`${plural(x.orcamentoSemResposta, 'cliente recebeu orçamento e ainda não respondeu', 'clientes receberam orçamento e ainda não responderam')}.`);
+  if (x.prometeramRetornar) pontos.push(`${plural(x.prometeramRetornar, 'cliente prometeu retornar', 'clientes prometeram retornar')}.`);
+  if (x.aguardandoEquipe) pontos.push(`${plural(x.aguardandoEquipe, 'cliente está aguardando informações da equipe', 'clientes estão aguardando informações da equipe')}.`);
+  if (x.emAnalise) pontos.push(`${plural(x.emAnalise, 'conversa precisa de revisão humana', 'conversas precisam de revisão humana')}.`);
+  linhas.push('', 'Pontos de atenção:');
+  if (pontos.length) pontos.forEach((p) => linhas.push(`* ${p}`));
+  else linhas.push('* Nenhum ponto de atenção.');
+  return linhas.join('\n');
+}
+
+  // ---- fim da cópia ----
+
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const FMT_HORA = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const quando = (iso) => (iso ? FMT_HORA.format(new Date(iso)) : '—');
+  const fmtTel = (t) => { const m = /^55(\d{2})(\d{5})(\d{4})$/.exec(t || ''); return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : esc(t); };
+  const moeda = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+  const badge = (etapa) => `<span class="ic-badge ic-b-${esc(etapa)}">${esc(NOME[etapa] || etapa || 'Sem etapa')}</span>`;
+  const toast = (m, t) => { if (typeof showToast === 'function') showToast(m, t); };
+
+  const state = { iniciado: false, aba: 'geral', filtroEtapa: '', busca: '', dia: null, contatos: [], historico: [], analises: [], config: null, erro: null, abrir: null, msgs: [] };
+  const unsubs = [];
+  const root = () => document.getElementById('ic-root');
+  const database = () => (typeof db !== 'undefined' ? db : null);
+
+  function iniciar() {
+    if (state.iniciado) return;
+    const d = database();
+    if (!d) { state.erro = 'Banco de dados ainda não está pronto. Faça login e tente de novo.'; return; }
+    state.iniciado = true;
+    const falha = (e) => { state.erro = 'Não foi possível ler os dados (' + (e && e.code ? e.code : 'erro') + '). Confira se você está logado com o e-mail de administrador.'; desenhar(); };
+    unsubs.push(d.collection('ic_contatos').onSnapshot((s) => { state.contatos = s.docs.map((x) => x.data()); state.erro = null; desenhar(); }, falha));
+    unsubs.push(d.collection('ic_historico').orderBy('em', 'desc').limit(2000).onSnapshot((s) => { state.historico = s.docs.map((x) => x.data()); desenhar(); }, falha));
+    unsubs.push(d.collection('ic_analises').orderBy('em', 'desc').limit(300).onSnapshot((s) => { state.analises = s.docs.map((x) => x.data()); desenhar(); }, falha));
+    unsubs.push(d.collection('ic_config').doc('agente').onSnapshot((x) => { state.config = x.exists ? x.data() : null; desenhar(); }, falha));
+  }
+
+  // ---------- telas ----------
+  function relatorioAtual(dia) {
+    return calcularRelatorio({ contatos: state.contatos, historico: state.historico, dia, agora: Date.now(), cfg: CONFIG });
+  }
+
+  function telaGeral() {
+    const hoje = diaKey(Date.now());
+    const r = relatorioAtual(hoje);
+    const max = Math.max(1, ...Object.values(r.porEtapa));
+    const funil = Object.keys(NOME).map((e) => `<div class="ic-funil-row"><span>${esc(NOME[e])}</span><div class="ic-bar-wrap"><div class="ic-bar" style="width:${(r.porEtapa[e] / max) * 100}%"></div></div><b>${r.porEtapa[e]}</b></div>`).join('');
+    const horas = (iso) => (Date.now() - new Date(iso).getTime()) / 3600000;
+    const ops = [];
+    for (const c of state.contatos) {
+      if (c.etapa === E.ORCAMENTO_ENVIADO && c.ultimaInteracaoEm && horas(c.ultimaInteracaoEm) >= CONFIG.atencaoHoras) ops.push([c, 'Orçamento enviado, sem resposta']);
+      else if (c.etapa === E.AGUARDANDO_CLIENTE && c.ia && c.ia.cliente_prometeu_retornar) ops.push([c, 'Prometeu retornar']);
+      else if (c.etapa === E.AGUARDANDO_EMPRESA) ops.push([c, 'Aguardando a equipe']);
+      else if (c.etapa === E.EM_ANALISE) ops.push([c, 'Precisa de revisão humana']);
+    }
+    const lista = ops.slice(0, 12).map(([c, why]) => `<div class="ic-row"><div><b>${esc(c.nome || fmtTel(c.telefone))}</b> <span class="ic-muted">${esc(why)} · ${esc(c.ia && c.ia.proxima_acao || '')}</span></div><button class="btn btn-ghost btn-sm" data-ic-abrir="${esc(c.telefone)}">Abrir</button></div>`).join('') || '<p class="ic-muted">Nenhuma oportunidade pendente.</p>';
+    const pct = (v) => (v == null ? '—' : v + '%');
+    return `
+      <div class="ic-muted">Hoje (${esc(hoje.split('-').reverse().join('/'))})</div>
+      <div class="kpi-grid">
+        <div class="kpi-card" style="--kpi-color:var(--rose)"><div class="kpi-label">Conversas recebidas</div><div class="kpi-value">${r.conversasRecebidas}</div></div>
+        <div class="kpi-card" style="--kpi-color:var(--blue)"><div class="kpi-label">Novos contatos</div><div class="kpi-value">${r.novosContatos}</div></div>
+        <div class="kpi-card" style="--kpi-color:var(--amber)"><div class="kpi-label">Orçamentos enviados</div><div class="kpi-value">${r.orcamentosEnviados}</div></div>
+        <div class="kpi-card" style="--kpi-color:var(--green)"><div class="kpi-label">Vendas (com comprovante)</div><div class="kpi-value">${r.vendasConcluidas}</div></div>
+        <div class="kpi-card" style="--kpi-color:var(--ink-muted)"><div class="kpi-label">Perdidos</div><div class="kpi-value">${r.perdidos}</div></div>
+      </div>
+      <div class="card"><div class="card-header"><span class="card-title">Funil agora</span></div><div class="card-body">${funil}
+        <p class="ic-muted" style="margin-top:10px">Conversão (últimos 30 dias, ${r.conversao.contatos} contatos): contato → orçamento ${pct(r.conversao.contatoParaOrcamentoPct)} · orçamento → venda ${pct(r.conversao.orcamentoParaVendaPct)} · contato → venda ${pct(r.conversao.contatoParaVendaPct)}</p></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Oportunidades que precisam de acompanhamento</span></div><div class="card-body">${lista}</div></div>`;
+  }
+
+  function telaClientes() {
+    const termo = state.busca.trim().toLowerCase();
+    const lista = state.contatos
+      .filter((c) => !state.filtroEtapa || c.etapa === state.filtroEtapa)
+      .filter((c) => !termo || `${c.nome || ''} ${c.telefone || ''} ${(c.ia && c.ia.produto_interesse) || ''}`.toLowerCase().includes(termo))
+      .sort((a, b) => String(b.ultimaInteracaoEm || '').localeCompare(String(a.ultimaInteracaoEm || '')));
+    const linhas = lista.map((c) => {
+      const flags = ((c.ia && c.ia.flags) || []).map((f) => `<span class="ic-flag">${esc(FLAGS[f] || f)}</span>`).join('');
+      return `<tr class="ic-tr" data-ic-abrir="${esc(c.telefone)}"><td><b>${esc(c.nome || '—')}</b><div class="ic-muted">${fmtTel(c.telefone)}</div></td><td>${badge(c.etapa)}${c.etapaManual ? ' <span class="ic-muted">manual</span>' : ''}</td><td>${esc((c.ia && c.ia.produto_interesse) || '—')}</td><td>${moeda(c.ia && c.ia.valor_apresentado)}</td><td>${esc((c.ia && c.ia.proxima_acao) || '—')}${flags ? '<div>' + flags + '</div>' : ''}</td><td>${quando(c.ultimaInteracaoEm)}</td></tr>`;
+    }).join('');
+    const opcoes = Object.keys(NOME).map((e) => `<option value="${e}"${state.filtroEtapa === e ? ' selected' : ''}>${esc(NOME[e])}</option>`).join('');
+    return `<div class="card"><div class="card-header"><span class="card-title">Clientes classificados (${lista.length})</span></div><div class="card-body">
+      <div class="ic-filtros"><input id="ic-busca" placeholder="Buscar nome, telefone ou produto" value="${esc(state.busca)}"><select id="ic-fetapa"><option value="">Todas as etapas</option>${opcoes}</select></div>
+      <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>Produto</th><th>Valor</th><th>Próxima ação</th><th>Última interação</th></tr></thead><tbody>${linhas || '<tr><td colspan="6" class="ic-muted">Nenhum cliente ainda.</td></tr>'}</tbody></table></div></div></div>`;
+  }
+
+  function telaRelatorio() {
+    const dia = state.dia || diaKey(Date.now());
+    const r = relatorioAtual(dia);
+    return `<div class="card"><div class="card-header"><span class="card-title">Relatório diário</span></div><div class="card-body">
+      <div class="ic-filtros"><input type="date" id="ic-dia" value="${esc(dia)}"><button class="btn btn-ghost btn-sm" id="ic-copiar">Copiar texto</button></div>
+      <div class="ic-pre" id="ic-texto">${esc(r.texto)}</div>
+      <p class="ic-muted" style="margin-top:8px">Números do dia (conversas, orçamentos, vendas) e números de agora (aguardando, atenção). Calculados dos registros, sem estimativas.</p></div></div>`;
+  }
+
+  function telaStatus() {
+    const cfg = state.config || {};
+    const hoje = diaKey(Date.now());
+    const gasto = state.analises.filter((a) => a.dia === hoje).reduce((s, a) => s + (a.custoUSD || 0), 0);
+    const limite = cfg.limiteCustoDiarioUSD ?? 1;
+    const linhas = state.analises.slice(0, 15).map((a) => `<tr><td>${quando(a.em)}</td><td>${esc(a.telefone ? fmtTel(a.telefone) : '—')}</td><td>${a.ok ? 'ok' : '<b>falhou</b>'}${a.erro ? ' · ' + esc(a.erro) : ''}</td><td>${a.tokensEntrada || 0} / ${a.tokensSaida || 0}</td><td>US$ ${(a.custoUSD || 0).toFixed(5)}</td></tr>`).join('');
+    const demo = state.contatos.some((c) => c.demo);
+    return `<div class="card"><div class="card-header"><span class="card-title">Status do agente</span></div><div class="card-body">
+      <div class="ic-row"><span>Modo</span><b>${cfg.modoObservacao === false ? 'Atualização automática' : 'Observação (a equipe confirma)'}</b></div>
+      <div class="ic-row"><span>Conexão com o WhatsApp</span><b>${cfg.whatsappConectado ? 'Conectado' : 'Ainda não conectada (Fase 5)'}</b></div>
+      <div class="ic-row"><span>Custo de IA hoje</span><b>US$ ${gasto.toFixed(4)} de US$ ${Number(limite).toFixed(2)}</b></div>
+      <div class="ic-row"><span>Último processamento</span><b>${quando(cfg.ultimoProcessamentoEm || (state.analises[0] && state.analises[0].em))}</b></div>
+      <div class="ic-row"><span>Dados de demonstração</span><span><button class="btn btn-ghost btn-sm" id="ic-demo-on">${demo ? 'Recarregar' : 'Carregar'} demonstração</button> <button class="btn btn-ghost btn-sm" id="ic-demo-off">Remover demonstração</button></span></div>
+      <p class="ic-muted">A demonstração usa clientes e conversas INVENTADOS, marcados como "demo". Remover apaga só eles.</p></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Últimas análises</span></div><div class="card-body"><div class="table-wrap"><table><thead><tr><th>Quando</th><th>Cliente</th><th>Resultado</th><th>Tokens (entrada / saída)</th><th>Custo</th></tr></thead><tbody>${linhas || '<tr><td colspan="5" class="ic-muted">Nenhuma análise ainda.</td></tr>'}</tbody></table></div></div></div>`;
+  }
+
+  function modalCliente() {
+    const c = state.contatos.find((x) => x.telefone === state.abrir);
+    if (!c) return '';
+    const ia = c.ia || {};
+    const idsEv = new Set(ia.evidencias || []);
+    const hist = state.historico.filter((h) => h.telefone === c.telefone).sort((a, b) => String(b.em).localeCompare(String(a.em)));
+    const msgs = state.msgs.map((m) => `<div class="ic-msg ${m.from === 'cliente' ? 'cliente' : 'empresa'}"><small>${m.from === 'cliente' ? 'Cliente' : 'Equipe'} · ${quando(m.ts)}${idsEv.has(m.id) ? ' · ★ prova usada pela IA' : ''}</small>${m.text ? esc(m.text) : '<i>[' + esc(m.type || 'mídia') + ']</i>'}</div>`).join('') || '<p class="ic-muted">Sem mensagens carregadas.</p>';
+    const sugestao = ia.etapa_sugerida && ia.etapa_sugerida !== c.etapa ? `<div class="ic-muted">A IA sugeriu: ${esc(NOME[ia.etapa_sugerida] || ia.etapa_sugerida)}</div>` : '';
+    const opcoes = Object.keys(NOME).map((e) => `<option value="${e}"${c.etapa === e ? ' selected' : ''}>${esc(NOME[e])}</option>`).join('');
+    return `<div class="ic-overlay" id="ic-overlay"><div class="ic-modal">
+      <div style="display:flex;justify-content:space-between;gap:8px"><div><h3>${esc(c.nome || 'Cliente sem nome')}</h3><div class="ic-muted">${fmtTel(c.telefone)}</div></div><button class="btn btn-ghost btn-sm" id="ic-fechar">Fechar</button></div>
+      <div class="ic-sec">${badge(c.etapa)} ${c.etapaManual ? '<span class="ic-muted">definida pela equipe</span>' : ''} ${ia.confianca != null ? `<span class="ic-muted">confiança ${Math.round(ia.confianca * 100)}%</span>` : ''}${sugestao}
+        ${((ia.flags || []).map((f) => `<span class="ic-flag">${esc(FLAGS[f] || f)}</span>`).join(''))}</div>
+      <div class="ic-sec"><h4>Resumo da IA</h4><div>${esc(ia.resumo || 'Ainda sem análise.')}</div></div>
+      <div class="ic-sec"><h4>Dados</h4><div class="ic-muted">Produto: ${esc(ia.produto_interesse || '—')} · Tema: ${esc(ia.tema_convite || '—')} · Valor: ${moeda(ia.valor_apresentado)} · Próxima ação: ${esc(ia.proxima_acao || '—')}</div></div>
+      <div class="ic-sec"><h4>Corrigir etapa</h4><div class="ic-form"><select id="ic-novaetapa">${opcoes}</select><input id="ic-motivo" placeholder="Motivo (opcional)" style="flex:1;min-width:160px"><button class="btn btn-primary btn-sm" id="ic-salvar">Salvar correção</button>${c.etapaManual ? '<button class="btn btn-ghost btn-sm" id="ic-devolver">Devolver para a IA</button>' : ''}</div></div>
+      <div class="ic-sec"><h4>Histórico de mudanças</h4>${hist.map((h) => `<div class="ic-row"><span>${esc(NOME[h.de] || h.de || '—')} → <b>${esc(NOME[h.para] || h.para)}</b> <span class="ic-muted">${h.origem === 'manual' ? 'por ' + esc(h.usuario || 'equipe') : 'IA'} · ${esc(h.motivo || '')}</span></span><span class="ic-muted">${quando(h.em)}</span></div>`).join('') || '<p class="ic-muted">Sem mudanças registradas.</p>'}</div>
+      <div class="ic-sec"><h4>Conversa (original)</h4>${msgs}</div></div></div>`;
+  }
+
+  // ---------- desenho ----------
+  function desenhar() {
+    const el = root();
+    if (!el) return;
+    const abas = [['geral', 'Visão geral'], ['clientes', 'Clientes'], ['relatorio', 'Relatório diário'], ['status', 'Status do agente']];
+    let corpo = state.erro ? `<div class="ic-banner">${esc(state.erro)}</div>` : '';
+    if (!state.erro) corpo = state.aba === 'clientes' ? telaClientes() : state.aba === 'relatorio' ? telaRelatorio() : state.aba === 'status' ? telaStatus() : telaGeral();
+    const focoBusca = document.activeElement && document.activeElement.id === 'ic-busca';
+    el.innerHTML = `<div class="ic-wrap">
+      <div class="ic-banner">🧠 <b>Modo observação:</b> a IA sugere a etapa de cada cliente e a equipe confirma ou corrige. Nada aqui altera suas vendas.</div>
+      <div class="ic-tabs">${abas.map(([k, n]) => `<button class="ic-tab${state.aba === k ? ' active' : ''}" data-ic-aba="${k}">${n}</button>`).join('')}</div>
+      ${corpo}</div>${modalCliente()}`;
+    if (focoBusca) { const i = document.getElementById('ic-busca'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
+  }
+
+  async function abrirCliente(tel) {
+    state.abrir = tel; state.msgs = []; desenhar();
+    try {
+      const s = await database().collection('ic_contatos').doc(tel).collection('mensagens').orderBy('ts').get();
+      if (state.abrir === tel) { state.msgs = s.docs.map((x) => x.data()); desenhar(); }
+    } catch (e) { /* sem mensagens: segue sem elas */ }
+  }
+
+  async function corrigir(tel, etapa, motivo) {
+    const c = state.contatos.find((x) => x.telefone === tel);
+    if (!c || !NOME[etapa]) return;
+    const u = typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser;
+    const d = database();
+    await d.collection('ic_contatos').doc(tel).set({ etapa, etapaManual: true }, { merge: true });
+    await d.collection('ic_historico').add({ telefone: tel, de: c.etapa || null, para: etapa, motivo: motivo || 'Correção manual', confianca: 1, evidencias: [], origem: 'manual', usuario: (u && u.email) || null, em: new Date().toISOString() });
+    toast('Correção salva');
+  }
+
+  async function devolverParaIA(tel) {
+    await database().collection('ic_contatos').doc(tel).set({ etapaManual: false }, { merge: true });
+    toast('Devolvido para a IA');
+  }
+
+  // ---------- demonstração (dados INVENTADOS, marcados demo:true) ----------
+  function dadosDemo(agora = Date.now()) {
+    const h = (horasAtras) => new Date(agora - horasAtras * 3600000).toISOString();
+    const hoje = diaKey(agora);
+    const mk = (n, nome, etapa, horasUlt, ia, msgs, extra = {}) => ({
+      c: { telefone: '55119000000' + String(n).padStart(2, '0'), nome, etapa, etapaManual: false, primeiroContatoEm: h(horasUlt + 1), ultimaInteracaoEm: h(horasUlt), ultimaMensagemDe: msgs[msgs.length - 1].from,
+        diasClienteEscreveu: [hoje], falhasSeguidas: 0, demo: true, ia: { confianca: 0.9, valor_apresentado: null, orcamento_enviado: false, cliente_prometeu_retornar: false, flags: [], evidencias: [], etapa_sugerida: etapa, ...ia }, ...extra },
+      m: msgs.map((m, i) => ({ id: `d${n}-${i + 1}`, ts: h(horasUlt + (msgs.length - i) * 0.05), from: m[0], text: m[1], type: m[2] || 'text', analisada: true, demo: true })),
+    });
+    const itens = [
+      mk(1, 'Ana (demo)', E.NOVO_CONTATO, 0.3, { resumo: 'Cliente acabou de chamar pelo Instagram; ninguém respondeu ainda.', proxima_acao: 'Responder e entender o evento' }, [['cliente', 'Oi, boa tarde! Vi o Instagram de vocês e queria saber sobre convite']]),
+      mk(2, 'Bia (demo)', E.AGUARDANDO_CLIENTE, 2, { resumo: 'Gostou do convite animado e vai falar com o marido.', produto_interesse: 'Convite Interativo Animado', valor_apresentado: 40, orcamento_enviado: true, cliente_prometeu_retornar: true, proxima_acao: 'Aguardar retorno de amanhã' }, [['cliente', 'Quanto custa o convite animado?'], ['empresa', 'O Convite Interativo Animado sai por R$ 40.'], ['cliente', 'Gostei! Vou conversar com meu marido e retorno amanhã.']], { orcamentoEnviadoEm: h(2) }),
+      mk(3, 'Carla (demo)', E.ORCAMENTO_ENVIADO, 30, { resumo: 'Recebeu orçamento do tema safari e não respondeu.', produto_interesse: 'Convite 1 ano', tema_convite: 'Safari', valor_apresentado: 60, orcamento_enviado: true, proxima_acao: 'Fazer follow-up do orçamento' }, [['cliente', 'Preciso de convite de 1 ano, tema safari'], ['empresa', 'Fica R$ 60,00 com entrega em até 3 dias úteis.']], { orcamentoEnviadoEm: h(30) }),
+      mk(4, 'Dani (demo)', E.AGUARDANDO_EMPRESA, 1, { resumo: 'Pediu para trocar a cor do tema; a equipe ficou de verificar com a designer.', tema_convite: 'Unicórnio', proxima_acao: 'Responder sobre a cor lilás' }, [['cliente', 'Dá pra trocar a cor para lilás?'], ['empresa', 'Vou verificar com a designer e já te retorno!'], ['cliente', 'Ok, fico aguardando']]),
+      mk(5, 'Elisa (demo)', E.VENDA_CONCLUIDA, 5, { resumo: 'Fechou o convite dinossauro e enviou o comprovante do Pix.', produto_interesse: 'Convite personalizado', tema_convite: 'Dinossauro', valor_apresentado: 80, orcamento_enviado: true, evidencias: ['d5-4'], proxima_acao: 'Iniciar produção', flags: ['comprovante_nao_verificado'] }, [['cliente', 'Quero o convite do tema dinossauro'], ['empresa', 'Fica R$ 80 com personalização completa.'], ['cliente', 'Feito, vou pagar agora o pix'], ['cliente', '', 'image']], { orcamentoEnviadoEm: h(6) }),
+      mk(6, 'Fabi (demo)', E.PERDIDO, 20, { resumo: 'Achou caro e vai fazer com outra pessoa.', valor_apresentado: 70, orcamento_enviado: true, motivo_desistencia: 'preço', trecho_desistencia: 'vou fazer com outra pessoa', evidencias: ['d6-2'], proxima_acao: 'Nenhuma' }, [['empresa', 'O convite animado está R$ 70.'], ['cliente', 'Achei caro, vou fazer com outra pessoa. Obrigada!']], { orcamentoEnviadoEm: h(20) }),
+      mk(7, 'Gabi (demo)', E.EM_ANALISE, 3, { confianca: 0.45, resumo: 'Mensagem ambígua: disse "deixa pra lá, depois eu vejo".', proxima_acao: 'Revisar a conversa', flags: ['confianca_baixa'], etapa_sugerida: E.AGUARDANDO_CLIENTE }, [['cliente', 'Pode ser, mas depende'], ['empresa', 'Depende de quê? Posso te ajudar!'], ['cliente', 'Deixa pra lá, depois eu vejo']]),
+      mk(8, 'Helô (demo)', E.AGUARDANDO_CLIENTE, 4, { resumo: 'Aceitou o convite e vai pagar amanhã; ainda sem comprovante.', valor_apresentado: 50, orcamento_enviado: true, cliente_prometeu_retornar: true, proxima_acao: 'Aguardar o comprovante', flags: ['venda_sem_comprovante'], etapa_sugerida: E.VENDA_CONCLUIDA }, [['empresa', 'O convite fica R$ 50. Posso fechar?'], ['cliente', 'Pode fechar! Eu pago o pix amanhã cedo']], { orcamentoEnviadoEm: h(4) }),
+    ];
+    const historico = itens.map(({ c }) => ({ telefone: c.telefone, de: null, para: c.etapa, motivo: c.ia.resumo, confianca: c.ia.confianca, evidencias: c.ia.evidencias, origem: 'ia', em: c.ultimaInteracaoEm, demo: true }));
+    const analises = itens.map(({ c }) => ({ telefone: c.telefone, dia: hoje, em: c.ultimaInteracaoEm, modelo: 'demo', ok: true, erro: null, flags: [], tokensEntrada: 800, tokensSaida: 200, custoUSD: 0.0005, demo: true }));
+    return { itens, historico, analises };
+  }
+
+  async function carregarDemo() {
+    const d = database();
+    const { itens, historico, analises } = dadosDemo();
+    for (const { c, m } of itens) {
+      await d.collection('ic_contatos').doc(c.telefone).set(c);
+      for (const msg of m) await d.collection('ic_contatos').doc(c.telefone).collection('mensagens').doc(msg.id).set(msg);
+    }
+    for (const h of historico) await d.collection('ic_historico').add(h);
+    for (const a of analises) await d.collection('ic_analises').add(a);
+    toast('Demonstração carregada');
+  }
+
+  async function removerDemo() {
+    const d = database();
+    const b = d.batch();
+    const contatos = await d.collection('ic_contatos').where('demo', '==', true).get();
+    for (const doc of contatos.docs) {
+      const ms = await d.collection('ic_contatos').doc(doc.id).collection('mensagens').get();
+      ms.docs.forEach((x) => b.delete(x.ref));
+      b.delete(doc.ref);
+    }
+    for (const nome of ['ic_historico', 'ic_analises']) {
+      const s = await d.collection(nome).where('demo', '==', true).get();
+      s.docs.forEach((x) => b.delete(x.ref));
+    }
+    await b.commit();
+    toast('Demonstração removida');
+  }
+
+  // ---------- eventos ----------
+  function ligarEventos() {
+    const el = root();
+    if (!el || el.dataset.icLigado) return;
+    el.dataset.icLigado = '1';
+    const trata = async (ev) => {
+      const alvo = ev.target.closest('[data-ic-aba],[data-ic-abrir],#ic-fechar,#ic-salvar,#ic-devolver,#ic-copiar,#ic-demo-on,#ic-demo-off,#ic-overlay');
+      if (!alvo) return;
+      try {
+        if (alvo.dataset.icAba) { state.aba = alvo.dataset.icAba; desenhar(); }
+        else if (alvo.dataset.icAbrir) await abrirCliente(alvo.dataset.icAbrir);
+        else if (alvo.id === 'ic-fechar' || (alvo.id === 'ic-overlay' && ev.target === alvo)) { state.abrir = null; desenhar(); }
+        else if (alvo.id === 'ic-salvar') { await corrigir(state.abrir, document.getElementById('ic-novaetapa').value, document.getElementById('ic-motivo').value.trim()); }
+        else if (alvo.id === 'ic-devolver') { await devolverParaIA(state.abrir); }
+        else if (alvo.id === 'ic-copiar') { const t = document.getElementById('ic-texto').textContent; if (navigator.clipboard) await navigator.clipboard.writeText(t); toast('Relatório copiado'); }
+        else if (alvo.id === 'ic-demo-on') { if (confirm('Carregar clientes e conversas INVENTADOS para demonstração?')) await carregarDemo(); }
+        else if (alvo.id === 'ic-demo-off') { if (confirm('Remover só os dados de demonstração (marcados "demo")?')) await removerDemo(); }
+      } catch (e) { console.error(e); toast('Não foi possível concluir a ação', 'error'); }
+    };
+    el.addEventListener('click', trata);
+    el.addEventListener('input', (ev) => { if (ev.target.id === 'ic-busca') { state.busca = ev.target.value; desenhar(); } });
+    el.addEventListener('change', (ev) => {
+      if (ev.target.id === 'ic-fetapa') { state.filtroEtapa = ev.target.value; desenhar(); }
+      if (ev.target.id === 'ic-dia') { state.dia = ev.target.value || null; desenhar(); }
+    });
+  }
+
+  window.IC = {
+    render() { ligarEventos(); iniciar(); desenhar(); },
+    _state: state, _dadosDemo: dadosDemo, _abrir: abrirCliente, _corrigir: corrigir, _carregarDemo: carregarDemo, _removerDemo: removerDemo,
+  };
+})();
 
 </script>
 </body>
