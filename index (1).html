@@ -6410,7 +6410,7 @@ function textoRelatorio(n) {
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const FMT_HORA = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   const quando = (iso) => (iso ? FMT_HORA.format(new Date(iso)) : '—');
-  const fmtTel = (t) => { const m = /^55(\d{2})(\d{5})(\d{4})$/.exec(t || ''); return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : esc(t); };
+  const fmtTel = (t) => { const m = /^55(\d{2})(\d{5})(\d{4})$/.exec(t || ''); return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : (/^imp-/.test(t || '') ? 'sem telefone (importado)' : esc(t)); };
   const moeda = (v) => (v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
   const badge = (etapa) => `<span class="ic-badge ic-b-${esc(etapa)}">${esc(NOME[etapa] || etapa || 'Sem etapa')}</span>`;
   const toast = (m, t) => { if (typeof showToast === 'function') showToast(m, t); };
@@ -6503,6 +6503,7 @@ function textoRelatorio(n) {
       <div class="ic-row"><span>Conexão com o WhatsApp</span><b>${cfg.whatsappConectado ? 'Conectado' : 'Ainda não conectada (Fase 5)'}</b></div>
       <div class="ic-row"><span>Custo de IA hoje</span><b>US$ ${gasto.toFixed(4)} de US$ ${Number(limite).toFixed(2)}</b></div>
       <div class="ic-row"><span>Último processamento</span><b>${quando(cfg.ultimoProcessamentoEm || (state.analises[0] && state.analises[0].em))}</b></div>
+      <div class="ic-row"><span>Importar resultado do agente (arquivo .json)</span><span><button class="btn btn-ghost btn-sm" id="ic-importar">Escolher arquivo</button><input type="file" id="ic-arquivo" accept=".json,application/json" style="display:none"></span></div>
       <div class="ic-row"><span>Dados de demonstração</span><span><button class="btn btn-ghost btn-sm" id="ic-demo-on">${demo ? 'Recarregar' : 'Carregar'} demonstração</button> <button class="btn btn-ghost btn-sm" id="ic-demo-off">Remover demonstração</button></span></div>
       <p class="ic-muted">A demonstração usa clientes e conversas INVENTADOS, marcados como "demo". Remover apaga só eles.</p></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Últimas análises</span></div><div class="card-body"><div class="table-wrap"><table><thead><tr><th>Quando</th><th>Cliente</th><th>Resultado</th><th>Tokens (entrada / saída)</th><th>Custo</th></tr></thead><tbody>${linhas || '<tr><td colspan="5" class="ic-muted">Nenhuma análise ainda.</td></tr>'}</tbody></table></div></div></div>`;
@@ -6619,13 +6620,43 @@ function textoRelatorio(n) {
     toast('Demonstração removida');
   }
 
+  // ---------- importar o arquivo gerado pelo importador de conversas ----------
+  async function importarResultado(texto) {
+    let r;
+    try { r = JSON.parse(texto); } catch (e) { throw new Error('Arquivo inválido (não é JSON).'); }
+    if (!r || r.versao !== 1 || !Array.isArray(r.contatos) || !Array.isArray(r.mensagens)) throw new Error('Este arquivo não é um resultado do agente (versão 1).');
+    const d = database();
+    const ops = [];
+    for (const c of r.contatos) {
+      if (!c.telefone) continue;
+      const ref = d.collection('ic_contatos').doc(c.telefone);
+      const atual = await ref.get();
+      const dados = { ...c };
+      if (atual.exists && atual.data().etapaManual) { delete dados.etapa; delete dados.etapaManual; } // correção da equipe é preservada
+      ops.push([ref, dados, true]);
+    }
+    for (const m of r.mensagens) {
+      const { telefone, ...resto } = m;
+      ops.push([d.collection('ic_contatos').doc(telefone).collection('mensagens').doc(m.id), resto, false]);
+    }
+    for (const nome of ['historico', 'analises']) {
+      for (const x of (r[nome] || [])) { const { _id, ...resto } = x; ops.push([d.collection('ic_' + nome).doc(_id), resto, false]); }
+    }
+    for (let i = 0; i < ops.length; i += 400) {
+      const b = d.batch();
+      ops.slice(i, i + 400).forEach(([ref, dados, mesclar]) => (mesclar ? b.set(ref, dados, { merge: true }) : b.set(ref, dados)));
+      await b.commit();
+    }
+    return { contatos: r.contatos.length, mensagens: r.mensagens.length };
+  }
+
   // ---------- eventos ----------
   function ligarEventos() {
     const el = root();
     if (!el || el.dataset.icLigado) return;
     el.dataset.icLigado = '1';
     const trata = async (ev) => {
-      const alvo = ev.target.closest('[data-ic-aba],[data-ic-abrir],#ic-fechar,#ic-salvar,#ic-devolver,#ic-copiar,#ic-demo-on,#ic-demo-off,#ic-overlay');
+      const alvo = ev.target.closest('[data-ic-aba],[data-ic-abrir],#ic-fechar,#ic-salvar,#ic-devolver,#ic-copiar,#ic-demo-on,#ic-demo-off,#ic-importar,#ic-overlay');
       if (!alvo) return;
       try {
         if (alvo.dataset.icAba) { state.aba = alvo.dataset.icAba; desenhar(); }
@@ -6634,6 +6665,7 @@ function textoRelatorio(n) {
         else if (alvo.id === 'ic-salvar') { await corrigir(state.abrir, document.getElementById('ic-novaetapa').value, document.getElementById('ic-motivo').value.trim()); }
         else if (alvo.id === 'ic-devolver') { await devolverParaIA(state.abrir); }
         else if (alvo.id === 'ic-copiar') { const t = document.getElementById('ic-texto').textContent; if (navigator.clipboard) await navigator.clipboard.writeText(t); toast('Relatório copiado'); }
+        else if (alvo.id === 'ic-importar') { document.getElementById('ic-arquivo').click(); }
         else if (alvo.id === 'ic-demo-on') { if (confirm('Carregar clientes e conversas INVENTADOS para demonstração?')) await carregarDemo(); }
         else if (alvo.id === 'ic-demo-off') { if (confirm('Remover só os dados de demonstração (marcados "demo")?')) await removerDemo(); }
       } catch (e) { console.error(e); toast('Não foi possível concluir a ação: ' + ((e && (e.code || e.message)) || 'erro desconhecido'), 'error'); }
@@ -6641,6 +6673,12 @@ function textoRelatorio(n) {
     el.addEventListener('click', trata);
     el.addEventListener('input', (ev) => { if (ev.target.id === 'ic-busca') { state.busca = ev.target.value; desenhar(); } });
     el.addEventListener('change', (ev) => {
+      if (ev.target.id === 'ic-arquivo' && ev.target.files && ev.target.files[0]) {
+        const arq = ev.target.files[0];
+        arq.text().then((t) => importarResultado(t)).then((n) => toast('Importado: ' + n.contatos + ' clientes, ' + n.mensagens + ' mensagens'))
+          .catch((e) => { console.error(e); toast('Não foi possível importar: ' + ((e && (e.message || e.code)) || 'erro'), 'error'); });
+        ev.target.value = '';
+      }
       if (ev.target.id === 'ic-fetapa') { state.filtroEtapa = ev.target.value; desenhar(); }
       if (ev.target.id === 'ic-dia') { state.dia = ev.target.value || null; desenhar(); }
     });
@@ -6648,7 +6686,7 @@ function textoRelatorio(n) {
 
   window.IC = {
     render() { ligarEventos(); iniciar(); desenhar(); },
-    _state: state, _dadosDemo: dadosDemo, _abrir: abrirCliente, _corrigir: corrigir, _carregarDemo: carregarDemo, _removerDemo: removerDemo,
+    _importar: importarResultado, _state: state, _dadosDemo: dadosDemo, _abrir: abrirCliente, _corrigir: corrigir, _carregarDemo: carregarDemo, _removerDemo: removerDemo,
   };
 })();
 
