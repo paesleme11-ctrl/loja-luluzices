@@ -61,7 +61,7 @@
 
 <div id="content" class="wrap hidden">
   <div class="hero">
-    <img id="ev-logo" class="logo hidden">
+    
     <img id="ev-cover" class="cover hidden">
     <h1 id="ev-name"></h1>
     <div id="ev-host" class="sub"></div>
@@ -165,7 +165,6 @@ function showNotFound() {
 function render(d) {
   document.documentElement.style.setProperty("--p", d.colorPrimary || "#d6336c");
   document.documentElement.style.setProperty("--s", d.colorSecondary || "#e8c766");
-  if (d.bgImage) document.body.style.setProperty("--bgimg", `url('${d.bgImage}')`);
 
   document.getElementById("ev-name").textContent = d.name || "";
   document.getElementById("ev-host").textContent = d.hostName ? `de ${d.hostName}` : "";
@@ -174,7 +173,6 @@ function render(d) {
   document.getElementById("ev-text").textContent = d.customText || "";
 
   if (d.coverImage) { const el = document.getElementById("ev-cover"); el.src = d.coverImage; el.classList.remove("hidden"); }
-  if (d.logoUrl) { const el = document.getElementById("ev-logo"); el.src = d.logoUrl; el.classList.remove("hidden"); }
   if (d.extraInfo) {
     document.getElementById("ev-extra").textContent = d.extraInfo;
     document.getElementById("extra-info").classList.remove("hidden");
