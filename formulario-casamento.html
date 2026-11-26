@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#e8546a">
+<title>Formulário do convite de casamento · Luluzices</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root{--rose:#e8546a;--dark:#c23650;--cream:#fdf6f0;--ink:#25191c;--muted:#89777c;--line:#efdee1;--green:#25815f;--red:#b42336;--amber:#8a5a00}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);font:16px/1.45 'DM Sans',system-ui,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:720px;margin:auto;padding:22px 14px calc(60px + env(safe-area-inset-bottom))}
+  .hero{text-align:center;padding:18px 8px 8px}
+  .hero .mark{font-size:38px}
+  .hero h1{font:30px/1.15 'DM Serif Display',serif;margin:8px 0 6px}
+  .hero p{margin:0;color:var(--muted);font-size:15px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 8px 24px #44212b0b}
+  .card h2{font-size:17px;margin:0 0 4px}
+  .card .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  label,.lbl{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+  .opt{font-weight:400;color:var(--muted);font-size:12px}
+  input[type=text],input[type=tel],input[type=url],input[type=date],input[type=time],textarea{width:100%;padding:13px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+  textarea{min-height:92px;resize:vertical}
+  input:focus,textarea:focus{outline:2px solid #e8546a55;border-color:var(--rose)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:520px){.grid2{grid-template-columns:1fr}}
+  .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
+  .aviso{font-size:12.5px;color:var(--amber);margin-top:5px;display:none}
+  .err{font-size:12.5px;color:var(--red);margin-top:5px;display:none}
+  .invalid input,.invalid textarea{border-color:var(--red)}
+  .invalid .err{display:block}
+  .ok{font-size:12.5px;color:var(--green);margin-top:5px;display:none}
+  .choices{display:grid;gap:8px}
+  .choice{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:11px 12px;cursor:pointer;background:#fff}
+  .choice input{margin-top:3px;accent-color:var(--rose);width:18px;height:18px;flex:none}
+  .choice span{font-size:15px}
+  .choice:has(input:checked){border-color:var(--rose);background:#fff5f6}
+  .counter{float:right;font-size:11.5px;color:var(--muted);font-weight:400}
+  .sub-bloco{border-left:3px solid var(--line);padding-left:12px;margin-top:12px}
+  .hidden{display:none!important}
+  .nota{font-size:12px;color:var(--muted);text-align:center;margin:14px 6px}
+  button.principal{width:100%;border:0;border-radius:12px;padding:16px;background:var(--rose);color:#fff;font:700 17px 'DM Sans',sans-serif;cursor:pointer}
+  button.principal:hover{background:var(--dark)}
+  button.principal:disabled{opacity:.6;cursor:wait}
+  .resumo{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:14px 0 4px;font-size:14px}
+  .resumo small{color:var(--muted);display:block;font-size:12px}
+  .resumo button{border:0;background:none;color:var(--rose);font:600 13px 'DM Sans',sans-serif;cursor:pointer;padding:6px}
+  .erro-geral{background:#fdecee;border:1px solid #f1c9ce;color:var(--red);border-radius:10px;padding:12px 14px;font-size:14px;margin:12px 0;display:none}
+  .sucesso{text-align:center;padding:40px 10px}
+  .sucesso .mark{font-size:54px}
+  .sucesso h1{font:28px 'DM Serif Display',serif;margin:10px 0}
+  .sucesso p{color:var(--muted);max-width:440px;margin:8px auto}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <!-- TELA 1: nome e contato do comprador -->
+  <div id="telaDados">
+    <header class="hero">
+      <div class="mark">💍</div>
+      <h1>Vamos começar!</h1>
+      <p>Primeiro, precisamos do seu nome e do seu WhatsApp.</p>
+    </header>
+    <form id="formDados" novalidate autocomplete="on">
+      <section class="card">
+        <div class="field" data-campo="comprador">
+          <label for="comprador">Seu nome completo</label>
+          <input id="comprador" type="text" autocomplete="name" maxlength="120">
+          <div class="err">Informe o seu nome.</div>
+        </div>
+        <div class="field" data-campo="whatsapp">
+          <label for="whatsapp">Seu WhatsApp (com DDD)</label>
+          <input id="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" maxlength="25">
+          <div class="err">Informe um WhatsApp válido, com DDD.</div>
+        </div>
+      </section>
+      <button class="principal" id="continuar" type="submit">Continuar</button>
+      <p class="nota">Usamos estas informações somente para produzir o seu convite.</p>
+    </form>
+  </div>
+
+  <!-- TELA 2: informações do convite -->
+  <div id="telaForm" class="hidden">
+    <header class="hero">
+      <div class="mark">💍</div>
+      <h1>Informações do seu convite de casamento</h1>
+      <p>Preencha com calma. Quanto mais detalhes, mais fiel ao que você sonhou fica o seu convite.</p>
+    </header>
+    <div class="resumo"><div><b id="resumoNome"></b><small id="resumoTel"></small></div><button type="button" id="alterarDados">Alterar</button></div>
+
+    <form id="form" novalidate autocomplete="on">
+
+      <section class="card">
+        <h2>Os noivos</h2>
+        <div class="field" data-campo="noivos">
+          <label for="noivos">Nome dos noivos</label>
+          <input id="noivos" type="text" placeholder="Ex.: Marina e Pedro" maxlength="120">
+          <div class="err">Informe o nome dos noivos.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Cerimônia</h2>
+        <div class="grid2">
+          <div class="field" data-campo="data">
+            <label for="data">Data do casamento</label>
+            <input id="data" type="date">
+            <div class="err">Informe a data do casamento.</div>
+          </div>
+          <div class="field" data-campo="hora">
+            <label for="hora">Horário da cerimônia</label>
+            <input id="hora" type="time">
+            <div class="err">Informe o horário.</div>
+          </div>
+        </div>
+        <div class="field" data-campo="local">
+          <label for="local">Nome do local</label>
+          <input id="local" type="text" placeholder="Ex.: Igreja Matriz, Espaço Jardim..." maxlength="120">
+          <div class="err">Informe o nome do local.</div>
+        </div>
+        <div class="field" data-campo="endereco">
+          <label for="endereco">Endereço completo</label>
+          <textarea id="endereco" rows="2" maxlength="250" placeholder="Rua, número, bairro, cidade"></textarea>
+          <div class="err">Informe o endereço.</div>
+        </div>
+        <div class="field" data-campo="mapa">
+          <label for="mapa">Link do Google Maps</label>
+          <input id="mapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
+          <div class="hint">No Google Maps: abra o local → toque em “Compartilhar” → “Copiar link”.</div>
+          <div class="aviso" id="avisoMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+          <div class="err">Cole o link do Google Maps do local.</div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Recepção / festa</h2>
+        <div class="field" data-campo="mesmoLocal">
+          <span class="lbl">A recepção é no mesmo local da cerimônia?</span>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="mesmoLocal" value="sim"><span>Sim, é no mesmo local</span></label>
+            <label class="choice"><input type="radio" name="mesmoLocal" value="nao"><span>Não, é em outro local</span></label>
+            <label class="choice"><input type="radio" name="mesmoLocal" value="semfesta"><span>Não haverá recepção</span></label>
+          </div>
+          <div class="err">Escolha uma opção.</div>
+        </div>
+        <div id="blocoFesta" class="sub-bloco hidden">
+          <div class="field" data-campo="festaLocal">
+            <label for="festaLocal">Nome do local da recepção</label>
+            <input id="festaLocal" type="text" maxlength="120">
+            <div class="err">Informe o local da recepção.</div>
+          </div>
+          <div class="field" data-campo="festaEndereco">
+            <label for="festaEndereco">Endereço da recepção</label>
+            <textarea id="festaEndereco" rows="2" maxlength="250"></textarea>
+            <div class="err">Informe o endereço da recepção.</div>
+          </div>
+          <div class="field">
+            <label for="festaHora">Horário da recepção <span class="opt">(opcional)</span></label>
+            <input id="festaHora" type="time">
+          </div>
+          <div class="field" data-campo="festaMapa">
+            <label for="festaMapa">Link do Google Maps da recepção</label>
+            <input id="festaMapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
+            <div class="aviso" id="avisoFestaMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+            <div class="err">Cole o link do Google Maps da recepção.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Personalize o seu convite</h2>
+        <div class="field">
+          <label for="frase">Frase ou versículo bíblico <span class="opt">(opcional)</span> <span class="counter" id="contFrase">0/400</span></label>
+          <textarea id="frase" rows="4" maxlength="400" placeholder="Ex.: “O amor é paciente, o amor é bondoso.” (1 Coríntios 13:4)"></textarea>
+          <div class="hint">Escreva exatamente como quer que apareça, com a referência se houver.</div>
+        </div>
+        <div class="field" data-campo="musica">
+          <label for="musica">Link da música no YouTube <span class="opt">(opcional)</span></label>
+          <input id="musica" type="url" inputmode="url" placeholder="Cole aqui o link direto do vídeo" maxlength="300">
+          <div class="hint">No YouTube: toque em “Compartilhar” → “Copiar link”.</div>
+          <div class="err" id="erroMusica">Cole o link de um vídeo do YouTube.</div>
+          <div class="ok" id="okMusica">✓ Link do YouTube reconhecido.</div>
+        </div>
+        <div class="field">
+          <label for="pais">Pais e padrinhos <span class="opt">(opcional)</span></label>
+          <textarea id="pais" rows="3" maxlength="400" placeholder="Se quiser incluir, escreva como devem aparecer. Ex.: Pais da noiva: ... / Pais do noivo: ... / Padrinhos: ..."></textarea>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Convidados</h2>
+        <div class="field">
+          <span class="lbl">Confirmação de presença pelo WhatsApp</span>
+          <label class="choice"><input type="checkbox" id="mesmoZap" checked><span>Os convidados vão confirmar no mesmo WhatsApp que informei no início</span></label>
+        </div>
+        <div id="blocoWhatsConf" class="sub-bloco hidden">
+          <div class="field" data-campo="whatsConf">
+            <label for="whatsConf">WhatsApp para confirmação</label>
+            <input id="whatsConf" type="tel" inputmode="tel" placeholder="(11) 99999-9999" maxlength="25">
+            <div class="err">Informe um WhatsApp válido, com DDD.</div>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label for="presentes">Lista de presentes ou Pix <span class="opt">(opcional)</span></label>
+          <textarea id="presentes" rows="2" maxlength="400" placeholder="Cole o link da lista ou a chave Pix, se quiser incluir"></textarea>
+        </div>
+        <div class="hp" aria-hidden="true"><label>Não preencha este campo <input id="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+      </section>
+
+      <div class="erro-geral" id="erroGeral" role="alert"></div>
+      <button class="principal" id="enviar" type="submit">Enviar informações</button>
+      <p class="nota">Usamos estas informações somente para produzir o seu convite.</p>
+    </form>
+  </div>
+
+  <div id="telaSucesso" class="sucesso hidden">
+    <div class="mark">💌</div>
+    <h1>Recebemos as suas informações!</h1>
+    <p>Obrigada! Nossa equipe vai conferir tudo e começar o seu convite. Se faltar algum detalhe, falamos com você pelo WhatsApp.</p>
+    <p>Você já pode fechar esta página.</p>
+  </div>
+
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  'use strict';
+  var firebaseConfig = {apiKey:"AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",authDomain:"luluzices-4254e.firebaseapp.com",projectId:"luluzices-4254e",storageBucket:"luluzices-4254e.firebasestorage.app",messagingSenderId:"328419813225",appId:"1:328419813225:web:6f168623f3edd148ee7ff8"};
+  var RASCUNHO = 'luluzices_form_casamento_v2';
+  var $ = function (id) { return document.getElementById(id); };
+  var db = null;
+  try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
+
+  // ---------- utilidades ----------
+  function soDigitos(s) { return String(s || '').replace(/\D/g, ''); }
+  function telefoneValido(s) { var n = soDigitos(s); return n.length >= 10 && n.length <= 13; }
+  function dataBR(iso) { var p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : ''; }
+  function hojeISO() { var d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); }
+
+  // Link do Google Maps: obrigatório. Precisa ser um link de verdade; se não for do Google, só avisa (não trava o cliente).
+  function normalizarMapa(texto) {
+    var bruto = String(texto || '').trim();
+    if (!bruto) return { vazio: true, ok: false, erro: 'Cole o link do Google Maps do local.' };
+    if (!/^https?:\/\//i.test(bruto)) bruto = 'https://' + bruto;
+    var u;
+    try { u = new URL(bruto); } catch (e) { return { ok: false, erro: 'Cole o link do Google Maps do local.' }; }
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(u.hostname)) return { ok: false, erro: 'Esse link não parece válido. Copie o link pelo botão “Compartilhar” do Google Maps.' };
+    var h = u.hostname.toLowerCase().replace(/^www\./, '');
+    var reconhecido = h === 'maps.app.goo.gl' || h === 'g.page' || h === 'g.co' || h === 'share.google' || /^maps\.google\./.test(h) ||
+      (h === 'goo.gl' && /^\/maps/.test(u.pathname)) || (/^google\.[a-z.]+$/.test(h) && /^\/maps/.test(u.pathname));
+    return { ok: true, url: u.href, reconhecido: reconhecido };
+  }
+
+  // YouTube: aceita watch?v=, youtu.be/, shorts/, embed/, live/ e music.youtube.com. Recusa lista de reprodução sem vídeo.
+  function normalizarYoutube(texto) {
+    var bruto = String(texto || '').trim();
+    if (!bruto) return { vazio: true };
+    if (!/^https?:\/\//i.test(bruto)) bruto = 'https://' + bruto;
+    var u;
+    try { u = new URL(bruto); } catch (e) { return { ok: false, erro: 'Cole o link de um vídeo do YouTube.' }; }
+    var host = u.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    var id = null;
+    if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+      if (u.pathname === '/watch') id = u.searchParams.get('v');
+      else { var m = /^\/(shorts|embed|live|v)\/([^/?#]+)/.exec(u.pathname); if (m) id = m[2]; }
+      if (!id && u.searchParams.get('list')) return { ok: false, erro: 'Esse link é de uma lista de reprodução. Abra a música e copie o link dela.' };
+    } else return { ok: false, erro: 'Esse link não é do YouTube. Use um link que comece com youtube.com ou youtu.be.' };
+    if (!id || !/^[A-Za-z0-9_-]{6,20}$/.test(id)) return { ok: false, erro: 'Não consegui identificar o vídeo. Copie o link pelo botão “Compartilhar” do YouTube.' };
+    var t = u.searchParams.get('t') || u.searchParams.get('start') || '';
+    var inicio = /^\d+s?$/.test(t) ? t.replace('s', '') : '';
+    // Se a pessoa já colou o link com o momento (…&t=80), isso é mantido, sem perguntar nada.
+    return { ok: true, id: id, url: 'https://www.youtube.com/watch?v=' + id + (inicio ? '&t=' + inicio : '') };
+  }
+
+  // Texto de várias linhas sem quebrar o formato "* Campo: valor" lido pela gestão
+  function valorSeguro(v) {
+    return String(v || '').replace(/\r/g, '').split('\n').map(function (linha, i) {
+      linha = linha.trim();
+      return i > 0 ? linha.replace(/^[*\-•]\s*/, '– ') : linha;
+    }).join('\n').trim();
+  }
+
+  // ---------- leitura do formulário ----------
+  function radio(nome) { var r = document.querySelector('input[name="' + nome + '"]:checked'); return r ? r.value : ''; }
+  function ler() {
+    var mesmoZap = $('mesmoZap').checked;
+    return {
+      comprador: $('comprador').value.trim(), whatsapp: $('whatsapp').value.trim(),
+      noivos: $('noivos').value.trim(),
+      data: $('data').value, hora: $('hora').value, local: $('local').value.trim(), endereco: $('endereco').value.trim(), mapa: $('mapa').value.trim(),
+      mesmoLocal: radio('mesmoLocal'), festaLocal: $('festaLocal').value.trim(), festaEndereco: $('festaEndereco').value.trim(), festaHora: $('festaHora').value, festaMapa: $('festaMapa').value.trim(),
+      frase: $('frase').value.trim(), musica: $('musica').value.trim(), pais: $('pais').value.trim(),
+      mesmoZap: mesmoZap, whatsConf: mesmoZap ? $('whatsapp').value.trim() : $('whatsConf').value.trim(),
+      presentes: $('presentes').value.trim(),
+    };
+  }
+
+  function validarDados(d) {
+    var erros = {};
+    if (d.comprador.length < 3) erros.comprador = 'Informe o seu nome.';
+    if (!telefoneValido(d.whatsapp)) erros.whatsapp = 'Informe um WhatsApp válido, com DDD.';
+    return erros;
+  }
+
+  function validar(d) {
+    var erros = validarDados(d);
+    if (!d.noivos) erros.noivos = 'Informe o nome dos noivos.';
+    if (!d.data) erros.data = 'Informe a data do casamento.';
+    else if (d.data < hojeISO()) erros.data = 'Essa data já passou. Confira o dia, o mês e o ano.';
+    if (!d.hora) erros.hora = 'Informe o horário.';
+    if (!d.local) erros.local = 'Informe o nome do local.';
+    if (d.endereco.length < 5) erros.endereco = 'Informe o endereço.';
+    var m = normalizarMapa(d.mapa); if (!m.ok) erros.mapa = m.erro;
+    if (!d.mesmoLocal) erros.mesmoLocal = 'Escolha uma opção.';
+    if (d.mesmoLocal === 'nao') {
+      if (!d.festaLocal) erros.festaLocal = 'Informe o local da recepção.';
+      if (d.festaEndereco.length < 5) erros.festaEndereco = 'Informe o endereço da recepção.';
+      var fm = normalizarMapa(d.festaMapa); if (!fm.ok) erros.festaMapa = fm.vazio ? 'Cole o link do Google Maps da recepção.' : fm.erro;
+    }
+    if (d.musica) { var y = normalizarYoutube(d.musica); if (!y.ok) erros.musica = y.erro; }
+    if (!d.mesmoZap && !telefoneValido(d.whatsConf)) erros.whatsConf = 'Informe um WhatsApp válido, com DDD.';
+    return erros;
+  }
+
+  // Monta o texto "* Campo: valor" que a gestão mostra em "Ver detalhes".
+  function montarObs(d) {
+    var linhas = [], add = function (k, v) { v = valorSeguro(v); if (v) linhas.push('* ' + k + ': ' + v); };
+    var y = d.musica ? normalizarYoutube(d.musica) : null;
+    var mapa = normalizarMapa(d.mapa), fmapa = normalizarMapa(d.festaMapa);
+    add('Tipo de convite', 'Casamento');
+    add('Nome dos noivos', d.noivos);
+    add('Data do casamento', dataBR(d.data)); add('Horário da cerimônia', d.hora);
+    add('Local da cerimônia', d.local); add('Endereço da cerimônia', d.endereco); add('Mapa da cerimônia', mapa.ok ? mapa.url : d.mapa);
+    if (d.mesmoLocal === 'sim') add('Recepção', 'No mesmo local da cerimônia');
+    else if (d.mesmoLocal === 'semfesta') add('Recepção', 'Não haverá recepção');
+    else if (d.mesmoLocal === 'nao') {
+      add('Recepção', 'Em outro local'); add('Local da recepção', d.festaLocal); add('Endereço da recepção', d.festaEndereco);
+      add('Horário da recepção', d.festaHora); add('Mapa da recepção', fmapa.ok ? fmapa.url : d.festaMapa);
+    }
+    add('Frase ou versículo', d.frase);
+    if (y && y.ok) add('Música YouTube', y.url);
+    add('Pais e padrinhos', d.pais);
+    add('WhatsApp para confirmação', d.whatsConf);
+    add('Lista de presentes ou Pix', d.presentes);
+    return linhas.join('\n');
+  }
+
+  function montarPedido(d) {
+    var y = d.musica ? normalizarYoutube(d.musica) : null;
+    var dados = Object.assign({}, d, { musicaUrl: y && y.ok ? y.url : '', musicaId: y && y.ok ? y.id : '' });
+    return {
+      tipo: 'casamento', versaoFormulario: 2, status: 'pendente', criadoEm: new Date().toISOString(),
+      nomeComprador: d.comprador, whatsapp: d.whatsapp, obs: montarObs(d), dados: dados,
+    };
+  }
+
+  // ---------- interface ----------
+  function mostrarErros(erros) {
+    document.querySelectorAll('.field').forEach(function (f) { f.classList.remove('invalid'); });
+    var primeiro = null;
+    Object.keys(erros).forEach(function (campo) {
+      var f = document.querySelector('[data-campo="' + campo + '"]');
+      if (!f) return;
+      f.classList.add('invalid');
+      var e = f.querySelector('.err'); if (e) e.textContent = erros[campo];
+      if (!primeiro) primeiro = f;
+    });
+    if (primeiro) primeiro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function atualizarCondicionais() {
+    $('blocoFesta').classList.toggle('hidden', radio('mesmoLocal') !== 'nao');
+    $('blocoWhatsConf').classList.toggle('hidden', $('mesmoZap').checked);
+    var y = normalizarYoutube($('musica').value);
+    $('okMusica').style.display = y.ok ? 'block' : 'none';
+    var m = normalizarMapa($('mapa').value); $('avisoMapa').style.display = m.ok && !m.reconhecido ? 'block' : 'none';
+    var fm = normalizarMapa($('festaMapa').value); $('avisoFestaMapa').style.display = fm.ok && !fm.reconhecido ? 'block' : 'none';
+    $('contFrase').textContent = $('frase').value.length + '/400';
+  }
+
+  var etapa = 1;
+  function irParaEtapa(n) {
+    etapa = n;
+    $('telaDados').classList.toggle('hidden', n !== 1);
+    $('telaForm').classList.toggle('hidden', n !== 2);
+    if (n === 2) { $('resumoNome').textContent = $('comprador').value.trim(); $('resumoTel').textContent = $('whatsapp').value.trim(); }
+    window.scrollTo(0, 0);
+  }
+
+  function salvarRascunho() { try { var d = ler(); d.__etapa = etapa; localStorage.setItem(RASCUNHO, JSON.stringify(d)); } catch (e) { /* sem rascunho */ } }
+  var CAMPOS = ['comprador','whatsapp','noivos','data','hora','local','endereco','mapa','festaLocal','festaEndereco','festaHora','festaMapa','frase','musica','pais','presentes'];
+  function restaurarRascunho() {
+    try {
+      var d = JSON.parse(localStorage.getItem(RASCUNHO) || 'null'); if (!d) return;
+      CAMPOS.forEach(function (k) { if (d[k] != null && $(k)) $(k).value = d[k]; });
+      if (d.mesmoLocal) { var r = document.querySelector('input[name="mesmoLocal"][value="' + d.mesmoLocal + '"]'); if (r) r.checked = true; }
+      if (d.mesmoZap === false) { $('mesmoZap').checked = false; $('whatsConf').value = d.whatsConf || ''; }
+      if (d.__etapa === 2 && Object.keys(validarDados(ler())).length === 0) irParaEtapa(2);
+    } catch (e) { /* rascunho inválido */ }
+  }
+
+  function continuar(ev) {
+    ev.preventDefault();
+    var erros = validarDados(ler());
+    mostrarErros(erros);
+    if (Object.keys(erros).length) return;
+    irParaEtapa(2); salvarRascunho();
+  }
+
+  var enviando = false;
+  async function enviar(ev) {
+    ev.preventDefault();
+    if (enviando) return;
+    $('erroGeral').style.display = 'none';
+    if ($('website').value) { mostrarSucesso(); return; } // robô: finge que deu certo e não grava nada
+    var d = ler(), erros = validar(d);
+    if (Object.keys(erros).length) { if (erros.comprador || erros.whatsapp) irParaEtapa(1); mostrarErros(erros); return; }
+    mostrarErros({});
+    enviando = true; $('enviar').disabled = true; $('enviar').textContent = 'Enviando…';
+    try {
+      if (!db) throw new Error('sem banco');
+      await db.collection('pedidos_pendentes').add(montarPedido(d));
+      try { localStorage.removeItem(RASCUNHO); } catch (e) { /* ok */ }
+      mostrarSucesso();
+    } catch (e) {
+      console.error(e);
+      $('erroGeral').textContent = 'Não foi possível enviar agora. Confira a internet e toque em enviar de novo. Suas respostas estão salvas neste aparelho.';
+      $('erroGeral').style.display = 'block';
+      enviando = false; $('enviar').disabled = false; $('enviar').textContent = 'Enviar informações';
+    }
+  }
+  function mostrarSucesso() { $('telaDados').classList.add('hidden'); $('telaForm').classList.add('hidden'); $('telaSucesso').classList.remove('hidden'); window.scrollTo(0, 0); }
+
+  if ($('form')) {
+    $('data').min = hojeISO();
+    restaurarRascunho(); atualizarCondicionais();
+    $('formDados').addEventListener('submit', continuar);
+    $('form').addEventListener('submit', enviar);
+    $('alterarDados').addEventListener('click', function () { irParaEtapa(1); salvarRascunho(); });
+    ['formDados', 'form'].forEach(function (id) {
+      $(id).addEventListener('input', function () { atualizarCondicionais(); salvarRascunho(); });
+      $(id).addEventListener('change', function () { atualizarCondicionais(); salvarRascunho(); });
+    });
+  }
+
+  window.__formCasamento = { normalizarYoutube: normalizarYoutube, normalizarMapa: normalizarMapa, validar: validar, montarObs: montarObs, montarPedido: montarPedido, ler: ler, valorSeguro: valorSeguro };
+})();
+</script>
+</body>
+</html>
