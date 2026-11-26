@@ -2274,7 +2274,7 @@ function abrirDetalhesFormulario(vendaId) {
       valorHtml += ` <a href="${url}" target="_blank" style="color:var(--blue);font-weight:600;">🗺️ Ver no mapa</a>`;
     }
     // Se o campo parece ser um número de WhatsApp, adiciona link
-    if (/whats|telefone|celular|contato/i.test(chave) && /\d{8,}/.test(valor)) {
+    if (/whats|telefone|celular|contato/i.test(chave) && /\d{8,}/.test(String(valor).replace(/\D/g, ''))) {
       const linkW = linkWhatsApp(valor);
       valorHtml += ` <a href="${linkW}" target="_blank" style="color:var(--green);font-weight:600;">💬 Abrir WhatsApp</a>`;
     }
@@ -5134,6 +5134,16 @@ function cancelarMassa() {
 
 let _pedidoFormAguardandoConfirmacao = null;
 
+// O formulário externo aceita qualquer visitante: tudo o que vem dele é tratado como TEXTO, nunca como HTML.
+function escForm(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function telForm(s) { return String(s ?? '').replace(/[^0-9+() -]/g, ''); }
+function urlForm(u) { return String(u).replace(/["'<>`\\]/g, c => encodeURIComponent(c)); }
+function rotuloLinkForm(u) {
+  if (/^https?:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be)(\/|$|\?)/i.test(u)) return '▶️ Abrir no YouTube';
+  if (/maps|goo\.gl|g\.page/i.test(u)) return '🗺️ Ver no mapa';
+  return '🔗 Abrir link';
+}
+
 function confirmarPedidoForm(docId) {
   const ped = pedidosPendentesForm.find(p => p._docId === docId);
   if (!ped) return;
@@ -5178,8 +5188,8 @@ function abrirDetalhesPedidoForm(docId) {
       const url = extrairURL(valor);
       const valorLimpo = url ? removerURL(valor) : valor;
       let valorHtml = valorLimpo.replace(/</g,'&lt;').replace(/\n/g, '<br>');
-      if (url) valorHtml += ` <a href="${url}" target="_blank" style="color:var(--blue);font-weight:600;">🗺️ Ver no mapa</a>`;
-      if (/whats|telefone|celular|contato/i.test(chave) && /\d{8,}/.test(valor)) {
+      if (url) valorHtml += ` <a href="${urlForm(url)}" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-weight:600;">${rotuloLinkForm(url)}</a>`;
+      if (/whats|telefone|celular|contato/i.test(chave) && /\d{8,}/.test(String(valor).replace(/\D/g, ''))) {
         valorHtml += ` <a href="${linkWhatsApp(valor)}" target="_blank" style="color:var(--green);font-weight:600;">💬 Abrir WhatsApp</a>`;
       }
       return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);">
@@ -5263,7 +5273,8 @@ function renderTarefas() {
         <div class="tarefa-info">
           <div class="tarefa-contato">
             <span class="badge-pedido-site">Formulário Recebido</span>
-            ${ped.nomeComprador || '—'} ${ped.whatsapp ? `<button class="btn-copy-tel" onclick="event.stopPropagation();copiarTelefone('${ped.whatsapp.replace(/'/g,"\\'")}')" title="Copiar número">📋</button><a href="${linkWhatsApp(ped.whatsapp)}" target="_blank" class="btn-copy-tel" onclick="event.stopPropagation()" title="Abrir WhatsApp">💬</a>` : ''}
+            ${ped.tipo === 'casamento' ? '<span class="tarefa-chip" style="background:#fff0f2;color:var(--rose-dark);font-weight:700">💍 Casamento</span>' : ''}
+            ${escForm(ped.nomeComprador) || '—'} ${ped.whatsapp ? `<button class="btn-copy-tel" onclick="event.stopPropagation();copiarTelefone('${telForm(ped.whatsapp)}')" title="Copiar número">📋</button><a href="${linkWhatsApp(ped.whatsapp)}" target="_blank" class="btn-copy-tel" onclick="event.stopPropagation()" title="Abrir WhatsApp">💬</a>` : ''}
           </div>
           <div class="tarefa-meta">
             <span class="tarefa-chip" style="background:var(--warm);color:var(--ink-light)">📅 ${dataFmt}</span>
