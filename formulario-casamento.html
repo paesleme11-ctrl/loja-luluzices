@@ -37,6 +37,10 @@
   .choice{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:11px 12px;cursor:pointer;background:#fff}
   .choice input{margin-top:3px;accent-color:var(--rose);width:18px;height:18px;flex:none}
   .choice span{font-size:15px}
+  .choice small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  a.principal{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:16px;background:var(--rose);color:#fff;font:700 17px 'DM Sans',sans-serif}
+  .plano-b{display:none;margin-top:10px}
+  .plano-b a{display:block;text-align:center;text-decoration:none;border:2px solid var(--rose);color:var(--rose);border-radius:12px;padding:12px;font-weight:700}
   .choice:has(input:checked){border-color:var(--rose);background:#fff5f6}
   .counter{float:right;font-size:11.5px;color:var(--muted);font-weight:400}
   .sub-bloco{border-left:3px solid var(--line);padding-left:12px;margin-top:12px}
@@ -130,9 +134,12 @@
         </div>
         <div class="field" data-campo="mapa">
           <label for="mapa">Link do Google Maps</label>
-          <input id="mapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
-          <div class="hint">No Google Maps: abra o local → toque em “Compartilhar” → “Copiar link”.</div>
-          <div class="aviso" id="avisoMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+          <div id="mapaCampos">
+            <input id="mapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
+            <div class="hint">No Google Maps: abra o local → toque em “Compartilhar” → “Copiar link”.</div>
+            <div class="aviso" id="avisoMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+          </div>
+          <label class="choice" style="margin-top:10px"><input type="checkbox" id="semMapa"><span>Sem botão de localização no convite<small>Marque se não quiser o botão. Assim você não precisa enviar o link.</small></span></label>
           <div class="err">Cole o link do Google Maps do local.</div>
         </div>
       </section>
@@ -165,8 +172,11 @@
           </div>
           <div class="field" data-campo="festaMapa">
             <label for="festaMapa">Link do Google Maps da recepção</label>
-            <input id="festaMapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
-            <div class="aviso" id="avisoFestaMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+            <div id="festaMapaCampos">
+              <input id="festaMapa" type="url" inputmode="url" placeholder="Cole aqui o link do local no Google Maps" maxlength="400">
+              <div class="aviso" id="avisoFestaMapa">Esse link não parece ser do Google Maps. Confira se copiou o link certo.</div>
+            </div>
+            <label class="choice" style="margin-top:10px"><input type="checkbox" id="festaSemMapa"><span>Sem botão de localização no convite<small>Marque se não quiser o botão. Assim você não precisa enviar o link.</small></span></label>
             <div class="err">Cole o link do Google Maps da recepção.</div>
           </div>
         </div>
@@ -187,8 +197,8 @@
           <div class="ok" id="okMusica">✓ Link do YouTube reconhecido.</div>
         </div>
         <div class="field">
-          <label for="pais">Pais e padrinhos <span class="opt">(opcional)</span></label>
-          <textarea id="pais" rows="3" maxlength="400" placeholder="Se quiser incluir, escreva como devem aparecer. Ex.: Pais da noiva: ... / Pais do noivo: ... / Padrinhos: ..."></textarea>
+          <label for="pais">Nome dos pais <span class="opt">(opcional)</span></label>
+          <textarea id="pais" rows="3" maxlength="300" placeholder="Ex.: Pais da noiva: João e Maria&#10;Pais do noivo: José e Ana"></textarea>
         </div>
       </section>
 
@@ -213,6 +223,7 @@
       </section>
 
       <div class="erro-geral" id="erroGeral" role="alert"></div>
+      <div class="plano-b" id="planoB"><a id="planoBLink" href="#" rel="noopener">Enviar pelo WhatsApp mesmo assim</a></div>
       <button class="principal" id="enviar" type="submit">Enviar informações</button>
       <p class="nota">Usamos estas informações somente para produzir o seu convite.</p>
     </form>
@@ -221,8 +232,9 @@
   <div id="telaSucesso" class="sucesso hidden">
     <div class="mark">💌</div>
     <h1>Recebemos as suas informações!</h1>
-    <p>Obrigada! Nossa equipe vai conferir tudo e começar o seu convite. Se faltar algum detalhe, falamos com você pelo WhatsApp.</p>
-    <p>Você já pode fechar esta página.</p>
+    <p id="textoSucesso">Agora vamos abrir o WhatsApp para você enviar o formulário preenchido para a nossa equipe.</p>
+    <p id="blocoBtnWhats"><a id="btnWhats" class="principal" href="#" rel="noopener">Abrir o WhatsApp</a></p>
+    <p class="nota" id="notaWhats">Se o WhatsApp não abrir sozinho, toque no botão acima.</p>
   </div>
 
 </main>
@@ -234,6 +246,8 @@
   'use strict';
   var firebaseConfig = {apiKey:"AIzaSyBXbwnfpPIC9qRLsXRDcIHyGe5DmptYGzM",authDomain:"luluzices-4254e.firebaseapp.com",projectId:"luluzices-4254e",storageBucket:"luluzices-4254e.firebasestorage.app",messagingSenderId:"328419813225",appId:"1:328419813225:web:6f168623f3edd148ee7ff8"};
   var RASCUNHO = 'luluzices_form_casamento_v2';
+  // WhatsApp da equipe: para este número vai o formulário preenchido (formato internacional, só dígitos).
+  var WHATSAPP_EMPRESA = '5521981357208';
   var $ = function (id) { return document.getElementById(id); };
   var db = null;
   try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { console.error(e); }
@@ -295,8 +309,8 @@
     return {
       comprador: $('comprador').value.trim(), whatsapp: $('whatsapp').value.trim(),
       noivos: $('noivos').value.trim(),
-      data: $('data').value, hora: $('hora').value, local: $('local').value.trim(), endereco: $('endereco').value.trim(), mapa: $('mapa').value.trim(),
-      mesmoLocal: radio('mesmoLocal'), festaLocal: $('festaLocal').value.trim(), festaEndereco: $('festaEndereco').value.trim(), festaHora: $('festaHora').value, festaMapa: $('festaMapa').value.trim(),
+      data: $('data').value, hora: $('hora').value, local: $('local').value.trim(), endereco: $('endereco').value.trim(), mapa: $('mapa').value.trim(), semMapa: $('semMapa').checked,
+      mesmoLocal: radio('mesmoLocal'), festaLocal: $('festaLocal').value.trim(), festaEndereco: $('festaEndereco').value.trim(), festaHora: $('festaHora').value, festaMapa: $('festaMapa').value.trim(), festaSemMapa: $('festaSemMapa').checked,
       frase: $('frase').value.trim(), musica: $('musica').value.trim(), pais: $('pais').value.trim(),
       mesmoZap: mesmoZap, whatsConf: mesmoZap ? $('whatsapp').value.trim() : $('whatsConf').value.trim(),
       presentes: $('presentes').value.trim(),
@@ -318,12 +332,12 @@
     if (!d.hora) erros.hora = 'Informe o horário.';
     if (!d.local) erros.local = 'Informe o nome do local.';
     if (d.endereco.length < 5) erros.endereco = 'Informe o endereço.';
-    var m = normalizarMapa(d.mapa); if (!m.ok) erros.mapa = m.erro;
+    if (!d.semMapa) { var m = normalizarMapa(d.mapa); if (!m.ok) erros.mapa = m.erro; }
     if (!d.mesmoLocal) erros.mesmoLocal = 'Escolha uma opção.';
     if (d.mesmoLocal === 'nao') {
       if (!d.festaLocal) erros.festaLocal = 'Informe o local da recepção.';
       if (d.festaEndereco.length < 5) erros.festaEndereco = 'Informe o endereço da recepção.';
-      var fm = normalizarMapa(d.festaMapa); if (!fm.ok) erros.festaMapa = fm.vazio ? 'Cole o link do Google Maps da recepção.' : fm.erro;
+      if (!d.festaSemMapa) { var fm = normalizarMapa(d.festaMapa); if (!fm.ok) erros.festaMapa = fm.vazio ? 'Cole o link do Google Maps da recepção.' : fm.erro; }
     }
     if (d.musica) { var y = normalizarYoutube(d.musica); if (!y.ok) erros.musica = y.erro; }
     if (!d.mesmoZap && !telefoneValido(d.whatsConf)) erros.whatsConf = 'Informe um WhatsApp válido, com DDD.';
@@ -338,20 +352,44 @@
     add('Tipo de convite', 'Casamento');
     add('Nome dos noivos', d.noivos);
     add('Data do casamento', dataBR(d.data)); add('Horário da cerimônia', d.hora);
-    add('Local da cerimônia', d.local); add('Endereço da cerimônia', d.endereco); add('Mapa da cerimônia', mapa.ok ? mapa.url : d.mapa);
+    add('Local da cerimônia', d.local); add('Endereço da cerimônia', d.endereco); add('Mapa da cerimônia', d.semMapa ? 'Sem botão de localização' : (mapa.ok ? mapa.url : d.mapa));
     if (d.mesmoLocal === 'sim') add('Recepção', 'No mesmo local da cerimônia');
     else if (d.mesmoLocal === 'semfesta') add('Recepção', 'Não haverá recepção');
     else if (d.mesmoLocal === 'nao') {
       add('Recepção', 'Em outro local'); add('Local da recepção', d.festaLocal); add('Endereço da recepção', d.festaEndereco);
-      add('Horário da recepção', d.festaHora); add('Mapa da recepção', fmapa.ok ? fmapa.url : d.festaMapa);
+      add('Horário da recepção', d.festaHora); add('Mapa da recepção', d.festaSemMapa ? 'Sem botão de localização' : (fmapa.ok ? fmapa.url : d.festaMapa));
     }
     add('Frase ou versículo', d.frase);
     if (y && y.ok) add('Música YouTube', y.url);
-    add('Pais e padrinhos', d.pais);
+    add('Nome dos pais', d.pais);
     add('WhatsApp para confirmação', d.whatsConf);
     add('Lista de presentes ou Pix', d.presentes);
     return linhas.join('\n');
   }
+
+  // Mensagem do WhatsApp: o formulário preenchido, com os nomes dos campos em negrito (*texto*).
+  function montarMensagemWhats(d) {
+    var corpo = montarObs(d).split('\n').map(function (l) {
+      var m = /^\* ([^:]+): (.*)$/.exec(l);
+      return m ? '*' + m[1] + ':* ' + m[2] : l;
+    }).join('\n');
+    return 'Olá! Acabei de preencher o formulário do meu convite de casamento 💍\n\n' +
+      '*Nome:* ' + d.comprador + '\n*WhatsApp:* ' + d.whatsapp + '\n\n' + corpo;
+  }
+  // Links muito longos podem falhar em alguns celulares. Em casos raros (textos enormes) a mensagem é resumida;
+  // o formulário completo já foi gravado e está com a equipe.
+  function urlWhats(d) {
+    var base = 'https://wa.me/' + WHATSAPP_EMPRESA + '?text=';
+    var msg = montarMensagemWhats(d), url = base + encodeURIComponent(msg), corte = msg.length;
+    while (url.length > 6000 && corte > 400) {
+      corte = Math.floor(corte * 0.85);
+      var parte = msg.slice(0, corte);
+      if (/[\uD800-\uDBFF]$/.test(parte)) parte = parte.slice(0, -1); // não corta emoji no meio
+      url = base + encodeURIComponent(parte + '\n…(mensagem resumida: o formulário completo já foi enviado para a equipe)');
+    }
+    return url;
+  }
+  function abrirWhats(url) { (window.__abrirWhatsApp || function (u) { window.location.href = u; })(url); }
 
   function montarPedido(d) {
     var y = d.musica ? normalizarYoutube(d.musica) : null;
@@ -381,8 +419,10 @@
     $('blocoWhatsConf').classList.toggle('hidden', $('mesmoZap').checked);
     var y = normalizarYoutube($('musica').value);
     $('okMusica').style.display = y.ok ? 'block' : 'none';
-    var m = normalizarMapa($('mapa').value); $('avisoMapa').style.display = m.ok && !m.reconhecido ? 'block' : 'none';
-    var fm = normalizarMapa($('festaMapa').value); $('avisoFestaMapa').style.display = fm.ok && !fm.reconhecido ? 'block' : 'none';
+    $('mapaCampos').classList.toggle('hidden', $('semMapa').checked);
+    $('festaMapaCampos').classList.toggle('hidden', $('festaSemMapa').checked);
+    var m = normalizarMapa($('mapa').value); $('avisoMapa').style.display = !$('semMapa').checked && m.ok && !m.reconhecido ? 'block' : 'none';
+    var fm = normalizarMapa($('festaMapa').value); $('avisoFestaMapa').style.display = !$('festaSemMapa').checked && fm.ok && !fm.reconhecido ? 'block' : 'none';
     $('contFrase').textContent = $('frase').value.length + '/400';
   }
 
@@ -402,6 +442,8 @@
       var d = JSON.parse(localStorage.getItem(RASCUNHO) || 'null'); if (!d) return;
       CAMPOS.forEach(function (k) { if (d[k] != null && $(k)) $(k).value = d[k]; });
       if (d.mesmoLocal) { var r = document.querySelector('input[name="mesmoLocal"][value="' + d.mesmoLocal + '"]'); if (r) r.checked = true; }
+      if (d.semMapa) $('semMapa').checked = true;
+      if (d.festaSemMapa) $('festaSemMapa').checked = true;
       if (d.mesmoZap === false) { $('mesmoZap').checked = false; $('whatsConf').value = d.whatsConf || ''; }
       if (d.__etapa === 2 && Object.keys(validarDados(ler())).length === 0) irParaEtapa(2);
     } catch (e) { /* rascunho inválido */ }
@@ -429,15 +471,24 @@
       if (!db) throw new Error('sem banco');
       await db.collection('pedidos_pendentes').add(montarPedido(d));
       try { localStorage.removeItem(RASCUNHO); } catch (e) { /* ok */ }
-      mostrarSucesso();
+      mostrarSucesso(urlWhats(d));
     } catch (e) {
       console.error(e);
       $('erroGeral').textContent = 'Não foi possível enviar agora. Confira a internet e toque em enviar de novo. Suas respostas estão salvas neste aparelho.';
       $('erroGeral').style.display = 'block';
+      $('planoBLink').href = urlWhats(d); $('planoB').style.display = 'block'; // plano B: mandar direto pelo WhatsApp para a informação não se perder
       enviando = false; $('enviar').disabled = false; $('enviar').textContent = 'Enviar informações';
     }
   }
-  function mostrarSucesso() { $('telaDados').classList.add('hidden'); $('telaForm').classList.add('hidden'); $('telaSucesso').classList.remove('hidden'); window.scrollTo(0, 0); }
+  function mostrarSucesso(url) {
+    $('telaDados').classList.add('hidden'); $('telaForm').classList.add('hidden'); $('telaSucesso').classList.remove('hidden'); window.scrollTo(0, 0);
+    var temUrl = !!url;
+    $('blocoBtnWhats').classList.toggle('hidden', !temUrl); $('notaWhats').classList.toggle('hidden', !temUrl);
+    if (!temUrl) { $('textoSucesso').textContent = 'Obrigada! Nossa equipe vai conferir tudo e começar o seu convite.'; return; }
+    $('btnWhats').href = url;
+    var atraso = window.__atrasoWhats != null ? window.__atrasoWhats : 1500;
+    setTimeout(function () { abrirWhats(url); }, atraso); // abre o WhatsApp sozinho, com o formulário preenchido
+  }
 
   if ($('form')) {
     $('data').min = hojeISO();
@@ -451,7 +502,7 @@
     });
   }
 
-  window.__formCasamento = { normalizarYoutube: normalizarYoutube, normalizarMapa: normalizarMapa, validar: validar, montarObs: montarObs, montarPedido: montarPedido, ler: ler, valorSeguro: valorSeguro };
+  window.__formCasamento = { normalizarYoutube: normalizarYoutube, normalizarMapa: normalizarMapa, validar: validar, montarObs: montarObs, montarMensagemWhats: montarMensagemWhats, urlWhats: urlWhats, montarPedido: montarPedido, ler: ler, valorSeguro: valorSeguro };
 })();
 </script>
 </body>
